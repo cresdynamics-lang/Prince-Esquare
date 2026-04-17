@@ -6,14 +6,21 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { KENYA_COUNTIES, formatKES } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/checkout")({
-  head: () => ({ meta: [{ title: "Checkout — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Checkout - Prince Esquare" }] }),
   component: CheckoutPage,
 });
 
@@ -32,22 +39,59 @@ function CheckoutPage() {
   const { user } = useAuth();
   const [delivery, setDelivery] = useState<"standard" | "express" | "pickup">("standard");
   const [submitting, setSubmitting] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [discount, setDiscount] = useState({ amount: 0, code: "" });
+  const [applyingPromo, setApplyingPromo] = useState(false);
   const [form, setForm] = useState({
-    full_name: "", email: user?.email ?? "", phone: "",
-    street_address: "", apartment: "", city: "Nairobi", county: "Nairobi",
+    full_name: "",
+    email: user?.email ?? "",
+    phone: "",
+    street_address: "",
+    apartment: "",
+    city: "Nairobi",
+    county: "Nairobi",
   });
 
   if (count === 0) {
     return (
       <div className="container mx-auto px-4 py-24 text-center">
         <h1 className="font-display text-3xl font-bold">Nothing to checkout</h1>
-        <Link to="/shop" className="mt-4 inline-block text-gold hover:underline">Shop the collection →</Link>
+        <Link to="/shop" className="mt-4 inline-block text-gold hover:underline">
+          Shop the collection -&gt;
+        </Link>
       </div>
     );
   }
 
   const fee = delivery === "pickup" ? 0 : delivery === "express" ? 800 : 0;
-  const total = subtotal + fee;
+  const total = Math.max(0, subtotal + fee - discount.amount);
+
+  const applyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setApplyingPromo(true);
+    const { data, error } = await supabase
+      .from("promo_codes")
+      .select("*")
+      .eq("code", promoCode.trim().toUpperCase())
+      .eq("is_active", true)
+      .single();
+
+    if (error || !data) {
+      toast.error("Invalid or expired promo code.");
+      setDiscount({ amount: 0, code: "" });
+    } else if (data.minimum_order && subtotal < data.minimum_order) {
+      toast.error(`Minimum order of ${formatKES(data.minimum_order)} required.`);
+      setDiscount({ amount: 0, code: "" });
+    } else {
+      const calcDiscount =
+        data.discount_type === "percent"
+          ? subtotal * (data.discount_value / 100)
+          : data.discount_value;
+      setDiscount({ amount: calcDiscount, code: data.code });
+      toast.success("Promo code applied!");
+    }
+    setApplyingPromo(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,20 +102,21 @@ function CheckoutPage() {
     }
     setSubmitting(true);
 
-    const orderPayload = {
+    const orderPayload: TablesInsert<"orders"> = {
       user_id: user?.id ?? null,
       guest_email: user ? null : parsed.data.email,
       guest_name: user ? null : parsed.data.full_name,
       guest_phone: user ? null : parsed.data.phone,
       delivery_method: delivery,
       delivery_address: parsed.data,
-      subtotal: subtotal.toFixed(2),
-      delivery_fee: fee.toFixed(2),
-      discount_amount: "0",
-      total: total.toFixed(2),
-      payment_method: "mock",
-      payment_status: "paid" as const, // mock for phase 1
-      status: "processing" as const,
+      subtotal,
+      delivery_fee: fee,
+      discount_amount: discount.amount,
+      total,
+      promo_code: discount.code || null,
+      payment_method: "cash_on_delivery",
+      payment_status: "paid",
+      status: "processing",
       estimated_delivery: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
     };
 
@@ -88,7 +133,7 @@ function CheckoutPage() {
       return;
     }
 
-    const items = lines.map((l) => ({
+    const items: TablesInsert<"order_items">[] = lines.map((l) => ({
       order_id: order.id,
       product_id: l.productId,
       variant_id: l.variantId,
@@ -97,11 +142,18 @@ function CheckoutPage() {
       size: l.size,
       color: l.color,
       quantity: l.quantity,
-      unit_price: l.price.toFixed(2),
-      line_total: (l.price * l.quantity).toFixed(2),
+      unit_price: l.price,
+      line_total: l.price * l.quantity,
     }));
     const { error: itemsErr } = await supabase.from("order_items").insert(items);
-    if (itemsErr) console.error(itemsErr);
+    if (itemsErr) {
+      console.error(itemsErr);
+      toast.error(
+        `Order ${order.order_number} was created, but line items failed to save. Contact support before retrying.`,
+      );
+      setSubmitting(false);
+      return;
+    }
 
     clear();
     toast.success(`Order ${order.order_number} placed!`);
@@ -119,34 +171,65 @@ function CheckoutPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Full name</Label>
-                <Input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+                <Input
+                  required
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Email</Label>
-                <Input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <Input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input required placeholder="+254 7XX XXX XXX" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <Input
+                  required
+                  placeholder="+254 7XX XXX XXX"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
               </div>
               <div>
                 <Label>City / Town</Label>
-                <Input required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                <Input
+                  required
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                />
               </div>
               <div className="md:col-span-2">
                 <Label>Street address</Label>
-                <Input required value={form.street_address} onChange={(e) => setForm({ ...form, street_address: e.target.value })} />
+                <Input
+                  required
+                  value={form.street_address}
+                  onChange={(e) => setForm({ ...form, street_address: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Apartment / suite (optional)</Label>
-                <Input value={form.apartment} onChange={(e) => setForm({ ...form, apartment: e.target.value })} />
+                <Input
+                  value={form.apartment}
+                  onChange={(e) => setForm({ ...form, apartment: e.target.value })}
+                />
               </div>
               <div>
                 <Label>County</Label>
                 <Select value={form.county} onValueChange={(v) => setForm({ ...form, county: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent className="max-h-72">
-                    {KENYA_COUNTIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {KENYA_COUNTIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -155,19 +238,28 @@ function CheckoutPage() {
 
           <section className="rounded-md border border-border bg-card p-6">
             <h2 className="mb-4 font-display text-xl font-bold">Delivery Method</h2>
-            <RadioGroup value={delivery} onValueChange={(v) => setDelivery(v as typeof delivery)} className="space-y-3">
+            <RadioGroup
+              value={delivery}
+              onValueChange={(v) => setDelivery(v as typeof delivery)}
+              className="space-y-3"
+            >
               {[
-                { v: "standard", t: "Standard Delivery", d: "2–4 business days · Free in Nairobi", p: 0 },
-                { v: "express", t: "Express Delivery", d: "Next business day · Nairobi", p: 800 },
+                { v: "standard", t: "Standard Delivery", d: "2-4 business days - Free in Nairobi", p: 0 },
+                { v: "express", t: "Express Delivery", d: "Next business day - Nairobi", p: 800 },
                 { v: "pickup", t: "In-Store Pickup", d: "Collect from Kimathi Street", p: 0 },
               ].map((o) => (
-                <label key={o.v} className="flex cursor-pointer items-center gap-3 rounded border border-border p-3 hover:border-gold">
+                <label
+                  key={o.v}
+                  className="flex cursor-pointer items-center gap-3 rounded border border-border p-3 hover:border-gold"
+                >
                   <RadioGroupItem value={o.v} />
                   <div className="flex-1">
                     <div className="font-medium">{o.t}</div>
                     <div className="text-xs text-muted-foreground">{o.d}</div>
                   </div>
-                  <span className="text-sm font-semibold">{o.p === 0 ? "Free" : formatKES(o.p)}</span>
+                  <span className="text-sm font-semibold">
+                    {o.p === 0 ? "Free" : formatKES(o.p)}
+                  </span>
                 </label>
               ))}
             </RadioGroup>
@@ -176,7 +268,9 @@ function CheckoutPage() {
           <section className="rounded-md border border-border bg-card p-6">
             <h2 className="mb-2 font-display text-xl font-bold">Payment</h2>
             <p className="text-sm text-muted-foreground">
-              💳 Stripe and 📱 M-Pesa STK Push will be enabled in the next phase. For now, orders are placed as <span className="font-medium text-gold">Pay on delivery / In-store</span>.
+              Stripe and M-Pesa STK Push will be enabled in the next phase. For now, orders
+              are placed as{" "}
+              <span className="font-medium text-gold">Pay on delivery / In-store</span>.
             </p>
           </section>
         </div>
@@ -186,18 +280,52 @@ function CheckoutPage() {
           <div className="mt-4 space-y-2 text-sm">
             {lines.map((l) => (
               <div key={`${l.productId}-${l.variantId}`} className="flex justify-between">
-                <span className="line-clamp-1 pr-2">{l.title} <span className="text-muted-foreground">× {l.quantity}</span></span>
+                <span className="line-clamp-1 pr-2">
+                  {l.title} <span className="text-muted-foreground">x {l.quantity}</span>
+                </span>
                 <span>{formatKES(l.price * l.quantity)}</span>
               </div>
             ))}
             <div className="my-3 h-px bg-border" />
-            <div className="flex justify-between"><span>Subtotal</span><span>{formatKES(subtotal)}</span></div>
-            <div className="flex justify-between"><span>Delivery</span><span>{fee === 0 ? "Free" : formatKES(fee)}</span></div>
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{formatKES(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Delivery</span>
+              <span>{fee === 0 ? "Free" : formatKES(fee)}</span>
+            </div>
+            {discount.amount > 0 && (
+              <div className="flex justify-between text-success">
+                <span>Discount ({discount.code})</span>
+                <span>-{formatKES(discount.amount)}</span>
+              </div>
+            )}
             <div className="my-3 h-px bg-border" />
-            <div className="flex justify-between text-base font-semibold"><span>Total</span><span className="text-gold">{formatKES(total)}</span></div>
+            <div className="flex justify-between text-base font-semibold">
+              <span>Total</span>
+              <span className="text-gold">{formatKES(total)}</span>
+            </div>
+          </div>
+
+          <div className="mt-6 flex gap-2">
+            <Input
+              placeholder="Promo code"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value)}
+              disabled={applyingPromo || discount.amount > 0}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={applyPromo}
+              disabled={applyingPromo || !promoCode || discount.amount > 0}
+            >
+              Apply
+            </Button>
           </div>
           <Button type="submit" variant="hero" size="lg" className="mt-6 w-full" disabled={submitting}>
-            {submitting ? "Placing order…" : "Place Order"}
+            {submitting ? "Placing order..." : "Place Order"}
           </Button>
         </aside>
       </form>

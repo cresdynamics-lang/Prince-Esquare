@@ -59,9 +59,12 @@ function ContactPage() {
 
   return (
     <div>
-      <section className="bg-navy py-16 text-center text-navy-foreground md:py-20">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">We'd love to hear from you</p>
-        <h1 className="mt-3 font-display text-4xl font-bold md:text-5xl">Contact Prince Esquare</h1>
+      <section className="relative bg-navy py-16 text-center text-navy-foreground md:py-20">
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: "url('/hero-suit.jpg')" }} />
+        <div className="relative z-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">We'd love to hear from you</p>
+          <h1 className="mt-3 font-display text-4xl font-bold md:text-5xl">Contact Prince Esquare</h1>
+        </div>
       </section>
 
       <div className="container mx-auto grid gap-12 px-4 py-16 lg:grid-cols-2">

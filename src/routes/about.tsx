@@ -14,13 +14,16 @@ export const Route = createFileRoute("/about")({
 function AboutPage() {
   return (
     <div>
-      <section className="bg-navy py-20 text-center text-navy-foreground md:py-28">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Our Story</p>
-        <h1 className="mt-3 font-display text-4xl font-bold md:text-6xl">Crafting the modern gentleman.</h1>
-        <p className="mx-auto mt-5 max-w-2xl px-4 text-base text-navy-foreground/70">
-          Prince Esquare was founded on a simple belief: every man deserves clothes that fit him —
-          and his ambitions — perfectly.
-        </p>
+      <section className="relative bg-navy py-20 text-center text-navy-foreground md:py-28">
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: "url('/hero-suit.jpg')" }} />
+        <div className="relative z-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Our Story</p>
+          <h1 className="mt-3 font-display text-4xl font-bold md:text-6xl">Crafting the modern gentleman.</h1>
+          <p className="mx-auto mt-5 max-w-2xl px-4 text-base text-navy-foreground/70">
+            Prince Esquare was founded on a simple belief: every man deserves clothes that fit him —
+            and his ambitions — perfectly.
+          </p>
+        </div>
       </section>
 
       <section className="container mx-auto grid max-w-5xl gap-12 px-4 py-16 md:grid-cols-3">

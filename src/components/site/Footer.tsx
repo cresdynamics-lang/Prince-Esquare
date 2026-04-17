@@ -7,6 +7,15 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STORE_INFO } from "@/lib/format";
 
+const SHOP_CATEGORIES = [
+  { label: "Suits", slug: "suits" },
+  { label: "Shirts", slug: "shirts" },
+  { label: "Trousers", slug: "trousers" },
+  { label: "Shoes", slug: "shoes" },
+  { label: "Casual", slug: "casual" },
+  { label: "Formal", slug: "formal" },
+] as const;
+
 export function Footer() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -21,7 +30,7 @@ export function Footer() {
     setSubmitting(false);
     if (error) {
       if (error.code === "23505") {
-        toast.success("You're already on our list — thank you!");
+        toast.success("You're already on our list - thank you!");
       } else {
         toast.error("Could not subscribe. Please check your email and try again.");
       }
@@ -76,12 +85,17 @@ export function Footer() {
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">Shop</h4>
             <ul className="mt-4 space-y-2 text-sm text-navy-foreground/70">
-              <li><Link to="/category/suits" className="hover:text-gold">Suits</Link></li>
-              <li><Link to="/category/shirts" className="hover:text-gold">Shirts</Link></li>
-              <li><Link to="/category/trousers" className="hover:text-gold">Trousers</Link></li>
-              <li><Link to="/category/shoes" className="hover:text-gold">Shoes</Link></li>
-              <li><Link to="/category/casual" className="hover:text-gold">Casual</Link></li>
-              <li><Link to="/category/formal" className="hover:text-gold">Formal</Link></li>
+              {SHOP_CATEGORIES.map((category) => (
+                <li key={category.slug}>
+                  <Link
+                    to="/category/$slug"
+                    params={{ slug: category.slug }}
+                    className="hover:text-gold"
+                  >
+                    {category.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -94,19 +108,29 @@ export function Footer() {
               </li>
               <li className="flex items-start gap-2">
                 <Phone className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                <a href={`tel:${STORE_INFO.phone}`} className="hover:text-gold">{STORE_INFO.phone}</a>
+                <a href={`tel:${STORE_INFO.phone}`} className="hover:text-gold">
+                  {STORE_INFO.phone}
+                </a>
               </li>
               <li className="flex items-start gap-2">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                <a href={`mailto:${STORE_INFO.email}`} className="hover:text-gold">{STORE_INFO.email}</a>
+                <a href={`mailto:${STORE_INFO.email}`} className="hover:text-gold">
+                  {STORE_INFO.email}
+                </a>
               </li>
               <li className="text-xs text-navy-foreground/50">{STORE_INFO.hours}</li>
-              <li><Link to="/store-locator" className="text-gold hover:underline">Store locator →</Link></li>
+              <li>
+                <Link to="/store-locator" className="text-gold hover:underline">
+                  Store locator {"->"}
+                </Link>
+              </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">Newsletter</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+              Newsletter
+            </h4>
             <p className="mt-4 text-sm text-navy-foreground/70">
               First access to new collections and private events.
             </p>
@@ -127,11 +151,17 @@ export function Footer() {
         </div>
 
         <div className="mt-14 flex flex-col items-center justify-between gap-3 border-t border-navy-foreground/15 pt-6 text-xs text-navy-foreground/50 md:flex-row">
-          <p>© {new Date().getFullYear()} Prince Esquare. All rights reserved.</p>
+          <p>(c) {new Date().getFullYear()} Prince Esquare. All rights reserved.</p>
           <div className="flex gap-5">
-            <Link to="/about" className="hover:text-gold">About</Link>
-            <Link to="/contact" className="hover:text-gold">Contact</Link>
-            <Link to="/store-locator" className="hover:text-gold">Find us</Link>
+            <Link to="/about" className="hover:text-gold">
+              About
+            </Link>
+            <Link to="/contact" className="hover:text-gold">
+              Contact
+            </Link>
+            <Link to="/store-locator" className="hover:text-gold">
+              Find us
+            </Link>
           </div>
         </div>
       </div>

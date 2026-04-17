@@ -1,5 +1,5 @@
 // Maps `/src/assets/*.jpg` strings stored in the database (seed data) to
-// real ES6 image imports so Vite bundles & optimises them.
+// real ES6 image imports so Vite bundles and optimizes them.
 
 import suits from "@/assets/cat-suits.jpg";
 import shirts from "@/assets/cat-shirts.jpg";
@@ -11,6 +11,18 @@ import casual from "@/assets/cat-casual.jpg";
 import formal from "@/assets/cat-formal.jpg";
 import sportswear from "@/assets/cat-sportswear.jpg";
 
+const fashionImages = import.meta.glob("../assets/fashions/*.{jpg,jpeg,png,webp}", {
+  eager: true,
+  import: "default",
+}) as Record<string, string>;
+
+const fashionMap = Object.fromEntries(
+  Object.entries(fashionImages).map(([path, url]) => [
+    `/src/assets/fashions/${path.split("/").pop()}`,
+    url,
+  ]),
+);
+
 const map: Record<string, string> = {
   "/src/assets/cat-suits.jpg": suits,
   "/src/assets/cat-shirts.jpg": shirts,
@@ -21,11 +33,11 @@ const map: Record<string, string> = {
   "/src/assets/cat-casual.jpg": casual,
   "/src/assets/cat-formal.jpg": formal,
   "/src/assets/cat-sportswear.jpg": sportswear,
+  ...fashionMap,
 };
 
 export function resolveImage(src: string | null | undefined): string {
-  if (!src) return suits; // fallback
+  if (!src) return suits;
   if (map[src]) return map[src];
-  // Already a real URL (Cloudinary, etc.) — pass through
   return src;
 }

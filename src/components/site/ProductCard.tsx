@@ -15,7 +15,7 @@ export type ProductCardData = {
   category_name?: string;
 };
 
-export function ProductCard({ product }: { product: ProductCardData }) {
+export function ProductCard({ product, eager = false }: { product: ProductCardData; eager?: boolean }) {
   const { has, toggle } = useWishlist();
   const wished = has(product.id);
   const onSale =
@@ -32,7 +32,10 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           <img
             src={resolveImage(product.image)}
             alt={product.title}
-            loading="lazy"
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
+            width={400}
+            height={500}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
           {onSale && (

@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { STORE_INFO } from "@/lib/format";
 
 const NAV = [
-  { to: "/shop", label: "Shop All" },
-  { to: "/category/suits", label: "Suits" },
-  { to: "/category/shirts", label: "Shirts" },
-  { to: "/category/shoes", label: "Shoes" },
-  { to: "/category/casual", label: "Casual" },
-  { to: "/about", label: "About" },
-  { to: "/contact", label: "Contact" },
+  { type: "route", to: "/shop", label: "Shop All" },
+  { type: "category", slug: "suits", label: "Suits" },
+  { type: "category", slug: "shirts", label: "Shirts" },
+  { type: "category", slug: "shoes", label: "Shoes" },
+  { type: "category", slug: "casual", label: "Casual" },
+  { type: "route", to: "/about", label: "About" },
+  { type: "route", to: "/contact", label: "Contact" },
 ] as const;
 
 export function Header() {
@@ -37,21 +37,33 @@ export function Header() {
             Prince <span className="text-gold">Esquare</span>
           </span>
           <span className="hidden text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:inline">
-            Menswear · Nairobi
+            Menswear - Nairobi
           </span>
         </Link>
 
         <nav className="ml-8 hidden items-center gap-7 lg:flex">
-          {NAV.map((n) => (
-            <Link
-              key={n.to}
-              to={n.to}
-              className="text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
-              activeProps={{ className: "text-gold" }}
-            >
-              {n.label}
-            </Link>
-          ))}
+          {NAV.map((n) =>
+            n.type === "route" ? (
+              <Link
+                key={n.label}
+                to={n.to}
+                className="text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
+                activeProps={{ className: "text-gold" }}
+              >
+                {n.label}
+              </Link>
+            ) : (
+              <Link
+                key={n.label}
+                to="/category/$slug"
+                params={{ slug: n.slug }}
+                className="text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
+                activeProps={{ className: "text-gold" }}
+              >
+                {n.label}
+              </Link>
+            ),
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-1 md:gap-2">
@@ -82,7 +94,11 @@ export function Header() {
           </Link>
           {isStaff && (
             <Link to="/admin" className="ml-1 hidden md:inline-flex">
-              <Button variant="outline" size="sm" className="border-gold text-gold hover:bg-gold/10">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-gold text-gold hover:bg-gold/10"
+              >
                 Admin
               </Button>
             </Link>
@@ -93,16 +109,28 @@ export function Header() {
       {open && (
         <div className="border-t border-border bg-background lg:hidden">
           <nav className="container mx-auto flex flex-col px-4 py-2">
-            {NAV.map((n) => (
-              <Link
-                key={n.to}
-                to={n.to}
-                onClick={() => setOpen(false)}
-                className="border-b border-border/60 py-3 text-sm font-medium last:border-b-0"
-              >
-                {n.label}
-              </Link>
-            ))}
+            {NAV.map((n) =>
+              n.type === "route" ? (
+                <Link
+                  key={n.label}
+                  to={n.to}
+                  onClick={() => setOpen(false)}
+                  className="border-b border-border/60 py-3 text-sm font-medium last:border-b-0"
+                >
+                  {n.label}
+                </Link>
+              ) : (
+                <Link
+                  key={n.label}
+                  to="/category/$slug"
+                  params={{ slug: n.slug }}
+                  onClick={() => setOpen(false)}
+                  className="border-b border-border/60 py-3 text-sm font-medium last:border-b-0"
+                >
+                  {n.label}
+                </Link>
+              ),
+            )}
             {!user && (
               <Link
                 to="/auth"
