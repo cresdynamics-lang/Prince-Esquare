@@ -1,0 +1,76 @@
+export function formatKES(amount: number | string | null | undefined): string {
+  const n = typeof amount === "string" ? Number(amount) : (amount ?? 0);
+  if (Number.isNaN(n)) return "KES 0";
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+export const KENYA_COUNTIES = [
+  "Nairobi",
+  "Mombasa",
+  "Kisumu",
+  "Nakuru",
+  "Eldoret",
+  "Kiambu",
+  "Machakos",
+  "Kajiado",
+  "Kisii",
+  "Nyeri",
+  "Meru",
+  "Thika",
+  "Uasin Gishu",
+  "Kakamega",
+  "Bungoma",
+  "Kilifi",
+  "Kwale",
+  "Garissa",
+  "Embu",
+  "Kericho",
+  "Migori",
+  "Homa Bay",
+  "Bomet",
+  "Narok",
+  "Laikipia",
+  "Trans Nzoia",
+  "Vihiga",
+  "Busia",
+  "Siaya",
+  "Nandi",
+  "Baringo",
+  "West Pokot",
+  "Turkana",
+  "Samburu",
+  "Marsabit",
+  "Isiolo",
+  "Wajir",
+  "Mandera",
+  "Tana River",
+  "Lamu",
+  "Taita Taveta",
+  "Tharaka-Nithi",
+  "Murang'a",
+  "Nyandarua",
+  "Kirinyaga",
+  "Makueni",
+  "Nyamira",
+];
+
+export const STORE_INFO = {
+  name: "Prince Esquare",
+  tagline: "The Modern Gentleman, Outfitted.",
+  address: "Kimathi Street, CBD, Nairobi, Kenya",
+  phone: "+254 700 000 000",
+  whatsapp: "254700000000",
+  email: "hello@princeesquare.co.ke",
+  hours: "Mon–Sat 9:00 – 19:00 · Sun 10:00 – 17:00",
+  socials: {
+    instagram: "https://instagram.com/princeesquare",
+    facebook: "https://facebook.com/princeesquare",
+    tiktok: "https://tiktok.com/@princeesquare",
+  },
+  mapEmbed:
+    "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3988.4!2d36.8219!3d-1.2864!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMcKwMTcnMTEuMCJTIDM2wrA0OScxOC44IkU!5e0!3m2!1sen!2ske!4v1700000000000",
+};
