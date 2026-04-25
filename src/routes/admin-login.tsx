@@ -82,32 +82,34 @@ function AdminLoginPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-md px-4 py-16">
-      <div className="rounded-md border border-border bg-card p-6">
-        <h1 className="font-display text-2xl font-bold">Admin Login</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <div className="container mx-auto flex min-h-[calc(100svh-8rem)] w-full items-center justify-center px-3 py-8 sm:px-4 sm:py-12">
+      <div className="w-full max-w-md rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
+        <h1 className="font-display text-xl font-bold sm:text-2xl">Admin Login</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Use the admin credentials to manage orders, products, pricing, and categories.
         </p>
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-6">
           <div>
-            <Label>Username or Email</Label>
+            <Label className="text-sm">Username or Email</Label>
             <Input
               required
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="Admin or princeesquare@gmail.com"
+              placeholder="Admin or email"
+              className="mt-1 h-11 text-base"
             />
           </div>
           <div>
-            <Label>Password</Label>
+            <Label className="text-sm">Password</Label>
             <Input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 h-11 text-base"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={busy}>
+          <Button type="submit" className="h-11 w-full text-base" disabled={busy}>
             {busy ? "Signing in..." : "Login to Admin"}
           </Button>
         </form>
