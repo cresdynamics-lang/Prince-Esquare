@@ -1,10 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-login")({
@@ -13,21 +9,27 @@ export const Route = createFileRoute("/admin-login")({
 });
 
 function AdminLoginPage() {
-  const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const identifierRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && isAdmin) {
-      navigate({ to: "/admin" });
-    }
-  }, [loading, user, isAdmin, navigate]);
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+      const hasAdminRole = (roles ?? []).some((r: any) => r.role === "admin");
+      if (hasAdminRole) navigate({ to: "/admin" });
+    })();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedIdentifier = identifier.trim().toLowerCase();
+    const normalizedIdentifier = (identifierRef.current?.value ?? "").trim().toLowerCase();
+    const password = passwordRef.current?.value ?? "";
     if (!normalizedIdentifier) {
       toast.error("Username or email is required.");
       return;
@@ -82,7 +84,7 @@ function AdminLoginPage() {
   };
 
   return (
-    <div className="container mx-auto flex min-h-[calc(100svh-8rem)] w-full items-center justify-center px-3 py-8 sm:px-4 sm:py-12">
+    <div className="container mx-auto flex min-h-screen w-full items-center justify-center px-3 py-8 sm:px-4 sm:py-12">
       <div className="w-full max-w-md rounded-md border border-border bg-card p-4 shadow-sm sm:p-6">
         <h1 className="font-display text-xl font-bold sm:text-2xl">Admin Login</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -90,28 +92,34 @@ function AdminLoginPage() {
         </p>
         <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-6">
           <div>
-            <Label className="text-sm">Username or Email</Label>
-            <Input
+            <label className="text-sm font-medium">Username or Email</label>
+            <input
+              ref={identifierRef}
               required
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              defaultValue=""
               placeholder="Admin or email"
-              className="mt-1 h-11 text-base"
+              className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-base outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              autoComplete="username"
             />
           </div>
           <div>
-            <Label className="text-sm">Password</Label>
-            <Input
+            <label className="text-sm font-medium">Password</label>
+            <input
+              ref={passwordRef}
               type="password"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 h-11 text-base"
+              defaultValue=""
+              className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-base outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              autoComplete="current-password"
             />
           </div>
-          <Button type="submit" className="h-11 w-full text-base" disabled={busy}>
+          <button
+            type="submit"
+            className="h-11 w-full rounded-md bg-gold px-4 text-base font-medium text-gold-foreground disabled:opacity-60"
+            disabled={busy}
+          >
             {busy ? "Signing in..." : "Login to Admin"}
-          </Button>
+          </button>
         </form>
       </div>
     </div>
