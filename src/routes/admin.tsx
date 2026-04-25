@@ -68,6 +68,8 @@ function AdminPage() {
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [syncingAssetProducts, setSyncingAssetProducts] = useState(false);
+  const [uploadingNewProductImage, setUploadingNewProductImage] = useState(false);
+  const [uploadingProductImageId, setUploadingProductImageId] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [productCategoryFilter, setProductCategoryFilter] = useState("all");
   const [productVisibilityFilter, setProductVisibilityFilter] = useState<
@@ -84,6 +86,52 @@ function AdminPage() {
     is_published: true,
     is_featured: false,
   });
+
+  const uploadImageToStorage = async (file: File) => {
+    const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const fileBase = file.name
+      .replace(/\.[^.]+$/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "image";
+    const filePath = `admin-uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${fileBase}.${fileExt}`;
+    const bucket = supabase.storage.from("product-images");
+    const { error: uploadError } = await bucket.upload(filePath, file, {
+      upsert: true,
+      cacheControl: "3600",
+      contentType: file.type || undefined,
+    });
+    if (uploadError) throw uploadError;
+    const { data } = bucket.getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const uploadNewProductImage = async (file: File) => {
+    try {
+      setUploadingNewProductImage(true);
+      const publicUrl = await uploadImageToStorage(file);
+      setNewProduct((p) => ({ ...p, image_url: publicUrl }));
+      toast.success("Image uploaded.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Failed to upload image.");
+    } finally {
+      setUploadingNewProductImage(false);
+    }
+  };
+
+  const uploadDraftProductImage = async (productId: string, file: File) => {
+    try {
+      setUploadingProductImageId(productId);
+      const publicUrl = await uploadImageToStorage(file);
+      updateProductDraft(productId, "image_url", publicUrl);
+      toast.success("Image uploaded.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Failed to upload image.");
+    } finally {
+      setUploadingProductImageId(null);
+    }
+  };
 
   useEffect(() => {
     if (!loading && !isAdmin) navigate({ to: "/" });
@@ -828,6 +876,25 @@ function AdminPage() {
                 placeholder="Image URL (/src/assets/... or https://...)"
                 className="rounded border border-border bg-background px-3 py-2 text-sm md:col-span-3"
               />
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">
+                  Or upload image from computer
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="block w-full rounded border border-border bg-background px-3 py-2 text-sm"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    void uploadNewProductImage(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                {uploadingNewProductImage && (
+                  <p className="mt-1 text-xs text-muted-foreground">Uploading image...</p>
+                )}
+              </div>
               <textarea
                 value={newProduct.description}
                 onChange={(e) => setNewProduct((p) => ({ ...p, description: e.target.value }))}
@@ -966,12 +1033,28 @@ function AdminPage() {
                       />
                     </td>
                     <td className="p-3">
-                      <input
-                        value={productDrafts[p.id]?.image_url ?? ""}
-                        onChange={(e) => updateProductDraft(p.id, "image_url", e.target.value)}
-                        placeholder="/src/assets/... or https://..."
-                        className="w-56 rounded border border-border bg-background px-2 py-1 text-sm"
-                      />
+                      <div className="space-y-2">
+                        <input
+                          value={productDrafts[p.id]?.image_url ?? ""}
+                          onChange={(e) => updateProductDraft(p.id, "image_url", e.target.value)}
+                          placeholder="/src/assets/... or https://..."
+                          className="w-56 rounded border border-border bg-background px-2 py-1 text-sm"
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="w-56 rounded border border-border bg-background px-2 py-1 text-xs"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            void uploadDraftProductImage(p.id, file);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        {uploadingProductImageId === p.id && (
+                          <p className="text-xs text-muted-foreground">Uploading...</p>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <div className="flex flex-col gap-1 text-xs">

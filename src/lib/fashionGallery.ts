@@ -40,10 +40,6 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
     name: "Shirts",
     description: "Dress shirts and casual button-downs from the current studio collection.",
   },
-  "t-shirts": {
-    name: "T-Shirts",
-    description: "Everyday cotton tees and clean casual staples.",
-  },
   jackets: {
     name: "Jackets",
     description: "Blazers, leather jackets, and layered outerwear for the modern gentleman.",
@@ -103,21 +99,28 @@ function hasTag(item: FashionGalleryItem, tags: string[]) {
   return item.tags.some((tag) => tags.includes(tag));
 }
 
+function normalizeCategory(category: string) {
+  return category === "t-shirts" ? "shirts" : category;
+}
+
 const metadataItems: FashionGalleryItem[] = (metadataModule?.images ?? []).map(
-  (item) => ({
-    id: item.newName,
-    image: `/src/assets/fashions/${item.newName}`,
-    category: item.category,
-    categoryLabel: CATEGORY_COPY[item.category]?.name ?? titleCase(item.category),
-    description: item.description,
-    tags: item.tags,
-  }),
+  (item) => {
+    const category = normalizeCategory(item.category);
+    return {
+      id: item.newName,
+      image: `/src/assets/fashions/${item.newName}`,
+      category,
+      categoryLabel: CATEGORY_COPY[category]?.name ?? titleCase(category),
+      description: item.description,
+      tags: [category, ...item.tags.filter((tag) => tag !== "t-shirts")],
+    };
+  },
 );
 
 const catalogItems: FashionGalleryItem[] = Object.entries(catalogImageModules).map(([path]) => {
   const normalized = path.replace(/\\/g, "/");
   const parts = normalized.split("/");
-  const category = parts[parts.length - 2] ?? "misc";
+  const category = normalizeCategory(parts[parts.length - 2] ?? "misc");
   const fileName = parts[parts.length - 1] ?? "";
   const descriptionBase = fileName.replace(/\.[^.]+$/, "").replace(/^[a-z-]+-/, "");
   const description = titleCase(descriptionBase.replace(/-/g, " "));

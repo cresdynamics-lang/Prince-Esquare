@@ -31,6 +31,7 @@ function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [adminBusy, setAdminBusy] = useState(false);
+  const [adminUploadingImage, setAdminUploadingImage] = useState(false);
   const [adminCategories, setAdminCategories] = useState<{ id: string; name: string }[]>([]);
   const [adminDraft, setAdminDraft] = useState({
     title: "",
@@ -192,6 +193,34 @@ function ProductPage() {
     window.location.reload();
   };
 
+  const uploadAdminImage = async (file: File) => {
+    try {
+      setAdminUploadingImage(true);
+      const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const fileBase = file.name
+        .replace(/\.[^.]+$/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "image";
+      const filePath = `admin-uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${fileBase}.${fileExt}`;
+      const bucket = supabase.storage.from("product-images");
+      const { error: uploadError } = await bucket.upload(filePath, file, {
+        upsert: true,
+        cacheControl: "3600",
+        contentType: file.type || undefined,
+      });
+      if (uploadError) throw uploadError;
+      const { data } = bucket.getPublicUrl(filePath);
+      setAdminDraft((d) => ({ ...d, image_url: data.publicUrl }));
+      toast.success("Image uploaded.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Failed to upload image.");
+    } finally {
+      setAdminUploadingImage(false);
+    }
+  };
+
   const deleteProductNow = async () => {
     if (!isAdmin) return;
     const confirmed = window.confirm(`Delete "${product.title}" from website?`);
@@ -332,6 +361,25 @@ function ProductPage() {
                   placeholder="Image URL"
                   className="rounded border border-border bg-background px-2 py-1 text-sm md:col-span-2"
                 />
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground">
+                    Or upload image from computer
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="block w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      void uploadAdminImage(file);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                  {adminUploadingImage && (
+                    <p className="mt-1 text-xs text-muted-foreground">Uploading image...</p>
+                  )}
+                </div>
               </div>
               <div className="mt-2 flex gap-4 text-xs">
                 <label className="inline-flex items-center gap-2">

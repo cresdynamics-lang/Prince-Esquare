@@ -14,7 +14,6 @@ const SHOP_CATEGORIES = [
   { label: "Socks", slug: "socks" },
   { label: "Suits", slug: "suits" },
   { label: "Shirts", slug: "shirts" },
-  { label: "T-Shirts", slug: "t-shirts" },
   { label: "Trousers", slug: "trousers" },
   { label: "Khaki Pants", slug: "khaki-pants" },
   { label: "Track Suits", slug: "track-suits" },

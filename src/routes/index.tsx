@@ -81,6 +81,22 @@ function HomePage() {
       ctaLabel: "Shop Shoes",
       ctaParams: { slug: "shoes" as const },
     },
+    {
+      image: "/src/assets/catalog/shirts/shirts-material-polyester-fibershirts-type-casual.avif",
+      title: "New Shirts Drop",
+      body: "Fresh casual and formal shirt styles now available as ready-to-shop products.",
+      ctaTo: "/category/$slug" as const,
+      ctaLabel: "Shop Shirts",
+      ctaParams: { slug: "shirts" as const },
+    },
+    {
+      image: "/src/assets/catalog/track-suits/track-suits-mens-track-suits-2-piece-the-track-suit-consists.webp",
+      title: "Track Suit Essentials",
+      body: "Comfort-first matching sets with clean cuts for training, travel, and everyday style.",
+      ctaTo: "/category/$slug" as const,
+      ctaLabel: "Shop Track Suits",
+      ctaParams: { slug: "track-suits" as const },
+    },
   ];
   const [curated, setCurated] = useState<ProductCardData[]>([]);
   const [featured, setFeatured] = useState<ProductCardData[]>([]);

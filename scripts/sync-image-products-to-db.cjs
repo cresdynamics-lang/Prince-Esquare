@@ -94,7 +94,8 @@ async function walk(dir) {
 }
 
 function normalizeCatalogCategory(folderName) {
-  return slugify(folderName);
+  const slug = slugify(folderName);
+  return slug === "t-shirts" ? "shirts" : slug;
 }
 
 function productTitleFromFilename(fileName, categorySlug) {
@@ -142,7 +143,7 @@ async function collectAssetProducts() {
 
     const rootSlug = slugify(base);
     const categoryGuessRaw = base.startsWith("cat-") ? base.slice(4).split("-")[0] : "formal";
-    const categorySlug = slugify(categoryGuessRaw || "formal");
+    const categorySlug = normalizeCatalogCategory(categoryGuessRaw || "formal");
     products.push({
       slug: rootSlug,
       title: titleCaseFromSlug(rootSlug.replace(/^cat-/, "").replace(/^hero-/, "")),
@@ -163,7 +164,7 @@ async function collectAssetProducts() {
     const fileBase = entry.name.replace(/\.[^.]+$/, "");
     const slug = slugify(fileBase);
     const categoryGuess = slug.split("-")[0] || "misc";
-    const categorySlug = slugify(categoryGuess);
+    const categorySlug = normalizeCatalogCategory(categoryGuess);
     products.push({
       slug,
       title: productTitleFromFilename(entry.name, categorySlug),
@@ -224,6 +225,19 @@ async function main() {
       throw new Error(`Category insert failed: ${error.message}`);
     }
     console.log(`Inserted ${categoriesToInsert.length} missing categories.`);
+  }
+
+  // Merge legacy t-shirts into shirts so shirt categories are unified.
+  const { data: categoryRows } = await supabase.from("categories").select("id,slug");
+  const shirtsCategoryId = (categoryRows ?? []).find((c) => c.slug === "shirts")?.id;
+  const tShirtsCategoryId = (categoryRows ?? []).find((c) => c.slug === "t-shirts")?.id;
+  if (shirtsCategoryId && tShirtsCategoryId) {
+    await supabase
+      .from("products")
+      .update({ category_id: shirtsCategoryId })
+      .eq("category_id", tShirtsCategoryId);
+    await supabase.from("categories").delete().eq("id", tShirtsCategoryId);
+    console.log("Merged t-shirts category into shirts.");
   }
 
   const { data: freshCategories, error: freshCategoriesError } = await supabase
