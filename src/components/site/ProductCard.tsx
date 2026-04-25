@@ -13,13 +13,19 @@ export type ProductCardData = {
   sale_price: number | null;
   image: string | null;
   category_name?: string;
+  /** When set, shop filters can match this to a DB category `slug` (used for bundled `fashions/` products). */
+  category_slug?: string;
+  /** Show “Price on request” instead of a numeric price (studio / enquiry-only items). */
+  price_on_request?: boolean;
 };
 
 export function ProductCard({ product, eager = false }: { product: ProductCardData; eager?: boolean }) {
   const { has, toggle } = useWishlist();
   const wished = has(product.id);
   const onSale =
-    product.sale_price != null && Number(product.sale_price) < Number(product.price);
+    !product.price_on_request &&
+    product.sale_price != null &&
+    Number(product.sale_price) < Number(product.price);
 
   return (
     <div className="product-card group relative overflow-hidden rounded-md border border-border bg-card">
@@ -34,6 +40,8 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDa
             alt={product.title}
             loading={eager ? "eager" : "lazy"}
             decoding="async"
+            fetchPriority={eager ? "high" : "low"}
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             width={400}
             height={500}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -70,7 +78,9 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDa
           {product.title}
         </h3>
         <div className="mt-2 flex items-baseline gap-2">
-          {onSale ? (
+          {product.price_on_request ? (
+            <span className="text-sm font-medium text-muted-foreground">Price on request</span>
+          ) : onSale ? (
             <>
               <span className="font-semibold text-gold">
                 {formatKES(product.sale_price)}

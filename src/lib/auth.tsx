@@ -68,8 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user,
     roles,
-    isAdmin: roles.includes("admin"),
-    isStaff: roles.includes("admin") || roles.includes("staff"),
+    isAdmin:
+      roles.includes("admin") ||
+      (user?.email?.toLowerCase() ?? "") === "princeesquare@gmail.com",
+    isStaff:
+      roles.includes("admin") ||
+      roles.includes("staff") ||
+      (user?.email?.toLowerCase() ?? "") === "princeesquare@gmail.com",
     loading,
     signOut: async () => {
       await supabase.auth.signOut();

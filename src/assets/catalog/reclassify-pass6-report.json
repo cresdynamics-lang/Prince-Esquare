@@ -1,0 +1,112 @@
+{
+  "moved_count": 26,
+  "moved": [
+    {
+      "from": "catalog/misc/misc-download.jfif",
+      "to": "catalog/shirts/shirts-download.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-2.jfif",
+      "to": "catalog/shoes/shoes-download-2.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-3.jfif",
+      "to": "catalog/track-suits/track-suits-download-3.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-4.jfif",
+      "to": "catalog/shoes/shoes-download-4.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-5.jfif",
+      "to": "catalog/shoes/shoes-download-5.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-6.jfif",
+      "to": "catalog/shoes/shoes-download-6.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-7.jfif",
+      "to": "catalog/shoes/shoes-download-7.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-8.jfif",
+      "to": "catalog/shoes/shoes-download-8.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-9.jfif",
+      "to": "catalog/shoes/shoes-download-9.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-10.jfif",
+      "to": "catalog/shoes/shoes-download-10.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-11.jfif",
+      "to": "catalog/shoes/shoes-download-11.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-download-12.jfif",
+      "to": "catalog/shirts/shirts-download-12.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-temu-best-deals.jfif",
+      "to": "catalog/shoes/shoes-temu-best-deals.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-ky.jfif",
+      "to": "catalog/shoes/shoes-ky.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-this-item-is-unavailable-etsy.jfif",
+      "to": "catalog/shoes/shoes-this-item-is-unavailable-etsy.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-brand-name-icpansmodel-number-xk058material.jfif",
+      "to": "catalog/trousers/trousers-brand-name-icpansmodel-number-xk058material.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-product-id-4001153086977.jfif",
+      "to": "catalog/shirts/shirts-product-id-4001153086977.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-instagram.jfif",
+      "to": "catalog/t-shirts/t-shirts-instagram.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-instagram-2.jfif",
+      "to": "catalog/suits/suits-instagram-2.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-item.jfif",
+      "to": "catalog/belts/belts-item.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-item-2.jfif",
+      "to": "catalog/track-suits/track-suits-item-2.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-product-information-materials-90-polyester-10.jfif",
+      "to": "catalog/track-suits/track-suits-product-information-materials-90-polyester-10.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-service-if-you-have-any-question-please-feel.jfif",
+      "to": "catalog/track-suits/track-suits-service-if-you-have-any-question-please-feel.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-shein.jfif",
+      "to": "catalog/track-suits/track-suits-shein.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-looks-like-something-from-a-final-fantasy.jfif",
+      "to": "catalog/suits/suits-looks-like-something-from-a-final-fantasy.jfif"
+    },
+    {
+      "from": "catalog/misc/misc-price-product-description-item.jfif",
+      "to": "catalog/track-suits/track-suits-price-product-description-item.jfif"
+    }
+  ],
+  "remaining_misc": [
+    "misc-bubblems.jfif"
+  ]
+}

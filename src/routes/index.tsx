@@ -5,16 +5,40 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FashionGallery } from "@/components/site/FashionGallery";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
-import { resolveImage } from "@/lib/assetMap";
 import { fashionGalleryItems } from "@/lib/fashionGallery";
+import { dedupeProductsBySlugPreferOrder, fashionProductsAsCards } from "@/lib/fashionProducts";
 import heroImg from "@/assets/hero-suit.jpg";
 
-type CategoryRow = {
-  id: string;
-  slug: string;
-  name: string;
-  image_url: string | null;
-};
+function pickMixedCategories(products: ProductCardData[], limit: number): ProductCardData[] {
+  if (products.length <= limit) return products;
+
+  const buckets = new Map<string, ProductCardData[]>();
+  for (const product of products) {
+    const key = (product.category_name ?? "other").toLowerCase();
+    const list = buckets.get(key) ?? [];
+    list.push(product);
+    buckets.set(key, list);
+  }
+
+  const keys = Array.from(buckets.keys());
+  const picked: ProductCardData[] = [];
+  let guard = 0;
+
+  while (picked.length < limit && guard < 1000) {
+    guard += 1;
+    let tookAny = false;
+    for (const key of keys) {
+      if (picked.length >= limit) break;
+      const list = buckets.get(key);
+      if (!list || list.length === 0) continue;
+      picked.push(list.shift()!);
+      tookAny = true;
+    }
+    if (!tookAny) break;
+  }
+
+  return picked;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -31,26 +55,80 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const HOME_SECTION_SIZE = 8;
+  const SOCKS_SECTION_SIZE = 4;
+  const heroSlides = [
+    {
+      image: heroImg,
+      title: "The Modern Gentleman, Outfitted.",
+      body: "Master tailoring, considered fabrics, and timeless silhouettes - crafted for Nairobi&apos;s most discerning men.",
+      ctaTo: "/shop" as const,
+      ctaLabel: "Shop the Collection",
+    },
+    {
+      image: "/src/assets/cat-suits.jpg",
+      title: "Signature Suits Collection",
+      body: "Sharp lines, rich textures, and refined silhouettes for events, office, and formal evenings.",
+      ctaTo: "/category/$slug" as const,
+      ctaLabel: "Explore Suits",
+      ctaParams: { slug: "suits" as const },
+    },
+    {
+      image: "/src/assets/cat-shoes.jpg",
+      title: "Premium Footwear Edit",
+      body: "From polished Oxfords to statement loafers, complete every look with confidence.",
+      ctaTo: "/category/$slug" as const,
+      ctaLabel: "Shop Shoes",
+      ctaParams: { slug: "shoes" as const },
+    },
+  ];
+  const [curated, setCurated] = useState<ProductCardData[]>([]);
   const [featured, setFeatured] = useState<ProductCardData[]>([]);
+  const [socksHighlights, setSocksHighlights] = useState<ProductCardData[]>([]);
+  const [curatedVisibleCount, setCuratedVisibleCount] = useState(HOME_SECTION_SIZE);
+  const [featuredVisibleCount, setFeaturedVisibleCount] = useState(HOME_SECTION_SIZE);
+  const [activeSlide, setActiveSlide] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const id = window.setInterval(() => {
+      setActiveSlide((s) => (s + 1) % heroSlides.length);
+    }, 4500);
+    return () => window.clearInterval(id);
+  }, [heroSlides.length]);
+
+  useEffect(() => {
     (async () => {
-      const [{ data: cats }, { data: prods }] = await Promise.all([
-        supabase.from("categories").select("id,slug,name,image_url").order("display_order"),
-        supabase
-          .from("products")
-          .select(
-            "id,slug,title,price,sale_price,is_featured,product_images(image_url),categories(name)",
-          )
-          .eq("is_published", true)
-          .eq("is_featured", true)
-          .limit(8),
-      ]);
-      setCategories(cats ?? []);
-      setFeatured(
-        (prods ?? []).map((p: any) => ({
+      try {
+        const [{ data: featuredProds }, { data: curatedProds }] = await Promise.all([
+          supabase
+            .from("products")
+            .select(
+              "id,slug,title,price,sale_price,is_featured,product_images(image_url),categories(name,slug)",
+            )
+            .eq("is_published", true)
+            .eq("is_featured", true)
+            .limit(16),
+          supabase
+            .from("products")
+            .select("id,slug,title,price,sale_price,product_images(image_url),categories(name,slug)")
+            .eq("is_published", true)
+            .order("created_at", { ascending: false })
+            .limit(16),
+        ]);
+
+        let prods = featuredProds ?? [];
+        if (prods.length === 0) {
+          const { data: latestProducts } = await supabase
+            .from("products")
+            .select("id,slug,title,price,sale_price,product_images(image_url),categories(name,slug)")
+            .eq("is_published", true)
+            .order("created_at", { ascending: false })
+            .limit(16);
+          prods = latestProducts ?? [];
+        }
+
+        const mappedCurated = (curatedProds ?? []).map((p: any) => ({
           id: p.id,
           slug: p.slug,
           title: p.title,
@@ -58,23 +136,65 @@ function HomePage() {
           sale_price: p.sale_price != null ? Number(p.sale_price) : null,
           image: p.product_images?.[0]?.image_url ?? null,
           category_name: p.categories?.name,
-        })),
-      );
-      setLoading(false);
+          category_slug: p.categories?.slug,
+        }));
+        const mappedFeatured = prods.map((p: any) => ({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          price: Number(p.price),
+          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+          image: p.product_images?.[0]?.image_url ?? null,
+          category_name: p.categories?.name,
+          category_slug: p.categories?.slug,
+        }));
+        const fashionCards = fashionProductsAsCards();
+        const curatedMerged = dedupeProductsBySlugPreferOrder([...mappedCurated, ...fashionCards]);
+        const featuredMerged = dedupeProductsBySlugPreferOrder([...mappedFeatured, ...fashionCards]);
+        const curatedList = pickMixedCategories(curatedMerged, 16);
+        const featuredList = pickMixedCategories(featuredMerged, 16);
+        const socksList = [...featuredMerged, ...curatedMerged]
+          .filter((product) => {
+            const slugMatch = product.category_slug?.toLowerCase() === "socks";
+            const nameMatch = product.category_name?.toLowerCase() === "socks";
+            return slugMatch || nameMatch;
+          })
+          .slice(0, SOCKS_SECTION_SIZE);
+        setCurated(curatedList);
+        setFeatured(featuredList);
+        setSocksHighlights(socksList);
+      } catch (error) {
+        console.error("Failed to load homepage products", error);
+        setCurated([]);
+        setFeatured([]);
+        setSocksHighlights([]);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
+
+  const visibleCurated = curated.slice(0, curatedVisibleCount);
+  const visibleFeatured = featured.slice(0, featuredVisibleCount);
+  const hasMoreCurated = !loading && visibleCurated.length < curated.length;
+  const hasMoreFeatured = !loading && visibleFeatured.length < featured.length;
 
   return (
     <div className="fade-in">
       <section className="relative overflow-hidden bg-navy text-navy-foreground">
         <div className="absolute inset-0">
-          <img
-            src={heroImg}
-            alt="A gentleman in a tailored navy three-piece suit"
-            className="h-full w-full object-cover object-right opacity-80"
-            width={1920}
-            height={1080}
-          />
+          {heroSlides.map((slide, idx) => (
+            <img
+              key={slide.title}
+              src={slide.image}
+              alt={slide.title}
+              className={`absolute inset-0 h-full w-full object-cover object-right transition-opacity duration-700 ${idx === activeSlide ? "opacity-80" : "opacity-0"}`}
+              loading={idx === 0 ? "eager" : "lazy"}
+              decoding="async"
+              width={1920}
+              height={1080}
+            />
+          ))}
           <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/80 to-transparent" />
         </div>
         <div className="container relative mx-auto px-4 py-24 md:py-36 lg:py-44">
@@ -83,18 +203,31 @@ function HomePage() {
               Autumn Collection - 2026
             </p>
             <h1 className="mt-4 font-display text-4xl font-bold leading-[1.05] md:text-6xl lg:text-7xl">
-              The Modern <span className="text-gold">Gentleman</span>, Outfitted.
+              {heroSlides[activeSlide]?.title.includes("Gentleman") ? (
+                <>
+                  The Modern <span className="text-gold">Gentleman</span>, Outfitted.
+                </>
+              ) : (
+                heroSlides[activeSlide]?.title
+              )}
             </h1>
             <p className="mt-5 max-w-md text-base text-navy-foreground/80 md:text-lg">
-              Master tailoring, considered fabrics, and timeless silhouettes - crafted for
-              Nairobi&apos;s most discerning men.
+              {heroSlides[activeSlide]?.body}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/shop">
-                <Button variant="hero" size="lg">
-                  Shop the Collection <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
+              {heroSlides[activeSlide]?.ctaTo === "/shop" ? (
+                <Link to="/shop">
+                  <Button variant="hero" size="lg">
+                    {heroSlides[activeSlide]?.ctaLabel} <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/category/$slug" params={heroSlides[activeSlide]?.ctaParams ?? { slug: "suits" }}>
+                  <Button variant="hero" size="lg">
+                    {heroSlides[activeSlide]?.ctaLabel} <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
               <Link to="/category/$slug" params={{ slug: "suits" }}>
                 <Button
                   variant="outline"
@@ -104,6 +237,17 @@ function HomePage() {
                   Explore Suits
                 </Button>
               </Link>
+            </div>
+            <div className="mt-6 flex items-center gap-2">
+              {heroSlides.map((slide, idx) => (
+                <button
+                  key={slide.title}
+                  type="button"
+                  onClick={() => setActiveSlide(idx)}
+                  aria-label={`Go to slide ${idx + 1}`}
+                  className={`h-2.5 rounded-full transition-all ${idx === activeSlide ? "w-8 bg-gold" : "w-2.5 bg-navy-foreground/50"}`}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -126,59 +270,26 @@ function HomePage() {
             View all {"->"}
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 lg:grid-cols-5">
-          {categories.slice(0, 5).map((c, index) => (
-            <Link
-              key={c.id}
-              to="/category/$slug"
-              params={{ slug: c.slug }}
-              className="product-card group relative aspect-[3/4] overflow-hidden rounded-md bg-muted"
-            >
-              <img
-                src={resolveImage(c.image_url)}
-                alt={c.name}
-                loading={index < 3 ? "eager" : "lazy"}
-                decoding="async"
-                width={400}
-                height={533}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-navy/10 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-4">
-                <h3 className="font-display text-lg font-bold text-navy-foreground md:text-xl">
-                  {c.name}
-                </h3>
-                <p className="mt-0.5 text-xs text-gold">Shop now {"->"}</p>
-              </div>
-            </Link>
-          ))}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {loading
+            ? Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
+              ))
+            : visibleCurated.map((p, index) => (
+                <ProductCard key={p.id} product={p} eager={index < 1} />
+              ))}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-          {categories.slice(5).map((c) => (
-            <Link
-              key={c.id}
-              to="/category/$slug"
-              params={{ slug: c.slug }}
-              className="product-card group relative aspect-[5/3] overflow-hidden rounded-md bg-muted"
+        {hasMoreCurated && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setCuratedVisibleCount((n) => n + HOME_SECTION_SIZE)}
+              className="rounded-md border border-border px-6 py-2 text-sm font-medium transition-colors hover:border-gold hover:text-gold"
             >
-              <img
-                src={resolveImage(c.image_url)}
-                alt={c.name}
-                loading="lazy"
-                decoding="async"
-                width={400}
-                height={240}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-navy/80 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-3">
-                <h3 className="font-display text-base font-bold text-navy-foreground">
-                  {c.name}
-                </h3>
-              </div>
-            </Link>
-          ))}
-        </div>
+              Load more
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="bg-secondary/40 py-16 md:py-24">
@@ -197,8 +308,21 @@ function HomePage() {
               ? Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
                 ))
-              : featured.map((p, index) => <ProductCard key={p.id} product={p} eager={index < 4} />)}
+              : visibleFeatured.map((p, index) => (
+                  <ProductCard key={p.id} product={p} eager={index < 1} />
+                ))}
           </div>
+          {hasMoreFeatured && (
+            <div className="mt-8 text-center">
+              <button
+                type="button"
+                onClick={() => setFeaturedVisibleCount((n) => n + HOME_SECTION_SIZE)}
+                className="rounded-md border border-border px-6 py-2 text-sm font-medium transition-colors hover:border-gold hover:text-gold"
+              >
+                Load more
+              </button>
+            </div>
+          )}
           <div className="mt-10 text-center">
             <Link to="/shop">
               <Button variant="default" size="lg">
@@ -209,12 +333,39 @@ function HomePage() {
         </div>
       </section>
 
+      {!loading && socksHighlights.length > 0 && (
+        <section className="container mx-auto px-4 pb-6 pt-14 md:pt-16">
+          <div className="mb-8 flex items-end justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+                Essentials
+              </p>
+              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">
+                Socks Highlights
+              </h2>
+            </div>
+            <Link
+              to="/category/$slug"
+              params={{ slug: "socks" }}
+              className="hidden text-sm font-medium text-foreground/70 hover:text-gold md:inline-flex"
+            >
+              Shop socks {"->"}
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {socksHighlights.map((p, index) => (
+              <ProductCard key={p.id} product={p} eager={index < 1} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <FashionGallery
         items={fashionGalleryItems}
         limit={8}
         eyebrow="Studio Gallery"
         title="Fresh From The Fashion Rail"
-        description="Your latest bundled fashion images now surface directly on the website as a visual collection."
+        description="The same looks from your fashions folder are listed as products in the shop. This grid is an extra visual browse of the rail."
       />
 
       <section className="container mx-auto px-4 py-16 md:py-24">

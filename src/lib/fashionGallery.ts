@@ -22,14 +22,27 @@ const metadataModule = Object.values(
   }),
 )[0] as FashionMetadataFile | undefined;
 
+const catalogImageModules = import.meta.glob("../assets/catalog/*/*.{jpg,jpeg,png,webp,jfif}", {
+  eager: true,
+  import: "default",
+}) as Record<string, string>;
+
 const CATEGORY_COPY: Record<string, CategoryCopy> = {
   shoes: {
     name: "Shoes",
     description: "Formal pairs, loafers, sneakers, and everyday leather options.",
   },
+  suits: {
+    name: "Suits",
+    description: "Tailored suits for business, events, and premium formalwear.",
+  },
   shirts: {
     name: "Shirts",
     description: "Dress shirts and casual button-downs from the current studio collection.",
+  },
+  "t-shirts": {
+    name: "T-Shirts",
+    description: "Everyday cotton tees and clean casual staples.",
   },
   jackets: {
     name: "Jackets",
@@ -50,6 +63,22 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
   trousers: {
     name: "Trousers",
     description: "Trouser-led looks and coordinated business-ready separates.",
+  },
+  "khaki-pants": {
+    name: "Khaki Pants",
+    description: "Khaki chinos and neutral pants for versatile styling.",
+  },
+  "track-suits": {
+    name: "Track Suits",
+    description: "Athletic-inspired matching sets with modern fits.",
+  },
+  belts: {
+    name: "Belts",
+    description: "Leather belts and buckle styles to complete each outfit.",
+  },
+  socks: {
+    name: "Socks",
+    description: "Comfort-focused socks for dress and everyday wear.",
   },
 };
 
@@ -74,7 +103,7 @@ function hasTag(item: FashionGalleryItem, tags: string[]) {
   return item.tags.some((tag) => tags.includes(tag));
 }
 
-export const fashionGalleryItems: FashionGalleryItem[] = (metadataModule?.images ?? []).map(
+const metadataItems: FashionGalleryItem[] = (metadataModule?.images ?? []).map(
   (item) => ({
     id: item.newName,
     image: `/src/assets/fashions/${item.newName}`,
@@ -84,6 +113,29 @@ export const fashionGalleryItems: FashionGalleryItem[] = (metadataModule?.images
     tags: item.tags,
   }),
 );
+
+const catalogItems: FashionGalleryItem[] = Object.entries(catalogImageModules).map(([path]) => {
+  const normalized = path.replace(/\\/g, "/");
+  const parts = normalized.split("/");
+  const category = parts[parts.length - 2] ?? "misc";
+  const fileName = parts[parts.length - 1] ?? "";
+  const descriptionBase = fileName.replace(/\.[^.]+$/, "").replace(/^[a-z-]+-/, "");
+  const description = titleCase(descriptionBase.replace(/-/g, " "));
+  const words = descriptionBase.split(/[-_\s]+/).filter(Boolean);
+  return {
+    id: fileName,
+    image: `/src/assets/catalog/${category}/${fileName}`,
+    category,
+    categoryLabel: CATEGORY_COPY[category]?.name ?? titleCase(category),
+    description,
+    tags: [category, ...words],
+  };
+});
+
+export const fashionGalleryItems: FashionGalleryItem[] = [
+  ...metadataItems,
+  ...catalogItems,
+];
 
 export function getFashionGalleryForSlug(slug: string): FashionGalleryItem[] {
   switch (slug) {

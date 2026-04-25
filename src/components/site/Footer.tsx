@@ -1,22 +1,27 @@
 import { Link } from "@tanstack/react-router";
-import { Instagram, Facebook, Music2, MapPin, Phone, Mail } from "lucide-react";
+import { Instagram, Facebook, Music2, MapPin, Phone, Mail, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STORE_INFO } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
+import logoImg from "@/assets/Prince logo.png";
 
 const SHOP_CATEGORIES = [
+  { label: "Shoes", slug: "shoes" },
+  { label: "Socks", slug: "socks" },
   { label: "Suits", slug: "suits" },
   { label: "Shirts", slug: "shirts" },
+  { label: "T-Shirts", slug: "t-shirts" },
   { label: "Trousers", slug: "trousers" },
-  { label: "Shoes", slug: "shoes" },
-  { label: "Casual", slug: "casual" },
-  { label: "Formal", slug: "formal" },
+  { label: "Khaki Pants", slug: "khaki-pants" },
+  { label: "Track Suits", slug: "track-suits" },
 ] as const;
 
 export function Footer() {
+  const { isStaff } = useAuth();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,16 +47,27 @@ export function Footer() {
 
   return (
     <footer className="bg-navy text-navy-foreground">
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="font-display text-2xl font-bold">
-              Prince <span className="text-gold">Esquare</span>
+            <div className="flex items-center gap-2.5">
+              <img
+                src={logoImg}
+                alt="Prince Esquare logo"
+                className="h-8 w-8 rounded-full border border-gold/40 object-cover"
+                width={32}
+                height={32}
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="font-display text-lg font-bold">
+                Prince <span className="text-gold">Esquare</span>
+              </div>
             </div>
-            <p className="mt-3 text-sm text-navy-foreground/70">
+            <p className="mt-1.5 text-[11px] text-navy-foreground/70">
               {STORE_INFO.tagline} Premium menswear, crafted for the modern Nairobi gentleman.
             </p>
-            <div className="mt-5 flex gap-3">
+            <div className="mt-2.5 flex gap-2">
               <a
                 href={STORE_INFO.socials.instagram}
                 target="_blank"
@@ -83,8 +99,8 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">Shop</h4>
-            <ul className="mt-4 space-y-2 text-sm text-navy-foreground/70">
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">Shop</h4>
+            <ul className="mt-2.5 space-y-1 text-[11px] text-navy-foreground/70">
               {SHOP_CATEGORIES.map((category) => (
                 <li key={category.slug}>
                   <Link
@@ -100,8 +116,8 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">Visit</h4>
-            <ul className="mt-4 space-y-3 text-sm text-navy-foreground/70">
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">Visit</h4>
+            <ul className="mt-2.5 space-y-1.5 text-[11px] text-navy-foreground/70">
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
                 <span>{STORE_INFO.address}</span>
@@ -118,7 +134,7 @@ export function Footer() {
                   {STORE_INFO.email}
                 </a>
               </li>
-              <li className="text-xs text-navy-foreground/50">{STORE_INFO.hours}</li>
+              <li className="text-[11px] text-navy-foreground/50">{STORE_INFO.hours}</li>
               <li>
                 <Link to="/store-locator" className="text-gold hover:underline">
                   Store locator {"->"}
@@ -128,13 +144,13 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">
               Newsletter
             </h4>
-            <p className="mt-4 text-sm text-navy-foreground/70">
+            <p className="mt-2.5 text-[11px] text-navy-foreground/70">
               First access to new collections and private events.
             </p>
-            <form onSubmit={handleSubscribe} className="mt-4 flex gap-2">
+            <form onSubmit={handleSubscribe} className="mt-2.5 flex gap-2">
               <Input
                 type="email"
                 required
@@ -143,18 +159,33 @@ export function Footer() {
                 placeholder="your@email.com"
                 className="border-navy-foreground/20 bg-navy-foreground/5 text-navy-foreground placeholder:text-navy-foreground/40"
               />
-              <Button type="submit" variant="gold" disabled={submitting}>
+              <Button type="submit" variant="gold" size="sm" disabled={submitting}>
                 Join
               </Button>
             </form>
           </div>
         </div>
 
-        <div className="mt-14 flex flex-col items-center justify-between gap-3 border-t border-navy-foreground/15 pt-6 text-xs text-navy-foreground/50 md:flex-row">
-          <p>(c) {new Date().getFullYear()} Prince Esquare. All rights reserved.</p>
-          <div className="flex gap-5">
+        <div className="mt-6 border-t border-navy-foreground/15 pt-3 text-[10px] text-navy-foreground/50">
+          <div className="grid items-center gap-3 md:grid-cols-3">
+            <p className="text-center md:text-left">
+              (c) {new Date().getFullYear()} Prince Esquare. All rights reserved.
+            </p>
+            <div className="flex justify-center">
+              <Link
+                to={isStaff ? "/admin" : "/admin-login"}
+                aria-label="Admin"
+                className="rounded-full border border-navy-foreground/20 p-2 text-gold transition-colors hover:border-gold hover:bg-gold/10"
+              >
+                <ShieldCheck className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="flex justify-center gap-5 md:justify-end">
             <Link to="/about" className="hover:text-gold">
               About
+            </Link>
+            <Link to="/booking" className="hover:text-gold">
+              Booking
             </Link>
             <Link to="/contact" className="hover:text-gold">
               Contact
@@ -162,6 +193,7 @@ export function Footer() {
             <Link to="/store-locator" className="hover:text-gold">
               Find us
             </Link>
+            </div>
           </div>
         </div>
       </div>

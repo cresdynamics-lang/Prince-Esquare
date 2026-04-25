@@ -17,15 +17,15 @@ async function seedDatabase() {
 
   // Categories
   const categories = [
-    { slug: 'suits', name: 'Suits', description: 'Tailored suits for the modern gentleman', image_url: '/src/assets/cat-suits.jpg', display_order: 1 },
-    { slug: 'shirts', name: 'Shirts', description: 'Premium dress shirts in various styles', image_url: '/src/assets/cat-shirts.jpg', display_order: 2 },
-    { slug: 'trousers', name: 'Trousers', description: 'Formal and casual trousers', image_url: '/src/assets/cat-trousers.jpg', display_order: 3 },
-    { slug: 'shoes', name: 'Shoes', description: 'Leather dress shoes and casual footwear', image_url: '/src/assets/cat-shoes.jpg', display_order: 4 },
-    { slug: 'socks', name: 'Socks', description: 'Quality socks for every occasion', image_url: '/src/assets/cat-socks.jpg', display_order: 5 },
-    { slug: 'belts', name: 'Belts', description: 'Leather belts to complete your look', image_url: '/src/assets/cat-belts.jpg', display_order: 6 },
-    { slug: 'casual', name: 'Casual', description: 'Smart casual wear for everyday', image_url: '/src/assets/cat-casual.jpg', display_order: 7 },
-    { slug: 'formal', name: 'Formal', description: 'Formal attire for special occasions', image_url: '/src/assets/cat-formal.jpg', display_order: 8 },
-    { slug: 'sportswear', name: 'Sportswear', description: 'Athletic wear for the active man', image_url: '/src/assets/cat-sportswear.jpg', display_order: 9 },
+    { slug: 'shoes', name: 'Shoes', description: 'Leather dress shoes, loafers, and modern everyday pairs.', image_url: '/src/assets/cat-shoes.jpg', display_order: 1 },
+    { slug: 'suits', name: 'Suits', description: 'Tailored suits for business, events, and premium formalwear.', image_url: '/src/assets/cat-suits.jpg', display_order: 2 },
+    { slug: 'shirts', name: 'Shirts', description: 'Dress shirts and smart button-downs in premium fabrics.', image_url: '/src/assets/cat-shirts.jpg', display_order: 3 },
+    { slug: 't-shirts', name: 'T-Shirts', description: 'Essential cotton tees for everyday smart-casual styling.', image_url: '/src/assets/cat-casual.jpg', display_order: 4 },
+    { slug: 'trousers', name: 'Trousers', description: 'Formal and semi-formal trousers in modern fits.', image_url: '/src/assets/cat-trousers.jpg', display_order: 5 },
+    { slug: 'khaki-pants', name: 'Khaki Pants', description: 'Classic khaki chinos and versatile neutral bottoms.', image_url: '/src/assets/cat-trousers.jpg', display_order: 6 },
+    { slug: 'track-suits', name: 'Track Suits', description: 'Coordinated track sets for travel, gym, and off-duty style.', image_url: '/src/assets/cat-sportswear.jpg', display_order: 7 },
+    { slug: 'belts', name: 'Belts', description: 'Leather belts to complete your look', image_url: '/src/assets/cat-belts.jpg', display_order: 8 },
+    { slug: 'socks', name: 'Socks', description: 'Quality socks for every occasion', image_url: '/src/assets/cat-socks.jpg', display_order: 9 },
   ]
 
   // Insert categories
@@ -59,6 +59,9 @@ async function seedDatabase() {
     { slug: 'brown-leather-belt', title: 'Brown Leather Belt', description: 'Rich brown leather belt with antique brass buckle. Handcrafted from full-grain leather.', category_id: catMap['belts'], price: 2500, sale_price: null, is_published: true, is_featured: true, meta_title: 'Brown Leather Belt | Prince Esquare', meta_description: 'Handcrafted brown leather belt with brass buckle. Premium full-grain leather.' },
     { slug: 'grey-trousers', title: 'Grey Trousers', description: 'Classic grey trousers in a modern fit. Made from wrinkle-resistant fabric for all-day comfort.', category_id: catMap['trousers'], price: 6500, sale_price: 5500, is_published: true, is_featured: true, meta_title: 'Grey Trousers | Prince Esquare', meta_description: 'Modern grey trousers with wrinkle-resistant fabric. Perfect for business and formal wear.' },
     { slug: 'chino-trousers', title: 'Chino Trousers', description: 'Versatile chino trousers in a slim fit. Available in classic colors for any wardrobe.', category_id: catMap['trousers'], price: 5500, sale_price: null, is_published: true, is_featured: true, meta_title: 'Chino Trousers | Prince Esquare', meta_description: 'Slim fit chino trousers in premium cotton. Versatile style for any occasion.' },
+    { slug: 'minimalist-cotton-tee', title: 'Minimalist Cotton Tee', description: 'Soft premium cotton t-shirt in a clean regular fit, ideal for layering or standalone styling.', category_id: catMap['t-shirts'], price: 2200, sale_price: null, is_published: true, is_featured: true, meta_title: 'Minimalist Cotton Tee | Prince Esquare', meta_description: 'Premium cotton t-shirt with modern fit for everyday style.' },
+    { slug: 'sand-khaki-chinos', title: 'Sand Khaki Chinos', description: 'Clean-cut khaki chinos with stretch comfort and tailored ankle line.', category_id: catMap['khaki-pants'], price: 5200, sale_price: 4600, is_published: true, is_featured: true, meta_title: 'Sand Khaki Chinos | Prince Esquare', meta_description: 'Modern khaki chinos for office, weekend, and smart casual dressing.' },
+    { slug: 'city-track-set', title: 'City Track Set', description: 'Two-piece track suit with tapered fit, zip jacket, and breathable fabric.', category_id: catMap['track-suits'], price: 7800, sale_price: null, is_published: true, is_featured: true, meta_title: 'City Track Set | Prince Esquare', meta_description: 'Modern track suit set for travel, training, and relaxed street style.' },
     { slug: 'premium-socks-set', title: 'Premium Socks Set', description: 'Set of 3 premium cotton blend socks in classic colors. Reinforced heel and toe for durability.', category_id: catMap['socks'], price: 1200, sale_price: null, is_published: true, is_featured: true, meta_title: 'Premium Socks Set | Prince Esquare', meta_description: 'Set of 3 premium socks in classic colors. Reinforced for durability and comfort.' },
     { slug: 'dress-socks', title: 'Dress Socks', description: 'Fine merino wool dress socks in elegant patterns. Moisture-wicking for all-day comfort.', category_id: catMap['socks'], price: 800, sale_price: null, is_published: true, is_featured: true, meta_title: 'Dress Socks | Prince Esquare', meta_description: 'Luxurious merino wool dress socks. Moisture-wicking comfort for the modern gentleman.' },
   ]
@@ -94,6 +97,9 @@ async function seedDatabase() {
     { product_id: prodMap['brown-leather-belt'], image_url: '/src/assets/cat-belts.jpg', alt_text: 'Brown Leather Belt', display_order: 0 },
     { product_id: prodMap['grey-trousers'], image_url: '/src/assets/cat-trousers.jpg', alt_text: 'Grey Trousers front view', display_order: 0 },
     { product_id: prodMap['chino-trousers'], image_url: '/src/assets/cat-trousers.jpg', alt_text: 'Chino Trousers front view', display_order: 0 },
+    { product_id: prodMap['minimalist-cotton-tee'], image_url: '/src/assets/cat-casual.jpg', alt_text: 'Minimalist Cotton Tee', display_order: 0 },
+    { product_id: prodMap['sand-khaki-chinos'], image_url: '/src/assets/cat-trousers.jpg', alt_text: 'Sand Khaki Chinos', display_order: 0 },
+    { product_id: prodMap['city-track-set'], image_url: '/src/assets/cat-sportswear.jpg', alt_text: 'City Track Set', display_order: 0 },
     { product_id: prodMap['premium-socks-set'], image_url: '/src/assets/cat-socks.jpg', alt_text: 'Premium Socks Set', display_order: 0 },
     { product_id: prodMap['dress-socks'], image_url: '/src/assets/cat-socks.jpg', alt_text: 'Dress Socks', display_order: 0 },
   ]
@@ -148,6 +154,18 @@ async function seedDatabase() {
     { product_id: prodMap['chino-trousers'], size: '32', color: 'Beige', sku: 'PE-TRS-CHN-32', stock_quantity: 3 },
     { product_id: prodMap['chino-trousers'], size: '34', color: 'Beige', sku: 'PE-TRS-CHN-34', stock_quantity: 3 },
     { product_id: prodMap['chino-trousers'], size: '36', color: 'Beige', sku: 'PE-TRS-CHN-36', stock_quantity: 3 },
+    // Minimalist Cotton Tee
+    { product_id: prodMap['minimalist-cotton-tee'], size: 'M', color: 'White', sku: 'PE-TEE-MIN-M', stock_quantity: 8 },
+    { product_id: prodMap['minimalist-cotton-tee'], size: 'L', color: 'White', sku: 'PE-TEE-MIN-L', stock_quantity: 8 },
+    { product_id: prodMap['minimalist-cotton-tee'], size: 'XL', color: 'White', sku: 'PE-TEE-MIN-XL', stock_quantity: 6 },
+    // Sand Khaki Chinos
+    { product_id: prodMap['sand-khaki-chinos'], size: '32', color: 'Khaki', sku: 'PE-KHK-SND-32', stock_quantity: 6 },
+    { product_id: prodMap['sand-khaki-chinos'], size: '34', color: 'Khaki', sku: 'PE-KHK-SND-34', stock_quantity: 6 },
+    { product_id: prodMap['sand-khaki-chinos'], size: '36', color: 'Khaki', sku: 'PE-KHK-SND-36', stock_quantity: 5 },
+    // City Track Set
+    { product_id: prodMap['city-track-set'], size: 'M', color: 'Black', sku: 'PE-TRK-CTY-M', stock_quantity: 5 },
+    { product_id: prodMap['city-track-set'], size: 'L', color: 'Black', sku: 'PE-TRK-CTY-L', stock_quantity: 5 },
+    { product_id: prodMap['city-track-set'], size: 'XL', color: 'Black', sku: 'PE-TRK-CTY-XL', stock_quantity: 4 },
     // Premium Socks Set
     { product_id: prodMap['premium-socks-set'], size: 'One Size', color: 'Assorted', sku: 'PE-SOCK-PRM-OS', stock_quantity: 15 },
     // Dress Socks

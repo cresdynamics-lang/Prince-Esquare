@@ -62,8 +62,8 @@ export const STORE_INFO = {
   name: "Prince Esquare",
   tagline: "The Modern Gentleman, Outfitted.",
   address: "Kimathi Street, CBD, Nairobi, Kenya",
-  phone: "+254 700 000 000",
-  whatsapp: "254700000000",
+  phone: "+254 714 034067",
+  whatsapp: "254714034067",
   email: "hello@princeesquare.co.ke",
   hours: "Mon–Sat 9:00 – 19:00 · Sun 10:00 – 17:00",
   socials: {

@@ -1,14 +1,14 @@
 -- Seed data for categories
 INSERT INTO public.categories (slug, name, description, image_url, display_order) VALUES
-('suits', 'Suits', 'Tailored suits for the modern gentleman', '/src/assets/cat-suits.jpg', 1),
-('shirts', 'Shirts', 'Premium dress shirts in various styles', '/src/assets/cat-shirts.jpg', 2),
-('trousers', 'Trousers', 'Formal and casual trousers', '/src/assets/cat-trousers.jpg', 3),
-('shoes', 'Shoes', 'Leather dress shoes and casual footwear', '/src/assets/cat-shoes.jpg', 4),
-('socks', 'Socks', 'Quality socks for every occasion', '/src/assets/cat-socks.jpg', 5),
-('belts', 'Belts', 'Leather belts to complete your look', '/src/assets/cat-belts.jpg', 6),
-('casual', 'Casual', 'Smart casual wear for everyday', '/src/assets/cat-casual.jpg', 7),
-('formal', 'Formal', 'Formal attire for special occasions', '/src/assets/cat-formal.jpg', 8),
-('sportswear', 'Sportswear', 'Athletic wear for the active man', '/src/assets/cat-sportswear.jpg', 9);
+('shoes', 'Shoes', 'Leather dress shoes, loafers, and modern everyday pairs.', '/src/assets/cat-shoes.jpg', 1),
+('suits', 'Suits', 'Tailored suits for business, events, and premium formalwear.', '/src/assets/cat-suits.jpg', 2),
+('shirts', 'Shirts', 'Dress shirts and smart button-downs in premium fabrics.', '/src/assets/cat-shirts.jpg', 3),
+('t-shirts', 'T-Shirts', 'Essential cotton tees for everyday smart-casual styling.', '/src/assets/cat-casual.jpg', 4),
+('trousers', 'Trousers', 'Formal and semi-formal trousers in modern fits.', '/src/assets/cat-trousers.jpg', 5),
+('khaki-pants', 'Khaki Pants', 'Classic khaki chinos and versatile neutral bottoms.', '/src/assets/cat-trousers.jpg', 6),
+('track-suits', 'Track Suits', 'Coordinated track sets for travel, gym, and off-duty style.', '/src/assets/cat-sportswear.jpg', 7),
+('belts', 'Belts', 'Leather belts to complete your look', '/src/assets/cat-belts.jpg', 8),
+('socks', 'Socks', 'Quality socks for every occasion', '/src/assets/cat-socks.jpg', 9);
 
 -- Seed data for products (with images and featured flags)
 INSERT INTO public.products (slug, title, description, category_id, price, sale_price, is_published, is_featured, meta_title, meta_description) VALUES
@@ -22,6 +22,9 @@ INSERT INTO public.products (slug, title, description, category_id, price, sale_
 ('brown-leather-belt', 'Brown Leather Belt', 'Rich brown leather belt with antique brass buckle. Handcrafted from full-grain leather.', (SELECT id FROM public.categories WHERE slug = 'belts'), 2500, NULL, true, true, 'Brown Leather Belt | Prince Esquare', 'Handcrafted brown leather belt with brass buckle. Premium full-grain leather.'),
 ('grey-trousers', 'Grey Trousers', 'Classic grey trousers in a modern fit. Made from wrinkle-resistant fabric for all-day comfort.', (SELECT id FROM public.categories WHERE slug = 'trousers'), 6500, 5500, true, true, 'Grey Trousers | Prince Esquare', 'Modern grey trousers with wrinkle-resistant fabric. Perfect for business and formal wear.'),
 ('chino-trousers', 'Chino Trousers', 'Versatile chino trousers in a slim fit. Available in classic colors for any wardrobe.', (SELECT id FROM public.categories WHERE slug = 'trousers'), 5500, NULL, true, true, 'Chino Trousers | Prince Esquare', 'Slim fit chino trousers in premium cotton. Versatile style for any occasion.'),
+('minimalist-cotton-tee', 'Minimalist Cotton Tee', 'Soft premium cotton t-shirt in a clean regular fit, ideal for layering or standalone styling.', (SELECT id FROM public.categories WHERE slug = 't-shirts'), 2200, NULL, true, true, 'Minimalist Cotton Tee | Prince Esquare', 'Premium cotton t-shirt with modern fit for everyday style.'),
+('sand-khaki-chinos', 'Sand Khaki Chinos', 'Clean-cut khaki chinos with stretch comfort and tailored ankle line.', (SELECT id FROM public.categories WHERE slug = 'khaki-pants'), 5200, 4600, true, true, 'Sand Khaki Chinos | Prince Esquare', 'Modern khaki chinos for office, weekend, and smart casual dressing.'),
+('city-track-set', 'City Track Set', 'Two-piece track suit with tapered fit, zip jacket, and breathable fabric.', (SELECT id FROM public.categories WHERE slug = 'track-suits'), 7800, NULL, true, true, 'City Track Set | Prince Esquare', 'Modern track suit set for travel, training, and relaxed street style.'),
 ('premium-socks-set', 'Premium Socks Set', 'Set of 3 premium cotton blend socks in classic colors. Reinforced heel and toe for durability.', (SELECT id FROM public.categories WHERE slug = 'socks'), 1200, NULL, true, true, 'Premium Socks Set | Prince Esquare', 'Set of 3 premium socks in classic colors. Reinforced for durability and comfort.'),
 ('dress-socks', 'Dress Socks', 'Fine merino wool dress socks in elegant patterns. Moisture-wicking for all-day comfort.', (SELECT id FROM public.categories WHERE slug = 'socks'), 800, NULL, true, true, 'Dress Socks | Prince Esquare', 'Luxurious merino wool dress socks. Moisture-wicking comfort for the modern gentleman.');
 
@@ -47,6 +50,12 @@ INSERT INTO public.product_images (product_id, image_url, alt_text, display_orde
 ((SELECT id FROM public.products WHERE slug = 'grey-trousers'), '/src/assets/cat-trousers.jpg', 'Grey Trousers front view', 0),
 -- Chino Trousers
 ((SELECT id FROM public.products WHERE slug = 'chino-trousers'), '/src/assets/cat-trousers.jpg', 'Chino Trousers front view', 0),
+-- Minimalist Cotton Tee
+((SELECT id FROM public.products WHERE slug = 'minimalist-cotton-tee'), '/src/assets/cat-casual.jpg', 'Minimalist Cotton Tee', 0),
+-- Sand Khaki Chinos
+((SELECT id FROM public.products WHERE slug = 'sand-khaki-chinos'), '/src/assets/cat-trousers.jpg', 'Sand Khaki Chinos', 0),
+-- City Track Set
+((SELECT id FROM public.products WHERE slug = 'city-track-set'), '/src/assets/cat-sportswear.jpg', 'City Track Set', 0),
 -- Premium Socks Set
 ((SELECT id FROM public.products WHERE slug = 'premium-socks-set'), '/src/assets/cat-socks.jpg', 'Premium Socks Set', 0),
 -- Dress Socks
@@ -90,6 +99,18 @@ INSERT INTO public.product_variants (product_id, size, color, sku, stock_quantit
 ((SELECT id FROM public.products WHERE slug = 'chino-trousers'), '32', 'Beige', 'PE-TRS-CHN-32', 3),
 ((SELECT id FROM public.products WHERE slug = 'chino-trousers'), '34', 'Beige', 'PE-TRS-CHN-34', 3),
 ((SELECT id FROM public.products WHERE slug = 'chino-trousers'), '36', 'Beige', 'PE-TRS-CHN-36', 3),
+-- Minimalist Cotton Tee
+((SELECT id FROM public.products WHERE slug = 'minimalist-cotton-tee'), 'M', 'White', 'PE-TEE-MIN-M', 8),
+((SELECT id FROM public.products WHERE slug = 'minimalist-cotton-tee'), 'L', 'White', 'PE-TEE-MIN-L', 8),
+((SELECT id FROM public.products WHERE slug = 'minimalist-cotton-tee'), 'XL', 'White', 'PE-TEE-MIN-XL', 6),
+-- Sand Khaki Chinos
+((SELECT id FROM public.products WHERE slug = 'sand-khaki-chinos'), '32', 'Khaki', 'PE-KHK-SND-32', 6),
+((SELECT id FROM public.products WHERE slug = 'sand-khaki-chinos'), '34', 'Khaki', 'PE-KHK-SND-34', 6),
+((SELECT id FROM public.products WHERE slug = 'sand-khaki-chinos'), '36', 'Khaki', 'PE-KHK-SND-36', 5),
+-- City Track Set
+((SELECT id FROM public.products WHERE slug = 'city-track-set'), 'M', 'Black', 'PE-TRK-CTY-M', 5),
+((SELECT id FROM public.products WHERE slug = 'city-track-set'), 'L', 'Black', 'PE-TRK-CTY-L', 5),
+((SELECT id FROM public.products WHERE slug = 'city-track-set'), 'XL', 'Black', 'PE-TRK-CTY-XL', 4),
 -- Premium Socks Set
 ((SELECT id FROM public.products WHERE slug = 'premium-socks-set'), 'One Size', 'Assorted', 'PE-SOCK-PRM-OS', 15),
 -- Dress Socks

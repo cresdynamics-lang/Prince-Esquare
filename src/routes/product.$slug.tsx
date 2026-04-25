@@ -1,10 +1,11 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Heart, Truck, Store, ShieldCheck, Minus, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { resolveImage } from "@/lib/assetMap";
-import { formatKES } from "@/lib/format";
+import { formatKES, STORE_INFO } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import { toast } from "sonner";
@@ -18,6 +19,8 @@ type Variant = { id: string; size: string | null; color: string | null; stock_qu
 
 function ProductPage() {
   const { slug } = Route.useParams();
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const cart = useCart();
   const wishlist = useWishlist();
   const [product, setProduct] = useState<any>(null);
@@ -27,33 +30,93 @@ function ProductPage() {
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminCategories, setAdminCategories] = useState<{ id: string; name: string }[]>([]);
+  const [adminDraft, setAdminDraft] = useState({
+    title: "",
+    slug: "",
+    category_id: "",
+    price: "",
+    sale_price: "",
+    image_url: "",
+    is_published: true,
+    is_featured: false,
+  });
 
   useEffect(() => {
     (async () => {
       setLoading(true);
+      setMissing(false);
       const { data: p } = await supabase
         .from("products")
-        .select("id,slug,title,description,price,sale_price,categories(name,slug),product_images(image_url),product_variants(id,size,color,stock_quantity)")
+        .select(
+          "id,slug,title,description,price,sale_price,is_published,is_featured,categories(name,slug),product_images(image_url),product_variants(id,size,color,stock_quantity)",
+        )
         .eq("slug", slug)
         .eq("is_published", true)
         .maybeSingle();
-      if (!p) {
-        setMissing(true);
+      if (p) {
+        setProduct(p);
+        let categoryId = "";
+        if (p.categories?.slug) {
+          const { data: catRow } = await supabase
+            .from("categories")
+            .select("id")
+            .eq("slug", p.categories.slug)
+            .maybeSingle();
+          categoryId = catRow?.id ?? "";
+        }
+        const imgs = (p.product_images ?? []).map((i: any) => i.image_url);
+        setImages(imgs.length > 0 ? imgs : [null as any]);
+        const vs = (p.product_variants ?? []) as Variant[];
+        setVariants(vs);
+        setActiveVariant(vs.find((v) => v.stock_quantity > 0) ?? vs[0] ?? null);
+        setAdminDraft({
+          title: p.title ?? "",
+          slug: p.slug ?? "",
+          category_id: categoryId,
+          price: String(p.price ?? ""),
+          sale_price: p.sale_price != null ? String(p.sale_price) : "",
+          image_url: p.product_images?.[0]?.image_url ?? "",
+          is_published: Boolean(p.is_published ?? true),
+          is_featured: Boolean(p.is_featured ?? false),
+        });
         setLoading(false);
         return;
       }
-      setProduct(p);
-      const imgs = (p.product_images ?? []).map((i: any) => i.image_url);
-      setImages(imgs.length > 0 ? imgs : [null as any]);
-      const vs = (p.product_variants ?? []) as Variant[];
-      setVariants(vs);
-      setActiveVariant(vs.find((v) => v.stock_quantity > 0) ?? vs[0] ?? null);
+
+      setProduct(null);
+      setMissing(true);
       setLoading(false);
     })();
   }, [slug]);
 
-  if (missing) throw notFound();
-  if (loading || !product) {
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      const { data } = await supabase
+        .from("categories")
+        .select("id,name")
+        .order("display_order");
+      setAdminCategories(data ?? []);
+    })();
+  }, [isAdmin]);
+
+  if (!loading && missing) throw notFound();
+  if (loading) {
+    return (
+      <div className="container mx-auto grid gap-8 px-4 py-12 md:grid-cols-2">
+        <div className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
+        <div className="space-y-3">
+          <div className="h-8 w-3/4 animate-pulse rounded bg-muted" />
+          <div className="h-6 w-1/3 animate-pulse rounded bg-muted" />
+          <div className="h-24 animate-pulse rounded bg-muted" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!product) {
     return (
       <div className="container mx-auto grid gap-8 px-4 py-12 md:grid-cols-2">
         <div className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
@@ -70,6 +133,79 @@ function ProductPage() {
   const displayPrice = onSale ? Number(product.sale_price) : Number(product.price);
   const sizes = [...new Set(variants.map((v) => v.size).filter(Boolean))] as string[];
   const wished = wishlist.has(product.id);
+
+  const saveAdminChanges = async () => {
+    if (!isAdmin) return;
+    const price = Number(adminDraft.price);
+    const sale = adminDraft.sale_price.trim() === "" ? null : Number(adminDraft.sale_price);
+    if (!adminDraft.title.trim() || !adminDraft.slug.trim() || Number.isNaN(price)) {
+      toast.error("Fill a valid title, slug, and price.");
+      return;
+    }
+    if (sale !== null && Number.isNaN(sale)) {
+      toast.error("Sale price must be a valid number.");
+      return;
+    }
+
+    setAdminBusy(true);
+    const { error } = await supabase
+      .from("products")
+      .update({
+        title: adminDraft.title.trim(),
+        slug: adminDraft.slug
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, ""),
+        category_id: adminDraft.category_id || null,
+        price,
+        sale_price: sale,
+        is_published: adminDraft.is_published,
+        is_featured: adminDraft.is_featured,
+      })
+      .eq("id", product.id);
+    if (error) {
+      setAdminBusy(false);
+      toast.error(error.message);
+      return;
+    }
+
+    const existingImage = product.product_images?.[0];
+    const imageUrl = adminDraft.image_url.trim();
+    if (imageUrl) {
+      if (existingImage?.image_url) {
+        await supabase
+          .from("product_images")
+          .update({ image_url: imageUrl })
+          .eq("product_id", product.id)
+          .eq("image_url", existingImage.image_url);
+      } else {
+        await supabase.from("product_images").insert({
+          product_id: product.id,
+          image_url: imageUrl,
+          display_order: 0,
+        });
+      }
+    }
+    setAdminBusy(false);
+    toast.success("Product updated.");
+    window.location.reload();
+  };
+
+  const deleteProductNow = async () => {
+    if (!isAdmin) return;
+    const confirmed = window.confirm(`Delete "${product.title}" from website?`);
+    if (!confirmed) return;
+    setAdminBusy(true);
+    const { error } = await supabase.from("products").delete().eq("id", product.id);
+    setAdminBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Product deleted.");
+    navigate({ to: "/shop" });
+  };
 
   const handleAdd = () => {
     if (!activeVariant) return;
@@ -105,13 +241,29 @@ function ProductPage() {
       <div className="grid gap-10 md:grid-cols-2">
         <div className="space-y-3">
           <div className="aspect-[4/5] overflow-hidden rounded-md bg-muted">
-            <img src={resolveImage(images[0])} alt={product.title} className="h-full w-full object-cover" />
+            <img
+              src={resolveImage(images[0])}
+              alt={product.title}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="h-full w-full object-cover"
+            />
           </div>
           {images.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
               {images.map((src, i) => (
                 <div key={i} className="aspect-square overflow-hidden rounded bg-muted">
-                  <img src={resolveImage(src)} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={resolveImage(src)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    sizes="(max-width: 768px) 25vw, 12vw"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               ))}
             </div>
@@ -129,6 +281,90 @@ function ProductPage() {
           </div>
 
           <p className="mt-5 text-sm leading-relaxed text-foreground/80">{product.description}</p>
+
+          {isAdmin && (
+            <div className="mt-6 rounded-md border border-gold/40 bg-gold/5 p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+                Admin Quick Edit
+              </p>
+              <div className="grid gap-2 md:grid-cols-2">
+                <input
+                  value={adminDraft.title}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, title: e.target.value }))}
+                  placeholder="Title"
+                  className="rounded border border-border bg-background px-2 py-1 text-sm"
+                />
+                <input
+                  value={adminDraft.slug}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, slug: e.target.value }))}
+                  placeholder="Slug"
+                  className="rounded border border-border bg-background px-2 py-1 text-sm"
+                />
+                <select
+                  value={adminDraft.category_id}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, category_id: e.target.value }))}
+                  className="rounded border border-border bg-background px-2 py-1 text-sm md:col-span-2"
+                >
+                  <option value="">No category</option>
+                  {adminCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={adminDraft.price}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, price: e.target.value }))}
+                  placeholder="Price"
+                  className="rounded border border-border bg-background px-2 py-1 text-sm"
+                />
+                <input
+                  type="number"
+                  value={adminDraft.sale_price}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, sale_price: e.target.value }))}
+                  placeholder="Sale price"
+                  className="rounded border border-border bg-background px-2 py-1 text-sm"
+                />
+                <input
+                  value={adminDraft.image_url}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, image_url: e.target.value }))}
+                  placeholder="Image URL"
+                  className="rounded border border-border bg-background px-2 py-1 text-sm md:col-span-2"
+                />
+              </div>
+              <div className="mt-2 flex gap-4 text-xs">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={adminDraft.is_published}
+                    onChange={(e) =>
+                      setAdminDraft((d) => ({ ...d, is_published: e.target.checked }))
+                    }
+                  />
+                  Published
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={adminDraft.is_featured}
+                    onChange={(e) =>
+                      setAdminDraft((d) => ({ ...d, is_featured: e.target.checked }))
+                    }
+                  />
+                  Featured
+                </label>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" variant="outline" disabled={adminBusy} onClick={saveAdminChanges}>
+                  {adminBusy ? "Saving..." : "Save changes"}
+                </Button>
+                <Button size="sm" variant="destructive" disabled={adminBusy} onClick={deleteProductNow}>
+                  Delete product
+                </Button>
+              </div>
+            </div>
+          )}
 
           {sizes.length > 0 && (
             <div className="mt-6">

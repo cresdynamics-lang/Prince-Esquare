@@ -1,14 +1,8 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { FashionGallery } from "@/components/site/FashionGallery";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { resolveImage } from "@/lib/assetMap";
-import {
-  getFashionCategoryFallback,
-  getFashionGalleryForSlug,
-  type FashionGalleryItem,
-} from "@/lib/fashionGallery";
 
 export const Route = createFileRoute("/category/$slug")({
   component: CategoryPage,
@@ -23,28 +17,22 @@ export const Route = createFileRoute("/category/$slug")({
 });
 
 function CategoryPage() {
+  const PAGE_SIZE = 24;
   const { slug } = Route.useParams();
-  const fallbackCategory = getFashionCategoryFallback(slug);
-  const initialGallery = getFashionGalleryForSlug(slug);
   const [cat, setCat] = useState<{
     name: string;
     description: string | null;
     image_url: string | null;
-  } | null>(fallbackCategory);
+  } | null>(null);
   const [products, setProducts] = useState<ProductCardData[]>([]);
-  const [galleryItems, setGalleryItems] = useState<FashionGalleryItem[]>(initialGallery);
-  const [loading, setLoading] = useState(!fallbackCategory);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       setMissing(false);
-
-      const localFallbackCategory = getFashionCategoryFallback(slug);
-      const localGallery = getFashionGalleryForSlug(slug);
-
-      setGalleryItems(localGallery);
 
       const { data: c } = await supabase
         .from("categories")
@@ -53,23 +41,12 @@ function CategoryPage() {
         .maybeSingle();
 
       if (!c) {
-        if (localFallbackCategory) {
-          setCat(localFallbackCategory);
-          setProducts([]);
-          setLoading(false);
-          return;
-        }
-
         setMissing(true);
         setLoading(false);
         return;
       }
 
-      setCat({
-        ...c,
-        description: c.description ?? localFallbackCategory?.description ?? null,
-        image_url: c.image_url ?? localFallbackCategory?.image_url ?? null,
-      });
+      setCat(c);
 
       const { data: ps } = await supabase
         .from("products")
@@ -77,20 +54,26 @@ function CategoryPage() {
         .eq("category_id", c.id)
         .eq("is_published", true);
 
-      setProducts(
-        (ps ?? []).map((p: any) => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          price: Number(p.price),
-          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-          image: p.product_images?.[0]?.image_url ?? null,
-          category_name: c.name,
-        })),
-      );
+      const dbCards = (ps ?? []).map((p: any) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        price: Number(p.price),
+        sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+        image: p.product_images?.[0]?.image_url ?? null,
+        category_name: c.name,
+      }));
+      setProducts(dbCards);
       setLoading(false);
     })();
   }, [slug]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [slug]);
+
+  const visibleProducts = products.slice(0, visibleCount);
+  const hasMore = !loading && visibleProducts.length < products.length;
 
   if (missing) throw notFound();
 
@@ -123,25 +106,28 @@ function CategoryPage() {
             ? Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
               ))
-            : products.map((p) => <ProductCard key={p.id} product={p} />)}
+            : visibleProducts.map((p, index) => (
+                <ProductCard key={p.id} product={p} eager={index < 1} />
+              ))}
         </div>
+        {hasMore && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+              className="rounded-md border border-border px-6 py-2 text-sm font-medium transition-colors hover:border-gold hover:text-gold"
+            >
+              Load more products
+            </button>
+          </div>
+        )}
 
-        {!loading && products.length === 0 && galleryItems.length === 0 && (
+        {!loading && products.length === 0 && (
           <p className="py-16 text-center text-muted-foreground">
             No products in this category yet.
           </p>
         )}
       </div>
-
-      {!loading && galleryItems.length > 0 && (
-        <FashionGallery
-          items={galleryItems}
-          eyebrow="Studio Gallery"
-          title={`More ${cat?.name ?? "Collection"} Visuals`}
-          description="These images come from your bundled fashions folder and now appear directly inside the matching collection page."
-          className="pt-0"
-        />
-      )}
     </div>
   );
 }

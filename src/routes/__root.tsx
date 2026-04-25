@@ -6,6 +6,7 @@ import { WishlistProvider } from "@/lib/wishlist";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WhatsAppFab } from "@/components/site/WhatsAppFab";
+import brandLogo from "@/assets/Prince logo.png";
 
 import appCss from "../styles.css?url";
 
@@ -46,9 +47,15 @@ export const Route = createRootRoute({
       { property: "og:title", content: "Prince Esquare — Premium Menswear" },
       { property: "og:description", content: "Suits, shirts, shoes & more. Crafted for the modern gentleman." },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: brandLogo },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: brandLogo },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: brandLogo },
+      { rel: "apple-touch-icon", href: brandLogo },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

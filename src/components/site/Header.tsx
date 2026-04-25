@@ -5,14 +5,18 @@ import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { STORE_INFO } from "@/lib/format";
+import logoImg from "@/assets/Prince logo.png";
 
 const NAV = [
   { type: "route", to: "/shop", label: "Shop All" },
+  { type: "category", slug: "shoes", label: "Shoes" },
   { type: "category", slug: "suits", label: "Suits" },
   { type: "category", slug: "shirts", label: "Shirts" },
-  { type: "category", slug: "shoes", label: "Shoes" },
-  { type: "category", slug: "casual", label: "Casual" },
-  { type: "route", to: "/about", label: "About" },
+  { type: "category", slug: "trousers", label: "Trousers" },
+] as const;
+const MORE_NAV = [
+  { type: "category", slug: "socks", label: "Socks" },
+  { type: "route", to: "/booking", label: "Booking" },
   { type: "route", to: "/contact", label: "Contact" },
 ] as const;
 
@@ -32,22 +36,31 @@ export function Header() {
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
 
-        <Link to="/" className="flex flex-col leading-none">
-          <span className="font-display text-xl font-bold tracking-tight md:text-2xl">
+        <Link to="/" className="flex items-center gap-3 leading-none">
+          <img
+            src={logoImg}
+            alt="Prince Esquare logo"
+            className="h-10 w-10 rounded-full border border-gold/50 object-cover"
+            width={40}
+            height={40}
+          />
+          <span className="flex flex-col">
+            <span className="font-display text-xl font-bold tracking-tight md:text-2xl">
             Prince <span className="text-gold">Esquare</span>
-          </span>
-          <span className="hidden text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:inline">
-            Menswear - Nairobi
+            </span>
+            <span className="hidden text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:inline">
+              Menswear - Nairobi
+            </span>
           </span>
         </Link>
 
-        <nav className="ml-8 hidden items-center gap-7 lg:flex">
+        <nav className="ml-6 hidden items-center gap-4 xl:gap-5 lg:flex">
           {NAV.map((n) =>
             n.type === "route" ? (
               <Link
                 key={n.label}
                 to={n.to}
-                className="text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
+                className="text-xs xl:text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
                 activeProps={{ className: "text-gold" }}
               >
                 {n.label}
@@ -57,13 +70,40 @@ export function Header() {
                 key={n.label}
                 to="/category/$slug"
                 params={{ slug: n.slug }}
-                className="text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
+                className="text-xs xl:text-sm font-medium text-foreground/80 transition-colors hover:text-gold"
                 activeProps={{ className: "text-gold" }}
               >
                 {n.label}
               </Link>
             ),
           )}
+          <details className="group relative">
+            <summary className="list-none cursor-pointer text-xs xl:text-sm font-medium text-foreground/80 transition-colors hover:text-gold">
+              More
+            </summary>
+            <div className="absolute left-0 top-7 z-50 min-w-40 rounded-md border border-border bg-background p-2 shadow-lg">
+              {MORE_NAV.map((n) =>
+                n.type === "route" ? (
+                  <Link
+                    key={n.label}
+                    to={n.to}
+                    className="block rounded px-2 py-1.5 text-xs xl:text-sm text-foreground/80 hover:bg-muted hover:text-gold"
+                  >
+                    {n.label}
+                  </Link>
+                ) : (
+                  <Link
+                    key={n.label}
+                    to="/category/$slug"
+                    params={{ slug: n.slug }}
+                    className="block rounded px-2 py-1.5 text-xs xl:text-sm text-foreground/80 hover:bg-muted hover:text-gold"
+                  >
+                    {n.label}
+                  </Link>
+                ),
+              )}
+            </div>
+          </details>
         </nav>
 
         <div className="ml-auto flex items-center gap-1 md:gap-2">
@@ -92,24 +132,13 @@ export function Header() {
               )}
             </Button>
           </Link>
-          {isStaff && (
-            <Link to="/admin" className="ml-1 hidden md:inline-flex">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-gold text-gold hover:bg-gold/10"
-              >
-                Admin
-              </Button>
-            </Link>
-          )}
         </div>
       </div>
 
       {open && (
         <div className="border-t border-border bg-background lg:hidden">
           <nav className="container mx-auto flex flex-col px-4 py-2">
-            {NAV.map((n) =>
+            {[...NAV, ...MORE_NAV].map((n) =>
               n.type === "route" ? (
                 <Link
                   key={n.label}
@@ -138,15 +167,6 @@ export function Header() {
                 className="py-3 text-sm font-medium text-gold"
               >
                 Sign in / Create account
-              </Link>
-            )}
-            {isStaff && (
-              <Link
-                to="/admin"
-                onClick={() => setOpen(false)}
-                className="py-3 text-sm font-medium text-gold"
-              >
-                Admin Dashboard
               </Link>
             )}
             <a

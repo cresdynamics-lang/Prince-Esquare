@@ -1,9 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { FashionGallery } from "@/components/site/FashionGallery";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
-import { fashionGalleryItems } from "@/lib/fashionGallery";
 
 export const Route = createFileRoute("/shop")({
   head: () => ({
@@ -20,9 +18,12 @@ export const Route = createFileRoute("/shop")({
 });
 
 function ShopPage() {
+  const PAGE_SIZE = 24;
   const [products, setProducts] = useState<ProductCardData[]>([]);
+  const [productCategoryMap, setProductCategoryMap] = useState<Record<string, string | null>>({});
   const [cats, setCats] = useState<{ id: string; slug: string; name: string }[]>([]);
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,25 +39,47 @@ function ShopPage() {
           .eq("is_published", true)
           .order("created_at", { ascending: false }),
       ]);
-      setCats(cs ?? []);
-      setProducts(
-        (ps ?? []).map((p: any) => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          price: Number(p.price),
-          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-          image: p.product_images?.[0]?.image_url ?? null,
-          category_name: p.categories?.name,
-        })),
-      );
+      const categories = cs ?? [];
+      setCats(categories);
+      const dbCards: ProductCardData[] = (ps ?? []).map((p: any) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        price: Number(p.price),
+        sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+        image: p.product_images?.[0]?.image_url ?? null,
+        category_name: p.categories?.name,
+      }));
+
+      const categoryMap: Record<string, string | null> = {};
+      (ps ?? []).forEach((p: any) => {
+        categoryMap[p.id] = p.category_id ?? null;
+      });
+      setProductCategoryMap(categoryMap);
+      setProducts(dbCards);
       setLoading(false);
     })();
   }, []);
 
-  const filtered = activeCat
-    ? products.filter((p) => p.category_name === cats.find((c) => c.id === activeCat)?.name)
-    : products;
+  const filtered = useMemo(
+    () =>
+      activeCat
+        ? products.filter((p) => {
+            if (productCategoryMap[p.id] === activeCat) return true;
+            const cat = cats.find((c) => c.id === activeCat);
+            if (!cat || !p.category_slug) return false;
+            return p.category_slug === cat.slug;
+          })
+        : products,
+    [activeCat, cats, productCategoryMap, products],
+  );
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeCat]);
+
+  const visibleProducts = filtered.slice(0, visibleCount);
+  const hasMore = visibleProducts.length < filtered.length;
 
   return (
     <>
@@ -92,12 +115,26 @@ function ShopPage() {
             ? Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
               ))
-            : filtered.map((p, index) => <ProductCard key={p.id} product={p} eager={index < 4} />)}
+            : visibleProducts.map((p, index) => (
+                <ProductCard key={p.id} product={p} eager={index < 1} />
+              ))}
         </div>
+
+        {!loading && hasMore && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+              className="rounded-md border border-border px-6 py-2 text-sm font-medium transition-colors hover:border-gold hover:text-gold"
+            >
+              Load more products
+            </button>
+          </div>
+        )}
 
         {!loading && filtered.length === 0 && (
           <p className="py-16 text-center text-muted-foreground">
-            No live products in this category yet.{" "}
+            No products in this category yet.{" "}
             <Link to="/shop" className="text-gold hover:underline">
               View all
             </Link>
@@ -105,14 +142,6 @@ function ShopPage() {
         )}
       </div>
 
-      <FashionGallery
-        id="studio-gallery"
-        items={fashionGalleryItems}
-        eyebrow="Studio Gallery"
-        title="Bundled Fashion Visuals"
-        description="These images are loaded from your local fashions folder so the collection is visible on the site even before every item is entered into Supabase."
-        className="bg-secondary/40"
-      />
     </>
   );
 }

@@ -38,6 +38,7 @@ function CheckoutPage() {
   const { lines, subtotal, clear, count } = useCart();
   const { user } = useAuth();
   const [delivery, setDelivery] = useState<"standard" | "express" | "pickup">("standard");
+  const [paymentMethod, setPaymentMethod] = useState<"cash_on_delivery" | "stripe_card" | "mpesa">("stripe_card");
   const [submitting, setSubmitting] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [discount, setDiscount] = useState({ amount: 0, code: "" });
@@ -114,9 +115,9 @@ function CheckoutPage() {
       discount_amount: discount.amount,
       total,
       promo_code: discount.code || null,
-      payment_method: "cash_on_delivery",
-      payment_status: "paid",
-      status: "processing",
+      payment_method: paymentMethod,
+      payment_status: "pending",
+      status: "pending",
       estimated_delivery: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
     };
 
@@ -155,10 +156,62 @@ function CheckoutPage() {
       return;
     }
 
+    if (paymentMethod === "stripe_card") {
+      const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke(
+        "create-stripe-checkout",
+        {
+          body: {
+            orderNumber: order.order_number,
+            lineItems: lines.map((l) => ({
+              title: l.title,
+              quantity: l.quantity,
+              unitAmountKes: l.price,
+            })),
+            successUrl: `${window.location.origin}/order-confirmation?order=${order.order_number}&paid=1`,
+            cancelUrl: `${window.location.origin}/checkout?payment=cancelled`,
+          },
+        },
+      );
+      if (checkoutError || !checkoutData?.url) {
+        console.error(checkoutError);
+        toast.error("Could not start card payment. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      setSubmitting(false);
+      window.location.href = checkoutData.url as string;
+      return;
+    }
+
+    if (paymentMethod === "mpesa") {
+      const { data: stkData, error: stkError } = await supabase.functions.invoke("create-mpesa-stk", {
+        body: {
+          phone: parsed.data.phone,
+          amount: total,
+          orderNumber: order.order_number,
+        },
+      });
+      if (stkError || !stkData?.checkoutRequestId) {
+        console.error(stkError, stkData);
+        await supabase
+          .from("orders")
+          .update({ payment_status: "failed" })
+          .eq("id", order.id);
+        toast.error("Could not start M-Pesa payment. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      clear();
+      toast.success("M-Pesa prompt sent to your phone. Complete payment to confirm order.");
+      setSubmitting(false);
+      window.location.href = `/order-confirmation?order=${order.order_number}&paid=0&mpesa=1`;
+      return;
+    }
+
     clear();
     toast.success(`Order ${order.order_number} placed!`);
     setSubmitting(false);
-    window.location.href = `/order-confirmation?order=${order.order_number}`;
+    window.location.href = `/order-confirmation?order=${order.order_number}&paid=0`;
   };
 
   return (
@@ -267,11 +320,39 @@ function CheckoutPage() {
 
           <section className="rounded-md border border-border bg-card p-6">
             <h2 className="mb-2 font-display text-xl font-bold">Payment</h2>
-            <p className="text-sm text-muted-foreground">
-              Stripe and M-Pesa STK Push will be enabled in the next phase. For now, orders
-              are placed as{" "}
-              <span className="font-medium text-gold">Pay on delivery / In-store</span>.
-            </p>
+            <RadioGroup
+              value={paymentMethod}
+              onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}
+              className="space-y-3"
+            >
+              <label className="flex cursor-pointer items-center gap-3 rounded border border-border p-3 hover:border-gold">
+                <RadioGroupItem value="stripe_card" />
+                <div>
+                  <div className="font-medium">Card Payment (Stripe)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Pay securely now with card before order processing.
+                  </div>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-center gap-3 rounded border border-border p-3 hover:border-gold">
+                <RadioGroupItem value="mpesa" />
+                <div>
+                  <div className="font-medium">M-Pesa STK Push</div>
+                  <div className="text-xs text-muted-foreground">
+                    Receive a prompt on your phone and confirm payment with M-Pesa PIN.
+                  </div>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-center gap-3 rounded border border-border p-3 hover:border-gold">
+                <RadioGroupItem value="cash_on_delivery" />
+                <div>
+                  <div className="font-medium">Pay on Delivery / Pickup</div>
+                  <div className="text-xs text-muted-foreground">
+                    Pay at delivery or at the store when collecting.
+                  </div>
+                </div>
+              </label>
+            </RadioGroup>
           </section>
         </div>
 
@@ -325,7 +406,17 @@ function CheckoutPage() {
             </Button>
           </div>
           <Button type="submit" variant="hero" size="lg" className="mt-6 w-full" disabled={submitting}>
-            {submitting ? "Placing order..." : "Place Order"}
+            {submitting
+              ? paymentMethod === "stripe_card"
+                ? "Redirecting to payment..."
+                : paymentMethod === "mpesa"
+                  ? "Starting M-Pesa..."
+                : "Placing order..."
+              : paymentMethod === "stripe_card"
+                ? "Pay Now"
+                : paymentMethod === "mpesa"
+                  ? "Pay with M-Pesa"
+                : "Place Order"}
           </Button>
         </aside>
       </form>

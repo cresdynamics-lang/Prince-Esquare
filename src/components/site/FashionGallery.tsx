@@ -42,7 +42,7 @@ export function FashionGallery({
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-          {visibleItems.map((item, index) => (
+          {visibleItems.map((item) => (
             <Link
               key={item.id}
               to="/category/$slug"
@@ -53,8 +53,9 @@ export function FashionGallery({
                 <img
                   src={resolveImage(item.image)}
                   alt={item.description}
-                  loading={index < 4 ? "eager" : "lazy"}
+                  loading="lazy"
                   decoding="async"
+                  fetchPriority="low"
                   width={400}
                   height={500}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
