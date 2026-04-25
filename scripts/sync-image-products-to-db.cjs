@@ -7,7 +7,8 @@ const ROOT = process.cwd();
 const ENV_PATH = path.join(ROOT, ".env");
 const ASSETS_ROOT = path.join(ROOT, "src", "assets");
 const CATALOG_ROOT = path.join(ASSETS_ROOT, "catalog");
-const SOURCE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".jfif"]);
+const FASHIONS_ROOT = path.join(ASSETS_ROOT, "fashions");
+const SOURCE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".jfif", ".webp", ".avif"]);
 
 function slugify(value) {
   return value
@@ -148,6 +149,27 @@ async function collectAssetProducts() {
       category_slug: categorySlug,
       image_url: `/src/assets/${entry.name}`,
       price: estimatePrice(categorySlug, rootSlug),
+    });
+  }
+
+  // Fashions assets: /src/assets/fashions/<file>
+  const fashionFiles = await fs.readdir(FASHIONS_ROOT, { withFileTypes: true });
+  for (const entry of fashionFiles) {
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!SOURCE_EXTENSIONS.has(ext)) continue;
+    if (entry.name.toLowerCase().includes("metadata")) continue;
+
+    const fileBase = entry.name.replace(/\.[^.]+$/, "");
+    const slug = slugify(fileBase);
+    const categoryGuess = slug.split("-")[0] || "misc";
+    const categorySlug = slugify(categoryGuess);
+    products.push({
+      slug,
+      title: productTitleFromFilename(entry.name, categorySlug),
+      category_slug: categorySlug,
+      image_url: `/src/assets/fashions/${entry.name}`,
+      price: estimatePrice(categorySlug, slug),
     });
   }
 
