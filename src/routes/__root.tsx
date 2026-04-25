@@ -15,8 +15,6 @@ import { Footer } from "@/components/site/Footer";
 import { WhatsAppFab } from "@/components/site/WhatsAppFab";
 import brandLogo from "@/assets/Prince logo.webp";
 
-import appCss from "../styles.css?url";
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center bg-background px-4">
@@ -59,7 +57,6 @@ export const Route = createRootRoute({
       { name: "twitter:image", content: brandLogo },
     ],
     links: [
-      { rel: "stylesheet", href: appCss },
       { rel: "icon", href: brandLogo },
       { rel: "apple-touch-icon", href: brandLogo },
     ],
@@ -70,16 +67,13 @@ export const Route = createRootRoute({
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  // SPA: never nest <html>/<body> inside #root — that breaks focus, typing, and clicks in browsers.
   return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
+    <>
+      <HeadContent />
+      {children}
+      <Scripts />
+    </>
   );
 }
 
