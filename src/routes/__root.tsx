@@ -1,4 +1,11 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import {
+  Outlet,
+  Link,
+  createRootRoute,
+  HeadContent,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";
@@ -6,7 +13,7 @@ import { WishlistProvider } from "@/lib/wishlist";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WhatsAppFab } from "@/components/site/WhatsAppFab";
-import brandLogo from "@/assets/Prince logo.png";
+import brandLogo from "@/assets/Prince logo.webp";
 
 import appCss from "../styles.css?url";
 
@@ -77,17 +84,22 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const isAuthOrAdminRoute = pathname === "/admin-login" || pathname.startsWith("/admin");
+
   return (
     <AuthProvider>
       <CartProvider>
         <WishlistProvider>
           <div className="flex min-h-screen flex-col">
-            <Header />
+            {!isAuthOrAdminRoute && <Header />}
             <main className="flex-1">
               <Outlet />
             </main>
-            <Footer />
-            <WhatsAppFab />
+            {!isAuthOrAdminRoute && <Footer />}
+            {!isAuthOrAdminRoute && <WhatsAppFab />}
           </div>
           <Toaster richColors position="top-center" />
         </WishlistProvider>
