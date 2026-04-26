@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 
 export const Route = createFileRoute("/shop")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search.q === "string" ? search.q : "",
+  }),
   head: () => ({
     meta: [
       { title: "Shop All Menswear - Prince Esquare" },
@@ -18,6 +21,7 @@ export const Route = createFileRoute("/shop")({
 });
 
 function ShopPage() {
+  const { q } = Route.useSearch();
   const PAGE_SIZE = 24;
   const [products, setProducts] = useState<ProductCardData[]>([]);
   const [productCategoryMap, setProductCategoryMap] = useState<Record<string, string | null>>({});
@@ -63,15 +67,22 @@ function ShopPage() {
 
   const filtered = useMemo(
     () =>
-      activeCat
+      (activeCat
         ? products.filter((p) => {
             if (productCategoryMap[p.id] === activeCat) return true;
             const cat = cats.find((c) => c.id === activeCat);
             if (!cat || !p.category_slug) return false;
             return p.category_slug === cat.slug;
           })
-        : products,
-    [activeCat, cats, productCategoryMap, products],
+        : products).filter((p) => {
+        const term = q.trim().toLowerCase();
+        if (!term) return true;
+        const titleMatch = p.title.toLowerCase().includes(term);
+        const slugMatch = p.slug.toLowerCase().includes(term);
+        const categoryMatch = (p.category_name ?? "").toLowerCase().includes(term);
+        return titleMatch || slugMatch || categoryMatch;
+      }),
+    [activeCat, cats, productCategoryMap, products, q],
   );
 
   useEffect(() => {
@@ -90,6 +101,11 @@ function ShopPage() {
           </p>
           <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Shop All</h1>
           <div className="gold-divider mx-auto mt-4 w-24" />
+          {q.trim() && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Search results for <span className="font-semibold text-foreground">"{q}"</span>
+            </p>
+          )}
         </div>
 
         <div className="mb-8 flex flex-wrap justify-center gap-2">

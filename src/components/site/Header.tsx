@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ShoppingBag, Heart, User, Menu, Search, X } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/lib/cart";
@@ -23,7 +23,20 @@ const MORE_NAV = [
 export function Header() {
   const { count } = useCart();
   const { user, isStaff } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchTerm.trim();
+    navigate({
+      to: "/shop",
+      search: q ? { q } : {},
+    });
+    setSearchOpen(false);
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
@@ -107,11 +120,16 @@ export function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1 md:gap-2">
-          <Link to="/shop" aria-label="Search" className="hidden md:inline-flex">
-            <Button variant="ghost" size="icon">
+          <button
+            type="button"
+            aria-label="Search"
+            className="hidden md:inline-flex"
+            onClick={() => setSearchOpen((v) => !v)}
+          >
+            <Button variant="ghost" size="icon" type="button">
               <Search className="h-5 w-5" />
             </Button>
-          </Link>
+          </button>
           <Link to="/wishlist" aria-label="Wishlist">
             <Button variant="ghost" size="icon">
               <Heart className="h-5 w-5" />
@@ -134,6 +152,23 @@ export function Header() {
           </Link>
         </div>
       </div>
+
+      {searchOpen && (
+        <div className="border-t border-border bg-background/95 px-4 py-3">
+          <form onSubmit={submitSearch} className="container mx-auto flex items-center gap-2">
+            <input
+              autoFocus
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search products by name, slug, or category..."
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+            <Button type="submit" size="sm">
+              Search
+            </Button>
+          </form>
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-border bg-background lg:hidden">

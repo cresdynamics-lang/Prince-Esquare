@@ -8,6 +8,10 @@ import { ProductCard, type ProductCardData } from "@/components/site/ProductCard
 import { fashionGalleryItems } from "@/lib/fashionGallery";
 import { dedupeProductsBySlugPreferOrder, fashionProductsAsCards } from "@/lib/fashionProducts";
 import heroImg from "@/assets/hero-suit.jpg";
+import catSuitsImg from "@/assets/cat-suits.jpg";
+import catShoesImg from "@/assets/cat-shoes.jpg";
+import carouselShirtsImg from "@/assets/catalog/shirts/shirts-material-polyester-fibershirts-type-casual.avif";
+import carouselTrackSuitsImg from "@/assets/catalog/track-suits/track-suits-mens-track-suits-2-piece-the-track-suit-consists.webp";
 
 function pickMixedCategories(products: ProductCardData[], limit: number): ProductCardData[] {
   if (products.length <= limit) return products;
@@ -66,7 +70,7 @@ function HomePage() {
       ctaLabel: "Shop the Collection",
     },
     {
-      image: "/src/assets/cat-suits.jpg",
+      image: catSuitsImg,
       title: "Signature Suits Collection",
       body: "Sharp lines, rich textures, and refined silhouettes for events, office, and formal evenings.",
       ctaTo: "/category/$slug" as const,
@@ -74,7 +78,7 @@ function HomePage() {
       ctaParams: { slug: "suits" as const },
     },
     {
-      image: "/src/assets/cat-shoes.jpg",
+      image: catShoesImg,
       title: "Premium Footwear Edit",
       body: "From polished Oxfords to statement loafers, complete every look with confidence.",
       ctaTo: "/category/$slug" as const,
@@ -82,7 +86,7 @@ function HomePage() {
       ctaParams: { slug: "shoes" as const },
     },
     {
-      image: "/src/assets/catalog/shirts/shirts-material-polyester-fibershirts-type-casual.avif",
+      image: carouselShirtsImg,
       title: "New Shirts Drop",
       body: "Fresh casual and formal shirt styles now available as ready-to-shop products.",
       ctaTo: "/category/$slug" as const,
@@ -90,7 +94,7 @@ function HomePage() {
       ctaParams: { slug: "shirts" as const },
     },
     {
-      image: "/src/assets/catalog/track-suits/track-suits-mens-track-suits-2-piece-the-track-suit-consists.webp",
+      image: carouselTrackSuitsImg,
       title: "Track Suit Essentials",
       body: "Comfort-first matching sets with clean cuts for training, travel, and everyday style.",
       ctaTo: "/category/$slug" as const,
