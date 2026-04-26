@@ -15,7 +15,11 @@ export const Route = createFileRoute("/booking")({
       {
         name: "description",
         content:
-          "Book fittings, consultations, and in-store appointments with Prince Esquare.",
+          "Book a fitting or style consultation with Prince Esquare in Nairobi, Kenya. Reserve your menswear appointment online.",
+      },
+      {
+        name: "keywords",
+        content: "book menswear fitting nairobi, suit fitting kenya, style consultation nairobi, prince esquare booking",
       },
     ],
   }),
@@ -89,18 +93,23 @@ function BookingPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-14">
-      <div className="mb-8 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
-          Appointments
-        </p>
-        <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Book with Prince Esquare</h1>
-        <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-          Reserve a fitting, style consultation, or in-store service. We will confirm your booking by
-          phone or email.
-        </p>
-      </div>
+    <div>
+      <section className="relative bg-navy py-16 text-center text-navy-foreground md:py-20">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
+          style={{ backgroundImage: "url('/hero-suit.jpg')" }}
+        />
+        <div className="relative z-10 px-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Appointments</p>
+          <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Book with Prince Esquare</h1>
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-navy-foreground/85 md:text-base">
+            Reserve a fitting, style consultation, or in-store service. We will confirm your booking by
+            phone or email.
+          </p>
+        </div>
+      </section>
 
+      <div className="container mx-auto max-w-3xl px-4 py-14">
       <form onSubmit={handleSubmit} className="rounded-md border border-border bg-card p-6 md:p-8">
         <div className="grid gap-4 md:grid-cols-2">
           <div>
@@ -175,6 +184,7 @@ function BookingPage() {
           {submitting ? "Submitting..." : "Submit Booking"}
         </Button>
       </form>
+      </div>
     </div>
   );
 }

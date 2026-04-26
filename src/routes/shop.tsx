@@ -13,7 +13,12 @@ export const Route = createFileRoute("/shop")({
       {
         name: "description",
         content:
-          "Browse the full Prince Esquare menswear collection - suits, shirts, shoes, casual and more.",
+          "Shop men's fashion in Kenya with Prince Esquare: suits, shirts, shoes, trousers, track suits, belts and socks with Nairobi delivery.",
+      },
+      {
+        name: "keywords",
+        content:
+          "shop menswear kenya, buy suits nairobi, shirts kenya, men's shoes kenya, prince esquare shop",
       },
     ],
   }),
@@ -95,17 +100,27 @@ function ShopPage() {
   return (
     <>
       <div className="container mx-auto px-4 py-12 md:py-16">
+        <section className="relative mb-10 overflow-hidden rounded-md bg-navy py-14 text-center text-navy-foreground md:py-16">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
+            style={{ backgroundImage: "url('/hero-suit.jpg')" }}
+          />
+          <div className="relative z-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">The Collection</p>
+            <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Shop All</h1>
+            <div className="gold-divider mx-auto mt-4 w-24" />
+            {q.trim() && (
+              <p className="mt-3 text-sm text-navy-foreground/85">
+                Search results for <span className="font-semibold text-gold">"{q}"</span>
+              </p>
+            )}
+          </div>
+        </section>
+
         <div className="mb-8 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
-            The Collection
+            Browse By Category
           </p>
-          <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Shop All</h1>
-          <div className="gold-divider mx-auto mt-4 w-24" />
-          {q.trim() && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Search results for <span className="font-semibold text-foreground">"{q}"</span>
-            </p>
-          )}
         </div>
 
         <div className="mb-8 flex flex-wrap justify-center gap-2">

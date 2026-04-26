@@ -46,19 +46,41 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Prince Esquare crafts premium menswear for the modern Nairobi gentleman — suits, shirts, shoes and more. Free Nairobi delivery.",
+          "Prince Esquare is a leading Nairobi menswear store for premium suits, shirts, shoes, trousers, track suits, belts and socks. Shop quality mens fashion in Kenya with reliable Nairobi delivery.",
       },
+      {
+        name: "keywords",
+        content:
+          "menswear kenya, nairobi suits, men shirts kenya, men shoes nairobi, prince esquare, tailored suits kenya, kenya fashion store for men, buy mens clothing kenya",
+      },
+      { name: "robots", content: "index,follow,max-image-preview:large" },
+      { name: "geo.region", content: "KE-30" },
+      { name: "geo.placename", content: "Nairobi" },
+      { name: "language", content: "en-KE" },
       { name: "author", content: "Prince Esquare" },
       { property: "og:title", content: "Prince Esquare — Premium Menswear" },
-      { property: "og:description", content: "Suits, shirts, shoes & more. Crafted for the modern gentleman." },
+      {
+        property: "og:description",
+        content:
+          "Shop premium menswear in Nairobi, Kenya: suits, shirts, shoes, trousers, track suits, belts and socks.",
+      },
       { property: "og:type", content: "website" },
+      { property: "og:locale", content: "en_KE" },
+      { property: "og:site_name", content: "Prince Esquare" },
+      { property: "og:url", content: "https://princeesquare.vercel.app/" },
       { property: "og:image", content: brandLogo },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Prince Esquare — Premium Menswear in Nairobi" },
+      {
+        name: "twitter:description",
+        content: "Premium men's suits, shirts, shoes and more — built for Nairobi gentlemen.",
+      },
       { name: "twitter:image", content: brandLogo },
     ],
     links: [
       { rel: "icon", href: brandLogo },
       { rel: "apple-touch-icon", href: brandLogo },
+      { rel: "canonical", href: "https://princeesquare.vercel.app/" },
     ],
   }),
   shellComponent: RootShell,

@@ -14,7 +14,15 @@ export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
       { title: "Contact Us — Prince Esquare" },
-      { name: "description", content: "Get in touch with Prince Esquare. Visit our Nairobi store or message us anytime." },
+      {
+        name: "description",
+        content:
+          "Contact Prince Esquare in Nairobi, Kenya for menswear orders, fittings, style guidance, and customer support.",
+      },
+      {
+        name: "keywords",
+        content: "contact prince esquare, menswear support kenya, nairobi clothing store contact",
+      },
     ],
   }),
   component: ContactPage,

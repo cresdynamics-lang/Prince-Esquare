@@ -5,7 +5,15 @@ export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
       { title: "About Prince Esquare — Premium Menswear in Nairobi" },
-      { name: "description", content: "The story of Prince Esquare — premium menswear crafted for the modern Nairobi gentleman." },
+      {
+        name: "description",
+        content:
+          "Learn about Prince Esquare, a Nairobi-based premium menswear brand in Kenya focused on quality suits, shirts, shoes and timeless gentleman style.",
+      },
+      {
+        name: "keywords",
+        content: "about prince esquare, nairobi menswear brand, kenya men fashion, premium suits kenya",
+      },
     ],
   }),
   component: AboutPage,
@@ -40,6 +48,21 @@ function AboutPage() {
             <p className="mt-2 text-sm text-muted-foreground">{b.b}</p>
           </div>
         ))}
+      </section>
+
+      <section className="container mx-auto max-w-5xl px-4 pb-16">
+        <div className="rounded-md border border-border bg-card p-6 md:p-8">
+          <h2 className="font-display text-2xl font-bold md:text-3xl">Built for Kenya&apos;s modern gentleman</h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
+            Prince Esquare serves men who value fit, confidence, and quality. We curate collections for
+            business, weddings, events, and everyday smart style across Nairobi and beyond.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
+            From our Nairobi base, we combine classic tailoring principles with modern African city
+            style. Our goal is simple: help every client look sharp, feel confident, and dress with
+            purpose.
+          </p>
+        </div>
       </section>
     </div>
   );
