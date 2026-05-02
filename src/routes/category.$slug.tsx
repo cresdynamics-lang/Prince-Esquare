@@ -1,28 +1,41 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { resolveImage } from "@/lib/assetMap";
+import { defaultCarouselDescription, defaultCarouselTitle, getCategorySubcategoryLinks } from "@/lib/categoryCarousels";
 import { fetchPublishedProductsForCategoryPage } from "@/lib/publishedProductsQuery";
 import { getSubcategoriesForCategory, resolveSubcategory } from "@/lib/subcategories";
 
 export const Route = createFileRoute("/category/$slug")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    sub: typeof search.sub === "string" ? search.sub : "",
+  }),
   component: CategoryPage,
 });
 
 function CategoryPage() {
   const PAGE_SIZE = 24;
   const { slug } = Route.useParams();
+  const { sub } = Route.useSearch();
   const [cat, setCat] = useState<{
+    id: string;
     name: string;
     description: string | null;
     image_url: string | null;
+  } | null>(null);
+  const [carousel, setCarousel] = useState<{
+    title: string | null;
+    description: string | null;
+    image_url: string | null;
+    is_active: boolean;
   } | null>(null);
   const [products, setProducts] = useState<ProductCardData[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -42,6 +55,12 @@ function CategoryPage() {
       }
 
       setCat(c);
+      const { data: carouselRow } = await supabase
+        .from("category_carousels")
+        .select("title,description,image_url,is_active")
+        .eq("category_id", c.id)
+        .maybeSingle();
+      setCarousel(carouselRow ?? null);
 
       const { data: ps, error: prodErr } = await fetchPublishedProductsForCategoryPage(supabase, c.id);
       if (prodErr) {
@@ -73,10 +92,40 @@ function CategoryPage() {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-    setActiveSubcategory(null);
-  }, [slug]);
+    setActiveSubcategory(sub || null);
+    setActiveSlide(0);
+  }, [slug, sub]);
 
   const subcategories = getSubcategoriesForCategory(slug);
+  const carouselSubcategoryLinks = getCategorySubcategoryLinks(slug);
+  const carouselSlides = useMemo(() => {
+    const carouselEnabled = carousel?.is_active !== false;
+    const heading = carouselEnabled
+      ? carousel?.title?.trim() || defaultCarouselTitle(cat?.name ?? "Category")
+      : cat?.name ?? "Category";
+    const body = carouselEnabled
+      ? carousel?.description?.trim() || defaultCarouselDescription(cat?.name ?? "menswear")
+      : cat?.description || "";
+    const image = carouselEnabled ? carousel?.image_url || cat?.image_url || null : cat?.image_url || null;
+    if (carouselSubcategoryLinks.length === 0) {
+      return [{ key: "all", heading, body, image, subcategory: null as string | null }];
+    }
+    return carouselSubcategoryLinks.map((subcat) => ({
+      key: subcat,
+      heading,
+      body,
+      image,
+      subcategory: subcat,
+    }));
+  }, [carousel, carouselSubcategoryLinks, cat]);
+
+  useEffect(() => {
+    if (carouselSlides.length <= 1) return;
+    const id = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % carouselSlides.length);
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [carouselSlides.length]);
   const filteredProducts = activeSubcategory
     ? products.filter((p) => p.subcategory_name === activeSubcategory)
     : products;
@@ -97,22 +146,62 @@ function CategoryPage() {
   return (
     <div>
       <section className="relative overflow-hidden bg-navy text-navy-foreground">
-        {cat?.image_url && (
-          <div className="absolute inset-0 opacity-30">
-            <img src={resolveImage(cat.image_url)} alt="" className="h-full w-full object-cover" />
+        {carouselSlides.map((slide, idx) => (
+          <div
+            key={slide.key}
+            className={`absolute inset-0 transition-opacity duration-700 ${idx === activeSlide ? "opacity-100" : "opacity-0"}`}
+          >
+            {slide.image && (
+              <img src={resolveImage(slide.image)} alt={slide.heading} className="h-full w-full object-cover" />
+            )}
+            <div className="absolute inset-0 bg-navy/65" />
           </div>
-        )}
+        ))}
         <div className="container relative mx-auto px-4 py-16 text-center md:py-24">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
             Collection
           </p>
           <h1 className="mt-3 font-display text-4xl font-bold md:text-6xl">
-            {cat?.name ?? "Loading..."}
+            {carouselSlides[activeSlide]?.heading ?? cat?.name ?? "Loading..."}
           </h1>
-          {cat?.description && (
+          {(carouselSlides[activeSlide]?.body || cat?.description) && (
             <p className="mx-auto mt-4 max-w-xl text-sm text-navy-foreground/70 md:text-base">
-              {cat.description}
+              {carouselSlides[activeSlide]?.body || cat?.description}
             </p>
+          )}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              to="/category/$slug"
+              params={{ slug }}
+              search={{ sub: "" }}
+              className="rounded-full border border-gold bg-gold px-4 py-2 text-xs font-semibold text-gold-foreground transition hover:brightness-110"
+            >
+              All {cat?.name ?? "items"}
+            </Link>
+            {carouselSubcategoryLinks.map((subcat) => (
+              <Link
+                key={subcat}
+                to="/category/$slug"
+                params={{ slug }}
+                search={{ sub: subcat }}
+                className="rounded-full border border-navy-foreground/40 px-4 py-2 text-xs font-semibold text-navy-foreground transition hover:border-gold hover:text-gold"
+              >
+                {subcat}
+              </Link>
+            ))}
+          </div>
+          {carouselSlides.length > 1 && (
+            <div className="mt-5 flex items-center justify-center gap-2">
+              {carouselSlides.map((slide, idx) => (
+                <button
+                  key={slide.key}
+                  type="button"
+                  onClick={() => setActiveSlide(idx)}
+                  aria-label={`Open ${slide.subcategory ?? "all"} slide`}
+                  className={`h-2.5 rounded-full transition-all ${idx === activeSlide ? "w-8 bg-gold" : "w-2.5 bg-navy-foreground/50"}`}
+                />
+              ))}
+            </div>
           )}
         </div>
       </section>

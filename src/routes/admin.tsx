@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatKES, STORE_INFO } from "@/lib/format";
 import { fashionProductsAsCards } from "@/lib/fashionProducts";
 import { ALLOWED_CATEGORY_SLUGS, CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
+import { defaultCarouselDescription, defaultCarouselTitle, getCategorySubcategoryLinks } from "@/lib/categoryCarousels";
 import { getSubcategoriesForCategory, inferSubcategory, resolveSubcategory } from "@/lib/subcategories";
 import { productsInsertSafe, productsUpdateSafe, productsUpsertSafe } from "@/lib/productWriteFallback";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,19 @@ function AdminPage() {
   });
   const [categories, setCategories] = useState<any[]>([]);
   const [categoryNameDrafts, setCategoryNameDrafts] = useState<Record<string, string>>({});
+  const [carouselDrafts, setCarouselDrafts] = useState<
+    Record<
+      string,
+      {
+        title: string;
+        description: string;
+        image_url: string;
+        is_active: boolean;
+      }
+    >
+  >({});
+  const [savingCarouselCategoryId, setSavingCarouselCategoryId] = useState<string | null>(null);
+  const [uploadingCarouselCategoryId, setUploadingCarouselCategoryId] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [applyingRequiredTaxonomy, setApplyingRequiredTaxonomy] = useState(false);
   const [newCategory, setNewCategory] = useState({
@@ -195,6 +209,7 @@ function AdminPage() {
       { data: allVariants },
       { data: pr },
       { data: cs },
+      { data: carousels },
       { data: oi },
     ] =
       await Promise.all([
@@ -230,6 +245,7 @@ function AdminPage() {
           .order("created_at", { ascending: false }),
         supabase.from("promo_codes").select("*").order("created_at", { ascending: false }),
         supabase.from("categories").select("id,name,slug").order("display_order"),
+        supabase.from("category_carousels").select("category_id,title,description,image_url,is_active"),
         supabase.from("order_items").select("quantity,line_total,created_at"),
       ]);
     setOrders(os ?? []);
@@ -245,6 +261,28 @@ function AdminPage() {
       cDrafts[c.id] = c.name ?? "";
     });
     setCategoryNameDrafts(cDrafts);
+    const carouselByCategory = new Map<string, any>(
+      (carousels ?? []).map((row: any) => [row.category_id as string, row]),
+    );
+    const nextCarouselDrafts: Record<
+      string,
+      {
+        title: string;
+        description: string;
+        image_url: string;
+        is_active: boolean;
+      }
+    > = {};
+    (cs ?? []).forEach((c: any) => {
+      const existing = carouselByCategory.get(c.id);
+      nextCarouselDrafts[c.id] = {
+        title: existing?.title ?? defaultCarouselTitle(c.name ?? "Category"),
+        description: existing?.description ?? defaultCarouselDescription(c.name ?? "menswear"),
+        image_url: existing?.image_url ?? "",
+        is_active: existing?.is_active ?? true,
+      };
+    });
+    setCarouselDrafts(nextCarouselDrafts);
     const pDrafts: Record<string, string> = {};
     const sDrafts: Record<string, string> = {};
     const prDrafts: Record<
@@ -416,6 +454,13 @@ function AdminPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "categories" },
+        () => {
+          loadAll();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "category_carousels" },
         () => {
           loadAll();
         },
@@ -792,6 +837,56 @@ function AdminPage() {
     }
     toast.success("Category created.");
     setNewCategory({ name: "", slug: "", image_url: "", description: "" });
+    loadAll();
+  };
+
+  const updateCarouselDraft = (
+    categoryId: string,
+    key: "title" | "description" | "image_url" | "is_active",
+    value: string | boolean,
+  ) => {
+    setCarouselDrafts((prev) => ({
+      ...prev,
+      [categoryId]: {
+        ...prev[categoryId],
+        [key]: value,
+      },
+    }));
+  };
+
+  const uploadCarouselImage = async (categoryId: string, file: File) => {
+    try {
+      setUploadingCarouselCategoryId(categoryId);
+      const publicUrl = await uploadImageToStorage(file);
+      updateCarouselDraft(categoryId, "image_url", publicUrl);
+      toast.success("Carousel image uploaded.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Failed to upload carousel image.");
+    } finally {
+      setUploadingCarouselCategoryId(null);
+    }
+  };
+
+  const saveCategoryCarousel = async (categoryId: string) => {
+    const draft = carouselDrafts[categoryId];
+    if (!draft) return;
+    setSavingCarouselCategoryId(categoryId);
+    const { error } = await supabase.from("category_carousels").upsert(
+      {
+        category_id: categoryId,
+        title: draft.title.trim() || null,
+        description: draft.description.trim() || null,
+        image_url: draft.image_url.trim() || null,
+        is_active: draft.is_active,
+      },
+      { onConflict: "category_id" },
+    );
+    setSavingCarouselCategoryId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Category carousel saved.");
     loadAll();
   };
 
@@ -2098,6 +2193,86 @@ function AdminPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="mb-5 rounded-md border border-border bg-card p-4">
+            <p className="text-sm font-semibold">Category carousel content</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each category page has a hero carousel. Edit the headline, description, and image here. Subcategory
+              links shown on the carousel are generated from your taxonomy.
+            </p>
+            <div className="mt-4 space-y-3">
+              {categories.map((c: any) => {
+                const draft = carouselDrafts[c.id];
+                const subLinks = getCategorySubcategoryLinks(c.slug ?? "");
+                return (
+                  <div key={c.id} className="rounded-md border border-border p-3">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          /category/{c.slug}
+                          {subLinks.length > 0 ? ` · links: ${subLinks.join(", ")}` : " · no subcategory links"}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={savingCarouselCategoryId === c.id}
+                        onClick={() => saveCategoryCarousel(c.id)}
+                      >
+                        {savingCarouselCategoryId === c.id ? "Saving..." : "Save carousel"}
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input
+                        value={draft?.title ?? ""}
+                        onChange={(e) => updateCarouselDraft(c.id, "title", e.target.value)}
+                        placeholder="Carousel title"
+                        className="rounded border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <label className="inline-flex items-center gap-2 rounded border border-border bg-background px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(draft?.is_active)}
+                          onChange={(e) => updateCarouselDraft(c.id, "is_active", e.target.checked)}
+                        />
+                        Carousel active
+                      </label>
+                      <textarea
+                        value={draft?.description ?? ""}
+                        onChange={(e) => updateCarouselDraft(c.id, "description", e.target.value)}
+                        placeholder="Carousel description"
+                        rows={2}
+                        className="rounded border border-border bg-background px-3 py-2 text-sm md:col-span-2"
+                      />
+                      <input
+                        value={draft?.image_url ?? ""}
+                        onChange={(e) => updateCarouselDraft(c.id, "image_url", e.target.value)}
+                        placeholder="Carousel image URL"
+                        className="rounded border border-border bg-background px-3 py-2 text-sm md:col-span-2"
+                      />
+                      <div className="md:col-span-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="block w-full rounded border border-border bg-background px-3 py-2 text-xs"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            void uploadCarouselImage(c.id, file);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        {uploadingCarouselCategoryId === c.id && (
+                          <p className="mt-1 text-xs text-muted-foreground">Uploading image...</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
