@@ -39,3 +39,14 @@ SELECT
   TRUE
 FROM public.categories c
 ON CONFLICT (category_id) DO NOTHING;
+
+ALTER TABLE public.category_carousels ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read category carousels" ON public.category_carousels
+FOR SELECT
+USING (true);
+
+CREATE POLICY "Admins manage category carousels" ON public.category_carousels
+FOR ALL TO authenticated
+USING (public.has_role(auth.uid(), 'admin'))
+WITH CHECK (public.has_role(auth.uid(), 'admin'));
