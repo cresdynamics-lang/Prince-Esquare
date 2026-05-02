@@ -14,7 +14,11 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+.vite
 *.local
+
+# Supabase CLI local state
+supabase/.temp/
 
 # Wrangler / Cloudflare
 .wrangler/
