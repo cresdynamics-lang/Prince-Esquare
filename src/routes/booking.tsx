@@ -11,15 +11,15 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/booking")({
   head: () => ({
     meta: [
-      { title: "Book Appointment — Prince Esquare" },
+      { title: "Book Appointment — Prince Esquire" },
       {
         name: "description",
         content:
-          "Book a fitting or style consultation with Prince Esquare in Nairobi, Kenya. Reserve your menswear appointment online.",
+          "Book a fitting or style consultation with Prince Esquire in Nairobi, Kenya. Reserve your menswear appointment online.",
       },
       {
         name: "keywords",
-        content: "book menswear fitting nairobi, suit fitting kenya, style consultation nairobi, prince esquare booking",
+        content: "book menswear fitting nairobi, suit fitting kenya, style consultation nairobi, prince esquire booking",
       },
     ],
   }),
@@ -101,7 +101,7 @@ function BookingPage() {
         />
         <div className="relative z-10 px-4">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Appointments</p>
-          <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Book with Prince Esquare</h1>
+          <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Book with Prince Esquire</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-navy-foreground/85 md:text-base">
             Reserve a fitting, style consultation, or in-store service. We will confirm your booking by
             phone or email.

@@ -1,9 +1,18 @@
 import type { ProductCardData } from "@/components/site/ProductCard";
 import { fashionGalleryItems, getFashionGalleryForSlug } from "@/lib/fashionGallery";
 
-/** URL slug derived from `image-metadata.json` `newName` (filename without extension). */
+/**
+ * URL slug aligned with `scripts/sync-image-products-to-db.cjs`: stem + extension token so
+ * the same image in `.webp` / `.jfif` / `.avif` does not collapse to one product.
+ */
 export function fashionSlugFromFilename(newName: string): string {
-  return newName.replace(/\.[a-z0-9]+$/i, "");
+  const stem = newName.replace(/\.[^.]+$/i, "");
+  const ext = (newName.match(/\.([^.]+)$/i)?.[1] ?? "").toLowerCase();
+  const combined = ext ? `${stem}-${ext}` : stem;
+  return combined
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 const PRICE_RANGE_BY_CATEGORY: Record<string, { min: number; max: number }> = {

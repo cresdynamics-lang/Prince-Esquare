@@ -5,15 +5,15 @@ import { STORE_INFO } from "@/lib/format";
 export const Route = createFileRoute("/store-locator")({
   head: () => ({
     meta: [
-      { title: "Store Locator — Prince Esquare Nairobi" },
+      { title: "Store Locator — Prince Esquire Nairobi" },
       {
         name: "description",
         content:
-          "Find Prince Esquare in Nairobi, Kenya. Visit our menswear store for premium suits, shirts, shoes and personal style guidance.",
+          "Find Prince Esquire in Nairobi, Kenya. Visit our menswear store for premium suits, shirts, shoes and personal style guidance.",
       },
       {
         name: "keywords",
-        content: "nairobi menswear store, prince esquare location, mens fashion shop kenya, kimathi street store",
+        content: "nairobi menswear store, prince esquire location, mens fashion shop kenya, kimathi street store",
       },
     ],
   }),
@@ -52,7 +52,7 @@ function StoreLocatorPage() {
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="Prince Esquare store location"
+              title="Prince Esquire store location"
             />
           </div>
         </div>

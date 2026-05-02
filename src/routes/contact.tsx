@@ -13,15 +13,15 @@ import { STORE_INFO } from "@/lib/format";
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact Us — Prince Esquare" },
+      { title: "Contact Us — Prince Esquire" },
       {
         name: "description",
         content:
-          "Contact Prince Esquare in Nairobi, Kenya for menswear orders, fittings, style guidance, and customer support.",
+          "Contact Prince Esquire in Nairobi, Kenya for menswear orders, fittings, style guidance, and customer support.",
       },
       {
         name: "keywords",
-        content: "contact prince esquare, menswear support kenya, nairobi clothing store contact",
+        content: "contact prince esquire, menswear support kenya, nairobi clothing store contact",
       },
     ],
   }),
@@ -71,7 +71,7 @@ function ContactPage() {
         <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: "url('/hero-suit.jpg')" }} />
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">We'd love to hear from you</p>
-          <h1 className="mt-3 font-display text-4xl font-bold md:text-5xl">Contact Prince Esquare</h1>
+          <h1 className="mt-3 font-display text-4xl font-bold md:text-5xl">Contact Prince Esquire</h1>
         </div>
       </section>
 
@@ -94,7 +94,7 @@ function ContactPage() {
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="Prince Esquare store location"
+              title="Prince Esquire store location"
             />
           </div>
         </div>

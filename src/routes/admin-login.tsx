@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-login")({
-  head: () => ({ meta: [{ title: "Admin Login — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Admin Login — Prince Esquire" }] }),
   component: AdminLoginPage,
 });
 
@@ -38,7 +38,7 @@ function AdminLoginPage() {
       normalizedIdentifier.includes("@")
         ? normalizedIdentifier
         : normalizedIdentifier === "admin"
-          ? "princeesquare@gmail.com"
+          ? "princeesquire@gmail.com"
           : "";
     if (!normalizedEmail) {
       toast.error("Enter email or use username: Admin");

@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWishlist } from "@/lib/wishlist";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
+import { resolveSubcategory } from "@/lib/subcategories";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/wishlist")({
-  head: () => ({ meta: [{ title: "Wishlist — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Wishlist — Prince Esquire" }] }),
   component: WishlistPage,
 });
 
@@ -24,7 +25,7 @@ function WishlistPage() {
       }
       const { data } = await supabase
         .from("products")
-        .select("id,slug,title,price,sale_price,product_images(image_url),categories(name)")
+        .select("id,slug,title,price,sale_price,product_images(image_url),product_variants(stock_quantity),categories(name,slug)")
         .in("id", [...ids])
         .eq("is_published", true);
       setItems(
@@ -36,6 +37,16 @@ function WishlistPage() {
           sale_price: p.sale_price != null ? Number(p.sale_price) : null,
           image: p.product_images?.[0]?.image_url ?? null,
           category_name: p.categories?.name,
+          category_slug: p.categories?.slug,
+          subcategory_name: resolveSubcategory(
+            p.subcategory,
+            p.categories?.slug,
+            `${p.title ?? ""} ${p.slug ?? ""}`,
+          ),
+          stock_quantity_total: (p.product_variants ?? []).reduce(
+            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+            0,
+          ),
         })),
       );
       setLoading(false);

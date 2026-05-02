@@ -7,6 +7,7 @@ import { FashionGallery } from "@/components/site/FashionGallery";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { fashionGalleryItems } from "@/lib/fashionGallery";
 import { dedupeProductsBySlugPreferOrder, fashionProductsAsCards } from "@/lib/fashionProducts";
+import { resolveSubcategory } from "@/lib/subcategories";
 import heroImg from "@/assets/hero-suit.jpg";
 import catSuitsImg from "@/assets/cat-suits.jpg";
 import catShoesImg from "@/assets/cat-shoes.jpg";
@@ -47,7 +48,7 @@ function pickMixedCategories(products: ProductCardData[], limit: number): Produc
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Prince Esquare - Premium Menswear in Nairobi" },
+      { title: "Prince Esquire - Premium Menswear in Nairobi" },
       {
         name: "description",
         content:
@@ -124,14 +125,14 @@ function HomePage() {
           supabase
             .from("products")
             .select(
-              "id,slug,title,price,sale_price,is_featured,product_images(image_url),categories(name,slug)",
+              "id,slug,title,price,sale_price,is_featured,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
             )
             .eq("is_published", true)
             .eq("is_featured", true)
             .limit(16),
           supabase
             .from("products")
-            .select("id,slug,title,price,sale_price,product_images(image_url),categories(name,slug)")
+            .select("id,slug,title,price,sale_price,product_images(image_url),product_variants(stock_quantity),categories(name,slug)")
             .eq("is_published", true)
             .order("created_at", { ascending: false })
             .limit(16),
@@ -141,7 +142,9 @@ function HomePage() {
         if (prods.length === 0) {
           const { data: latestProducts } = await supabase
             .from("products")
-            .select("id,slug,title,price,sale_price,product_images(image_url),categories(name,slug)")
+            .select(
+              "id,slug,title,price,sale_price,is_featured,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
+            )
             .eq("is_published", true)
             .order("created_at", { ascending: false })
             .limit(16);
@@ -157,6 +160,15 @@ function HomePage() {
           image: p.product_images?.[0]?.image_url ?? null,
           category_name: p.categories?.name,
           category_slug: p.categories?.slug,
+          subcategory_name: resolveSubcategory(
+            p.subcategory,
+            p.categories?.slug,
+            `${p.title ?? ""} ${p.slug ?? ""}`,
+          ),
+          stock_quantity_total: (p.product_variants ?? []).reduce(
+            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+            0,
+          ),
         }));
         const mappedFeatured = prods.map((p: any) => ({
           id: p.id,
@@ -167,6 +179,15 @@ function HomePage() {
           image: p.product_images?.[0]?.image_url ?? null,
           category_name: p.categories?.name,
           category_slug: p.categories?.slug,
+          subcategory_name: resolveSubcategory(
+            p.subcategory,
+            p.categories?.slug,
+            `${p.title ?? ""} ${p.slug ?? ""}`,
+          ),
+          stock_quantity_total: (p.product_variants ?? []).reduce(
+            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+            0,
+          ),
         }));
         const fashionCards = fashionProductsAsCards();
         const curatedMerged = dedupeProductsBySlugPreferOrder([...mappedCurated, ...fashionCards]);
@@ -391,10 +412,10 @@ function HomePage() {
       <section className="container mx-auto px-4 py-16 md:py-24">
         <div className="mb-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
-            The Esquare Promise
+            The Esquire Promise
           </p>
           <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">
-            Why Prince Esquare
+            Why Prince Esquire
           </h2>
         </div>
         <div className="grid gap-8 md:grid-cols-4">

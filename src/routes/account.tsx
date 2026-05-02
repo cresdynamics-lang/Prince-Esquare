@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatKES } from "@/lib/format";
 
 export const Route = createFileRoute("/account")({
-  head: () => ({ meta: [{ title: "My Account — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "My Account — Prince Esquire" }] }),
   component: AccountPage,
 });
 

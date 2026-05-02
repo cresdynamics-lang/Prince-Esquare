@@ -20,7 +20,7 @@ import type { TablesInsert } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/checkout")({
-  head: () => ({ meta: [{ title: "Checkout - Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Checkout - Prince Esquire" }] }),
   component: CheckoutPage,
 });
 

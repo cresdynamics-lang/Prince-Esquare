@@ -11,6 +11,7 @@
     "images:optimize": "node scripts/generate-webp.cjs",
     "images:webp": "node scripts/generate-webp.cjs",
     "products:sync-images": "node scripts/sync-image-products-to-db.cjs",
+    "products:backfill-subcategories": "node scripts/backfill-product-subcategories.cjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

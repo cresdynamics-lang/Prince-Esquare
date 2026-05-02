@@ -4,7 +4,7 @@ import { STORE_INFO } from "@/lib/format";
 export function WhatsAppFab() {
   return (
     <a
-      href={`https://wa.me/${STORE_INFO.whatsapp}?text=${encodeURIComponent("Hello Prince Esquare, I'd like to enquire about ")}`}
+      href={`https://wa.me/${STORE_INFO.whatsapp}?text=${encodeURIComponent("Hello Prince Esquire, I'd like to enquire about ")}`}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"

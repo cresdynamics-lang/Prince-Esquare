@@ -17,6 +17,10 @@ export type ProductCardData = {
   category_slug?: string;
   /** Show “Price on request” instead of a numeric price (studio / enquiry-only items). */
   price_on_request?: boolean;
+  /** Total stock across variants (optional analytics / future use). */
+  stock_quantity_total?: number;
+  /** Optional inferred subcategory label for the card. */
+  subcategory_name?: string | null;
 };
 
 export function ProductCard({ product, eager = false }: { product: ProductCardData; eager?: boolean }) {
@@ -26,6 +30,7 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDa
     !product.price_on_request &&
     product.sale_price != null &&
     Number(product.sale_price) < Number(product.price);
+  const isSoldOut = (product.stock_quantity_total ?? 1) <= 0;
 
   return (
     <div className="product-card group relative overflow-hidden rounded-md border border-border bg-card">
@@ -72,6 +77,11 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDa
         {product.category_name && (
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {product.category_name}
+          </div>
+        )}
+        {product.subcategory_name && (
+          <div className="mt-0.5 text-[10px] font-medium text-muted-foreground">
+            {product.subcategory_name}
           </div>
         )}
         <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">

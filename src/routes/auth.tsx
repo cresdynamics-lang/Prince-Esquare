@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in / Create account — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Sign in / Create account — Prince Esquire" }] }),
   component: AuthPage,
 });
 
@@ -55,7 +55,7 @@ function AuthPage() {
   return (
     <div className="container mx-auto max-w-md px-4 py-16">
       <div className="text-center">
-        <h1 className="font-display text-3xl font-bold">Welcome to Prince Esquare</h1>
+        <h1 className="font-display text-3xl font-bold">Welcome to Prince Esquire</h1>
         <p className="mt-2 text-sm text-muted-foreground">Sign in or create an account.</p>
       </div>
 

@@ -7,17 +7,13 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { STORE_INFO } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
 import logoImg from "@/assets/Prince logo.png";
 
-const SHOP_CATEGORIES = [
-  { label: "Shoes", slug: "shoes" },
-  { label: "Socks", slug: "socks" },
-  { label: "Suits", slug: "suits" },
-  { label: "Shirts", slug: "shirts" },
-  { label: "Trousers", slug: "trousers" },
-  { label: "Khaki Pants", slug: "khaki-pants" },
-  { label: "Track Suits", slug: "track-suits" },
-] as const;
+const SHOP_CATEGORIES = CATALOG_TAXONOMY.map((category) => ({
+  label: category.name,
+  slug: category.slug,
+}));
 
 export function Footer() {
   const { isStaff } = useAuth();
@@ -40,7 +36,7 @@ export function Footer() {
       }
       return;
     }
-    toast.success("Welcome to the Esquare circle.");
+    toast.success("Welcome to the Esquire circle.");
     setEmail("");
   };
 
@@ -52,7 +48,7 @@ export function Footer() {
             <div className="flex items-center gap-2.5">
               <img
                 src={logoImg}
-                alt="Prince Esquare logo"
+                alt="Prince Esquire logo"
                 className="h-8 w-8 rounded-full border border-gold/40 object-cover"
                 width={32}
                 height={32}
@@ -60,7 +56,7 @@ export function Footer() {
                 decoding="async"
               />
               <div className="font-display text-lg font-bold">
-                Prince <span className="text-gold">Esquare</span>
+                Prince <span className="text-gold">Esquire</span>
               </div>
             </div>
             <p className="mt-1.5 text-[11px] text-navy-foreground/70">
@@ -168,7 +164,7 @@ export function Footer() {
         <div className="mt-6 border-t border-navy-foreground/15 pt-3 text-[10px] text-navy-foreground/50">
           <div className="grid items-center gap-3 md:grid-cols-3">
             <p className="text-center md:text-left">
-              (c) {new Date().getFullYear()} Prince Esquare. All rights reserved.
+              (c) {new Date().getFullYear()} Prince Esquire. All rights reserved.
             </p>
             <div className="flex justify-center">
               <Link

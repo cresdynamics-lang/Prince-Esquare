@@ -1,12 +1,27 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import {
+  Calendar,
+  ClipboardList,
+  Mail,
+  Menu,
+  Package,
+  Percent,
+  Shield,
+  Tag,
+  Warehouse,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Enums } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatKES } from "@/lib/format";
+import { formatKES, STORE_INFO } from "@/lib/format";
 import { fashionProductsAsCards } from "@/lib/fashionProducts";
+import { ALLOWED_CATEGORY_SLUGS, CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
+import { getSubcategoriesForCategory, inferSubcategory, resolveSubcategory } from "@/lib/subcategories";
+import { productsInsertSafe, productsUpdateSafe, productsUpsertSafe } from "@/lib/productWriteFallback";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 const ORDER_STATUSES: Enums<"order_status">[] = [
@@ -18,7 +33,7 @@ const ORDER_STATUSES: Enums<"order_status">[] = [
 ];
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin Dashboard - Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Admin Dashboard - Prince Esquire" }] }),
   component: AdminPage,
 });
 
@@ -39,10 +54,35 @@ function AdminPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [lowStock, setLowStock] = useState<any[]>([]);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [variantStockDrafts, setVariantStockDrafts] = useState<Record<string, string>>({});
+  const [variantBusyId, setVariantBusyId] = useState<string | null>(null);
+  const [autoCreatingVariants, setAutoCreatingVariants] = useState(false);
+  const [fillingDescriptions, setFillingDescriptions] = useState(false);
+  const [newVariant, setNewVariant] = useState({
+    product_id: "",
+    size: "",
+    color: "",
+    sku: "",
+    stock_quantity: "",
+  });
   const [promos, setPromos] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState("orders");
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true,
+  );
+  const [financeStats, setFinanceStats] = useState({
+    weeklyRevenue: 0,
+    monthlyRevenue: 0,
+    weeklyOrders: 0,
+    monthlyOrders: 0,
+    itemsSold: 0,
+    soldAmount: 0,
+  });
   const [categories, setCategories] = useState<any[]>([]);
   const [categoryNameDrafts, setCategoryNameDrafts] = useState<Record<string, string>>({});
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [applyingRequiredTaxonomy, setApplyingRequiredTaxonomy] = useState(false);
   const [newCategory, setNewCategory] = useState({
     name: "",
     slug: "",
@@ -58,6 +98,7 @@ function AdminPage() {
         title: string;
         slug: string;
         category_id: string;
+        subcategory: string;
         is_published: boolean;
         is_featured: boolean;
         image_url: string;
@@ -71,7 +112,12 @@ function AdminPage() {
   const [uploadingNewProductImage, setUploadingNewProductImage] = useState(false);
   const [uploadingProductImageId, setUploadingProductImageId] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState("");
-  const [productCategoryFilter, setProductCategoryFilter] = useState("all");
+  /** "all" or a category slug from `CATALOG_TAXONOMY`. */
+  const [productCategorySlugFilter, setProductCategorySlugFilter] = useState<string>("all");
+  /** "all" | "__none__" | subcategory label; only applies when a category slug is selected. */
+  const [productSubcategoryFilter, setProductSubcategoryFilter] = useState<string>("all");
+  /** Storefront = same inclusion rules as the public shop (published + approved catalog category). */
+  const [productCatalogScope, setProductCatalogScope] = useState<"storefront" | "full">("full");
   const [productVisibilityFilter, setProductVisibilityFilter] = useState<
     "all" | "published" | "draft"
   >("all");
@@ -80,6 +126,7 @@ function AdminPage() {
     slug: "",
     description: "",
     category_id: "",
+    subcategory: "",
     price: "",
     sale_price: "",
     image_url: "",
@@ -145,8 +192,10 @@ function AdminPage() {
       { data: ms },
       { data: bs },
       { data: vs },
+      { data: allVariants },
       { data: pr },
       { data: cs },
+      { data: oi },
     ] =
       await Promise.all([
         supabase
@@ -157,7 +206,7 @@ function AdminPage() {
         supabase
           .from("products")
           .select(
-            "id, title, slug, category_id, price, sale_price, is_published, is_featured, categories(name), product_images(id,image_url,display_order)",
+            "id, title, slug, category_id, subcategory, price, sale_price, is_published, is_featured, categories(name,slug), product_images(id,image_url,display_order)",
           )
           .order("created_at", { ascending: false }),
         supabase
@@ -175,14 +224,20 @@ function AdminPage() {
           .select("id, sku, size, stock_quantity, products(title)")
           .lt("stock_quantity", 5)
           .order("stock_quantity"),
+        supabase
+          .from("product_variants")
+          .select("id, product_id, sku, size, color, stock_quantity, products(title)")
+          .order("created_at", { ascending: false }),
         supabase.from("promo_codes").select("*").order("created_at", { ascending: false }),
         supabase.from("categories").select("id,name,slug").order("display_order"),
+        supabase.from("order_items").select("quantity,line_total,created_at"),
       ]);
     setOrders(os ?? []);
     setProducts(ps ?? []);
     setMessages(ms ?? []);
     setBookings(bs ?? []);
     setLowStock(vs ?? []);
+    setVariants(allVariants ?? []);
     setPromos(pr ?? []);
     setCategories(cs ?? []);
     const cDrafts: Record<string, string> = {};
@@ -198,6 +253,7 @@ function AdminPage() {
         title: string;
         slug: string;
         category_id: string;
+        subcategory: string;
         is_published: boolean;
         is_featured: boolean;
         image_url: string;
@@ -210,6 +266,7 @@ function AdminPage() {
         title: p.title ?? "",
         slug: p.slug ?? "",
         category_id: p.category_id ?? "",
+        subcategory: p.subcategory ?? "",
         is_published: Boolean(p.is_published),
         is_featured: Boolean(p.is_featured),
         image_url: p.product_images?.[0]?.image_url ?? "",
@@ -218,8 +275,25 @@ function AdminPage() {
     setPriceDrafts(pDrafts);
     setSalePriceDrafts(sDrafts);
     setProductDrafts(prDrafts);
+    const vDrafts: Record<string, string> = {};
+    (allVariants ?? []).forEach((v: any) => {
+      vDrafts[v.id] = String(v.stock_quantity ?? "0");
+    });
+    setVariantStockDrafts(vDrafts);
     const totalRev = (os ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
     const liveProducts = (ps ?? []).filter((p: any) => p.is_published).length;
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const weeklyOrders = (os ?? []).filter((o: any) => new Date(o.created_at).getTime() >= weekAgo);
+    const monthlyOrders = (os ?? []).filter((o: any) => new Date(o.created_at).getTime() >= monthAgo);
+    setFinanceStats({
+      weeklyRevenue: weeklyOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0),
+      monthlyRevenue: monthlyOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0),
+      weeklyOrders: weeklyOrders.length,
+      monthlyOrders: monthlyOrders.length,
+      itemsSold: (oi ?? []).reduce((sum: number, item: any) => sum + Number(item.quantity ?? 0), 0),
+      soldAmount: (oi ?? []).reduce((sum: number, item: any) => sum + Number(item.line_total ?? 0), 0),
+    });
     setStats({
       orders: (os ?? []).length,
       revenue: totalRev,
@@ -235,21 +309,66 @@ function AdminPage() {
     if (isAdmin) loadAll();
   }, [isAdmin]);
 
-  const productCategoryCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const product of products) {
-      const categoryName = product.categories?.name ?? "Uncategorized";
-      counts.set(categoryName, (counts.get(categoryName) ?? 0) + 1);
-    }
-    return Array.from(counts.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [products]);
+  useEffect(() => {
+    setProductSubcategoryFilter("all");
+  }, [productCategorySlugFilter]);
+
+  const taxonomyCategoryCounts = useMemo(() => {
+    return CATALOG_TAXONOMY.map((g) => {
+      const count = products.filter((p) => {
+        if (p.categories?.slug !== g.slug) return false;
+        if (productCatalogScope === "full") return true;
+        const slug = p.categories?.slug as string | undefined;
+        return Boolean(p.is_published && slug && ALLOWED_CATEGORY_SLUGS.has(slug));
+      }).length;
+      return { slug: g.slug, name: g.name, count };
+    });
+  }, [products, productCatalogScope]);
+
+  const storefrontProductCount = useMemo(
+    () =>
+      products.filter((p) => {
+        const slug = p.categories?.slug as string | undefined;
+        return Boolean(p.is_published && slug && ALLOWED_CATEGORY_SLUGS.has(slug));
+      }).length,
+    [products],
+  );
+
+  const subcategoryFilterOptions = useMemo(() => {
+    if (productCategorySlugFilter === "all") return [];
+    const fromTaxonomy = getSubcategoriesForCategory(productCategorySlugFilter);
+    return fromTaxonomy;
+  }, [productCategorySlugFilter]);
 
   const filteredProducts = useMemo(() => {
     const term = productSearch.trim().toLowerCase();
     return products.filter((product) => {
-      const categoryName = product.categories?.name ?? "Uncategorized";
-      const categoryMatch =
-        productCategoryFilter === "all" || categoryName === productCategoryFilter;
+      const catSlug = product.categories?.slug as string | undefined;
+
+      if (productCatalogScope === "storefront") {
+        const ok =
+          Boolean(product.is_published) &&
+          Boolean(catSlug && ALLOWED_CATEGORY_SLUGS.has(catSlug));
+        if (!ok) return false;
+      }
+
+      if (productCategorySlugFilter !== "all" && catSlug !== productCategorySlugFilter) {
+        return false;
+      }
+
+      if (productCategorySlugFilter !== "all" && productSubcategoryFilter !== "all") {
+        const resolved = resolveSubcategory(
+          product.subcategory,
+          catSlug,
+          `${product.title ?? ""} ${product.slug ?? ""}`,
+        );
+        if (productSubcategoryFilter === "__none__") {
+          if (resolved != null) return false;
+        } else if (resolved !== productSubcategoryFilter) {
+          return false;
+        }
+      }
+
       const visibilityMatch =
         productVisibilityFilter === "all" ||
         (productVisibilityFilter === "published" && product.is_published) ||
@@ -261,10 +380,20 @@ function AdminPage() {
           .includes(term) ||
         String(product.slug ?? "")
           .toLowerCase()
+          .includes(term) ||
+        String(resolveSubcategory(product.subcategory, catSlug, `${product.title ?? ""} ${product.slug ?? ""}`) ?? "")
+          .toLowerCase()
           .includes(term);
-      return categoryMatch && visibilityMatch && textMatch;
+      return visibilityMatch && textMatch;
     });
-  }, [products, productCategoryFilter, productVisibilityFilter, productSearch]);
+  }, [
+    products,
+    productCatalogScope,
+    productCategorySlugFilter,
+    productSubcategoryFilter,
+    productVisibilityFilter,
+    productSearch,
+  ]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -332,7 +461,7 @@ function AdminPage() {
 
   const updateProductDraft = (
     id: string,
-    key: "title" | "slug" | "category_id" | "is_published" | "is_featured" | "image_url",
+    key: "title" | "slug" | "category_id" | "subcategory" | "is_published" | "is_featured" | "image_url",
     value: string | boolean,
   ) => {
     setProductDrafts((prev) => ({
@@ -368,26 +497,29 @@ function AdminPage() {
     }
 
     setSavingProductId(id);
-    const { error } = await supabase
-      .from("products")
-      .update({
-        title: draft.title.trim(),
-        slug: draft.slug
-          .trim()
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, ""),
-        category_id: draft.category_id || null,
-        price,
-        sale_price: salePrice,
-        is_published: draft.is_published,
-        is_featured: draft.is_featured,
-      })
-      .eq("id", id);
+    const { error, omittedSubcategory } = await productsUpdateSafe(supabase, id, {
+      title: draft.title.trim(),
+      slug: draft.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, ""),
+      category_id: draft.category_id || null,
+      subcategory: draft.subcategory.trim() || null,
+      price,
+      sale_price: salePrice,
+      is_published: draft.is_published,
+      is_featured: draft.is_featured,
+    });
     if (error) {
       setSavingProductId(null);
       toast.error(error.message);
       return;
+    }
+    if (omittedSubcategory) {
+      toast.message(
+        "Other fields saved. Add column `products.subcategory` in Supabase (or run the migration) to store subcategories.",
+      );
     }
 
     const currentProduct = products.find((p) => p.id === id);
@@ -431,24 +563,26 @@ function AdminPage() {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        title: newProduct.title.trim(),
-        slug,
-        description: newProduct.description.trim() || null,
-        category_id: newProduct.category_id || null,
-        price: Number(newProduct.price || 0),
-        sale_price: newProduct.sale_price ? Number(newProduct.sale_price) : null,
-        is_published: newProduct.is_published,
-        is_featured: newProduct.is_featured,
-      })
-      .select("id")
-      .single();
+    const { data, error, omittedSubcategory } = await productsInsertSafe(supabase, {
+      title: newProduct.title.trim(),
+      slug,
+      description: newProduct.description.trim() || null,
+      category_id: newProduct.category_id || null,
+      subcategory: newProduct.subcategory.trim() || null,
+      price: Number(newProduct.price || 0),
+      sale_price: newProduct.sale_price ? Number(newProduct.sale_price) : null,
+      is_published: newProduct.is_published,
+      is_featured: newProduct.is_featured,
+    });
     if (error || !data) {
       setCreatingProduct(false);
       toast.error(error?.message ?? "Could not create product");
       return;
+    }
+    if (omittedSubcategory) {
+      toast.message(
+        "Product created. Add `products.subcategory` in Supabase to persist subcategory on future edits.",
+      );
     }
     if (newProduct.image_url.trim()) {
       await supabase.from("product_images").insert({
@@ -462,6 +596,7 @@ function AdminPage() {
       slug: "",
       description: "",
       category_id: "",
+      subcategory: "",
       price: "",
       sale_price: "",
       image_url: "",
@@ -534,11 +669,16 @@ function AdminPage() {
       const missingCards = candidates.filter((p) => !dbSlugSet.has(p.slug));
       const rowsToInsert = missingCards.map((p) => {
         const categorySlug = normalizeSlug(p.category_slug ?? p.category_name ?? "");
+        const sub = inferSubcategory(
+          categorySlug || undefined,
+          `${p.title ?? ""} ${p.slug ?? ""}`,
+        );
         return {
           slug: p.slug,
           title: p.title,
           description: p.title,
           category_id: categoryIdBySlug.get(categorySlug) ?? null,
+          subcategory: sub,
           price: Number(p.price ?? 0),
           sale_price: p.sale_price != null ? Number(p.sale_price) : null,
           is_published: true,
@@ -547,13 +687,16 @@ function AdminPage() {
       });
 
       if (rowsToInsert.length > 0) {
-        const { error: insertError } = await supabase.from("products").upsert(rowsToInsert, {
+        const { error: insertError, omittedSubcategory } = await productsUpsertSafe(supabase, rowsToInsert, {
           onConflict: "slug",
           ignoreDuplicates: true,
         });
         if (insertError) {
           toast.error(insertError.message);
           return;
+        }
+        if (omittedSubcategory) {
+          toast.message("Synced products without subcategory until the DB column exists.");
         }
       }
 
@@ -652,6 +795,361 @@ function AdminPage() {
     loadAll();
   };
 
+  const inferCategorySlug = (text: string) => {
+    const t = text.toLowerCase();
+    if (t.includes("polo")) return "polo-t-shirts";
+    if (/(shoe|loafer|oxford|boot|sandal)/.test(t)) return "shoes";
+    if (/(three-piece|two-piece|wedding suit|suit)/.test(t) && !t.includes("track")) return "suits";
+    if (t.includes("blazer")) return "blazers";
+    if (/(track|jogger|athleisure)/.test(t)) return "track-suits";
+    if (/(jacket|coat|bomber)/.test(t)) return "jackets";
+    if (/(khaki|chino|jean|gurkha|trouser|pant)/.test(t)) return "trousers";
+    if (t.includes("linen")) return "linen";
+    if (/(cap|hat)/.test(t)) return "caps-hats";
+    if (/(belt|tie)/.test(t)) return "belts-ties";
+    if (/(sweater|knitwear|cardigan|pullover)/.test(t)) return "sweaters";
+    if (/(t-shirt|tee|sweat-shirt|round-neck|v-neck)/.test(t)) return "t-shirts";
+    if (/(shirt|presidential)/.test(t)) return "shirts";
+    return "shirts";
+  };
+
+  const applyRequiredTaxonomy = async () => {
+    setApplyingRequiredTaxonomy(true);
+    try {
+      const requiredRows = CATALOG_TAXONOMY.map((cat, index) => ({
+        slug: cat.slug,
+        name: cat.name,
+        description:
+          cat.subcategories.length > 0
+            ? `Subcategories: ${cat.subcategories.join(", ")}`
+            : `${cat.name} collection`,
+        display_order: index + 1,
+      }));
+
+      const { error: upsertError } = await supabase
+        .from("categories")
+        .upsert(requiredRows, { onConflict: "slug" });
+      if (upsertError) {
+        toast.error(upsertError.message);
+        return;
+      }
+
+      const { data: freshCats, error: catReadError } = await supabase
+        .from("categories")
+        .select("id,slug");
+      if (catReadError) {
+        toast.error(catReadError.message);
+        return;
+      }
+      const categoryIdBySlug = new Map((freshCats ?? []).map((c: any) => [c.slug, c.id]));
+
+      for (const p of products) {
+        const text = `${p.slug ?? ""} ${p.title ?? ""}`;
+        const targetSlug = inferCategorySlug(text);
+        const targetCategoryId = categoryIdBySlug.get(targetSlug) ?? null;
+        const { error } = await supabase
+          .from("products")
+          .update({ category_id: targetCategoryId })
+          .eq("id", p.id);
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+      }
+
+      const keepSlugs = new Set(CATALOG_TAXONOMY.map((c) => c.slug));
+      const staleIds = (freshCats ?? [])
+        .filter((c: any) => !keepSlugs.has(c.slug))
+        .map((c: any) => c.id);
+      if (staleIds.length > 0) {
+        const { error: staleError } = await supabase.from("categories").delete().in("id", staleIds);
+        if (staleError) {
+          toast.error(staleError.message);
+          return;
+        }
+      }
+
+      toast.success("Required categories applied and products remapped.");
+      loadAll();
+    } finally {
+      setApplyingRequiredTaxonomy(false);
+    }
+  };
+
+  const updateVariantStock = async (variantId: string) => {
+    const stock = Number(variantStockDrafts[variantId]);
+    if (Number.isNaN(stock) || stock < 0) {
+      toast.error("Stock must be a valid non-negative number.");
+      return;
+    }
+    setVariantBusyId(variantId);
+    const { error } = await supabase
+      .from("product_variants")
+      .update({ stock_quantity: stock })
+      .eq("id", variantId);
+    setVariantBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Stock updated.");
+    loadAll();
+  };
+
+  const deleteVariant = async (variantId: string) => {
+    const confirmed = window.confirm("Delete this stock variant?");
+    if (!confirmed) return;
+    setVariantBusyId(variantId);
+    const { error } = await supabase.from("product_variants").delete().eq("id", variantId);
+    setVariantBusyId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Variant deleted.");
+    loadAll();
+  };
+
+  const createVariant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const stock = Number(newVariant.stock_quantity || 0);
+    if (!newVariant.product_id) {
+      toast.error("Choose a product for this stock row.");
+      return;
+    }
+    if (Number.isNaN(stock) || stock < 0) {
+      toast.error("Stock must be a valid non-negative number.");
+      return;
+    }
+    const { error } = await supabase.from("product_variants").insert({
+      product_id: newVariant.product_id,
+      size: newVariant.size || null,
+      color: newVariant.color || null,
+      sku: newVariant.sku || null,
+      stock_quantity: stock,
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Variant added.");
+    setNewVariant({ product_id: "", size: "", color: "", sku: "", stock_quantity: "" });
+    loadAll();
+  };
+
+  const autoCreateDefaultVariants = async () => {
+    setAutoCreatingVariants(true);
+    try {
+      const { data: allProducts, error: productsError } = await supabase
+        .from("products")
+        .select("id,slug,title,category_id,categories(name)");
+      if (productsError) {
+        toast.error(productsError.message);
+        return;
+      }
+      const { data: allExistingVariants, error: variantsError } = await supabase
+        .from("product_variants")
+        .select("product_id,sku");
+      if (variantsError) {
+        toast.error(variantsError.message);
+        return;
+      }
+      const productsWithVariants = new Set((allExistingVariants ?? []).map((v: any) => v.product_id));
+      const existingSkus = new Set((allExistingVariants ?? []).map((v: any) => String(v.sku ?? "")));
+
+      const rows: any[] = [];
+      for (const p of allProducts ?? []) {
+        if (productsWithVariants.has(p.id)) continue;
+        const text = `${p.slug ?? ""} ${p.title ?? ""} ${p.categories?.name ?? ""}`.toLowerCase();
+        const isShoes = /(shoe|loafer|oxford|boot|sandal)/.test(text);
+        const isAccessory = /(cap|hat|belt|tie)/.test(text);
+        const sizes = isAccessory ? ["One Size"] : isShoes ? ["40", "41", "42", "43"] : ["S", "M", "L", "XL"];
+        const colors = ["Black", "Navy", "Brown"];
+        const baseSku = String(p.slug ?? "item")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 20);
+        for (let i = 0; i < Math.min(3, sizes.length); i += 1) {
+          const size = sizes[i];
+          let sku = `${baseSku}-${String(size).replace(/\s+/g, "")}`;
+          if (existingSkus.has(sku)) {
+            sku = `${sku}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+          }
+          existingSkus.add(sku);
+          rows.push({
+            product_id: p.id,
+            size,
+            color: colors[i % colors.length],
+            sku,
+            stock_quantity: 5,
+          });
+        }
+      }
+
+      if (rows.length === 0) {
+        toast.success("All products already have variants.");
+        return;
+      }
+      const { error: insertError } = await supabase.from("product_variants").insert(rows);
+      if (insertError) {
+        toast.error(insertError.message);
+        return;
+      }
+      toast.success(`Created ${rows.length} default variants.`);
+      loadAll();
+    } finally {
+      setAutoCreatingVariants(false);
+    }
+  };
+
+  const autoFillMissingDescriptions = async () => {
+    setFillingDescriptions(true);
+    try {
+      const { data: allProducts, error: readError } = await supabase
+        .from("products")
+        .select("id,title,description,categories(name)");
+      if (readError) {
+        toast.error(readError.message);
+        return;
+      }
+
+      const categoryPitch = (categoryName: string) => {
+        const key = categoryName.toLowerCase();
+        if (key.includes("suit")) {
+          return {
+            material: "premium suiting blend",
+            fit: "structured tailored fit",
+            occasion: "weddings, business meetings, and formal events",
+            care: "Dry clean recommended to preserve shape and finish",
+          };
+        }
+        if (key.includes("shirt") || key.includes("polo")) {
+          return {
+            material: "soft breathable cotton blend",
+            fit: "modern regular fit",
+            occasion: "office, dinner, and polished casual wear",
+            care: "Machine wash cold and warm iron for a crisp look",
+          };
+        }
+        if (key.includes("shoe")) {
+          return {
+            material: "quality leather-look upper with durable sole",
+            fit: "comfort-focused foot shape",
+            occasion: "workdays, events, and smart weekend outfits",
+            care: "Wipe clean and store with shoe support",
+          };
+        }
+        if (key.includes("trouser") || key.includes("linen")) {
+          return {
+            material: "lightweight woven fabric with breathable comfort",
+            fit: "clean tapered silhouette",
+            occasion: "daily office wear, travel, and smart casual dressing",
+            care: "Gentle wash and low-heat pressing for best results",
+          };
+        }
+        if (key.includes("jacket") || key.includes("blazer") || key.includes("sweater")) {
+          return {
+            material: "premium textured outerwear fabric",
+            fit: "layer-friendly modern cut",
+            occasion: "cool-weather styling, office layering, and evening outings",
+            care: "Follow garment label care and avoid high-heat drying",
+          };
+        }
+        if (key.includes("cap") || key.includes("hat") || key.includes("belt") || key.includes("tie")) {
+          return {
+            material: "durable accessory-grade construction",
+            fit: "practical everyday profile",
+            occasion: "finishing touch for formal and smart-casual looks",
+            care: "Spot clean and store away from direct heat",
+          };
+        }
+        return {
+          material: "quality menswear fabric",
+          fit: "balanced modern fit",
+          occasion: "versatile day-to-evening styling",
+          care: "Follow basic garment care for long-term durability",
+        };
+      };
+
+      const keywordOverrides = (title: string) => {
+        const t = title.toLowerCase();
+        const out: Partial<{
+          material: string;
+          fit: string;
+          occasion: string;
+          care: string;
+        }> = {};
+
+        if (t.includes("linen")) {
+          out.material = "premium breathable linen blend";
+          out.occasion = "warm-weather business, events, and refined casual settings";
+          out.care = "Gentle wash or dry clean to preserve the natural linen texture";
+        }
+        if (t.includes("wedding")) {
+          out.occasion = "weddings, receptions, and premium celebration dressing";
+        }
+        if (t.includes("formal")) {
+          out.fit = "sharp formal profile with clean lines";
+          out.occasion = "boardroom meetings, ceremonies, and formal occasions";
+        }
+        if (t.includes("casual")) {
+          out.fit = "relaxed modern fit for all-day comfort";
+          out.occasion = "smart-casual days, travel, and weekend plans";
+        }
+        if (t.includes("track")) {
+          out.material = "lightweight performance-inspired fabric";
+          out.fit = "athletic modern cut with easy movement";
+          out.occasion = "travel, active days, and clean streetwear styling";
+          out.care = "Machine wash cold and air dry for best longevity";
+        }
+        if (t.includes("polo")) {
+          out.material = "soft knitted cotton blend";
+        }
+        if (t.includes("boot") || t.includes("loafer") || t.includes("oxford")) {
+          out.material = "structured premium upper with durable grip sole";
+          out.fit = "supportive footwear profile for extended wear";
+        }
+        if (t.includes("sweater")) {
+          out.material = "soft knit fabric with warm breathable feel";
+          out.care = "Hand wash or gentle cycle to maintain knit quality";
+        }
+        return out;
+      };
+
+      const baseCopy = (categoryName: string, title: string) => {
+        const profile = categoryPitch(categoryName);
+        const override = keywordOverrides(title);
+        const material = override.material ?? profile.material;
+        const fit = override.fit ?? profile.fit;
+        const occasion = override.occasion ?? profile.occasion;
+        const care = override.care ?? profile.care;
+        return `${title} is part of our ${categoryName} collection, created for men who want polished style with everyday comfort. Made from ${material}, it features a ${fit} that looks clean and confident. Ideal for ${occasion}, this piece pairs easily with both formal and smart-casual outfits. Care: ${care}. We deliver across Kenya, with fast Nairobi fulfilment for a smooth shopping experience.`;
+      };
+
+      let updated = 0;
+      for (const p of allProducts ?? []) {
+        const categoryName = String(p.categories?.name ?? "menswear");
+        const description = baseCopy(categoryName, p.title);
+        const { error } = await supabase.from("products").update({ description }).eq("id", p.id);
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        updated += 1;
+      }
+
+      toast.success(
+        updated > 0
+          ? `Generated detailed descriptions for ${updated} products.`
+          : "No products found to update.",
+      );
+      loadAll();
+    } finally {
+      setFillingDescriptions(false);
+    }
+  };
+
   if (loading || !isAdmin) {
     return (
       <div className="container mx-auto py-24 text-center text-muted-foreground">
@@ -660,49 +1158,169 @@ function AdminPage() {
     );
   }
 
+  const isSuperAdmin = Boolean(user?.email && user.email.toLowerCase() === STORE_INFO.email.toLowerCase());
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const openProductsFilteredBySubcategory = (categorySlug: string, subFilter: string) => {
+    setProductCatalogScope("full");
+    setProductCategorySlugFilter(categorySlug);
+    setProductSubcategoryFilter(subFilter);
+    setProductSearch("");
+    setActiveTab("products");
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const taxonomyGroupsWithSubcategories = useMemo(
+    () => CATALOG_TAXONOMY.filter((g) => g.subcategories.length > 0),
+    [],
+  );
+
   return (
-    <div className="container mx-auto px-4 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-[60] flex h-14 items-center gap-3 border-b border-border bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 md:px-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          aria-expanded={sidebarOpen}
+          aria-controls="admin-sidebar"
+          aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+          onClick={() => setSidebarOpen((o) => !o)}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-lg font-bold leading-tight md:text-xl">Admin Dashboard</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            {user?.email} {isSuperAdmin ? "· Super Admin" : "· Admin"}
+          </p>
         </div>
-        <Link to="/">
-          <Button variant="outline">View store -&gt;</Button>
+        <Link to="/" className="shrink-0">
+          <Button variant="outline" size="sm" className="text-xs md:text-sm">
+            View store →
+          </Button>
         </Link>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
-        {[
-          { label: "Recent Orders", value: stats.orders },
-          { label: "Recent Revenue", value: formatKES(stats.revenue) },
-          { label: "Live Products", value: stats.liveProducts, sub: `Total: ${stats.totalProducts}` },
-          { label: "Pending Bookings", value: stats.bookings, accent: stats.bookings > 0 },
-          { label: "Low Stock", value: stats.lowStock, accent: stats.lowStock > 0 },
-          { label: "Unread Messages", value: stats.messages, accent: stats.messages > 0 },
-        ].map((s) => (
-          <div key={s.label} className="rounded-md border border-border bg-card p-4">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</p>
-            <p className={`mt-1 font-display text-2xl font-bold ${s.accent ? "text-gold" : ""}`}>
-              {s.value}
-            </p>
-            {s.sub && <p className="mt-1 text-xs text-muted-foreground">{s.sub}</p>}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="relative flex min-h-[calc(100vh-3.5rem)] w-full">
+        {sidebarOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 top-14 z-40 bg-black/50 lg:hidden"
+            aria-label="Close menu"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        <aside
+          id="admin-sidebar"
+          className={cn(
+            "fixed left-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-[min(100vw-2.5rem,18rem)] flex-col border-r border-border bg-card shadow-xl transition-transform duration-200 ease-out lg:shadow-md",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Dashboard
+            </span>
           </div>
-        ))}
-      </div>
+          <TabsList className="h-auto flex-1 flex-col items-stretch justify-start gap-0.5 overflow-y-auto rounded-none border-0 bg-transparent p-2">
+            <TabsTrigger
+              value="orders"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <ClipboardList className="h-4 w-4 shrink-0 opacity-70" />
+              Orders
+            </TabsTrigger>
+            <TabsTrigger
+              value="products"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Package className="h-4 w-4 shrink-0 opacity-70" />
+              Products
+            </TabsTrigger>
+            <TabsTrigger
+              value="messages"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Mail className="h-4 w-4 shrink-0 opacity-70" />
+              Messages
+            </TabsTrigger>
+            <TabsTrigger
+              value="bookings"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Calendar className="h-4 w-4 shrink-0 opacity-70" />
+              Bookings
+            </TabsTrigger>
+            <TabsTrigger
+              value="inventory"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Warehouse className="h-4 w-4 shrink-0 opacity-70" />
+              Inventory
+            </TabsTrigger>
+            <TabsTrigger
+              value="categories"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Tag className="h-4 w-4 shrink-0 opacity-70" />
+              Categories
+            </TabsTrigger>
+            <TabsTrigger
+              value="promos"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Percent className="h-4 w-4 shrink-0 opacity-70" />
+              Promos
+            </TabsTrigger>
+            <TabsTrigger
+              value="super-admin"
+              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
+            >
+              <Shield className="h-4 w-4 shrink-0 opacity-70" />
+              Super Admin
+            </TabsTrigger>
+          </TabsList>
+        </aside>
 
-      <Tabs defaultValue="orders" className="mt-8">
-        <TabsList>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="messages">Messages</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="promos">Promos</TabsTrigger>
-        </TabsList>
+        <div
+          className={cn(
+            "min-w-0 flex-1 px-3 pb-10 pt-6 transition-[margin] duration-200 ease-out md:px-4",
+            sidebarOpen ? "lg:ml-72" : "lg:ml-0",
+          )}
+        >
+          <div className="mx-auto max-w-7xl">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+              {[
+                { label: "Recent Orders", value: stats.orders },
+                { label: "Recent Revenue", value: formatKES(stats.revenue) },
+                { label: "Live Products", value: stats.liveProducts, sub: `Total: ${stats.totalProducts}` },
+                { label: "Pending Bookings", value: stats.bookings, accent: stats.bookings > 0 },
+                { label: "Low Stock", value: stats.lowStock, accent: stats.lowStock > 0 },
+                { label: "Unread Messages", value: stats.messages, accent: stats.messages > 0 },
+              ].map((s) => (
+                <div key={s.label} className="rounded-md border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</p>
+                  <p className={`mt-1 font-display text-2xl font-bold ${s.accent ? "text-gold" : ""}`}>
+                    {s.value}
+                  </p>
+                  {s.sub && <p className="mt-1 text-xs text-muted-foreground">{s.sub}</p>}
+                </div>
+              ))}
+            </div>
 
-        <TabsContent value="orders">
+            <div className="mt-8 space-y-4">
+        <TabsContent value="orders" className="mt-0">
           <div className="overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-sm">
               <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -819,15 +1437,26 @@ function AdminPage() {
           >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm font-semibold">Add new product</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={syncingAssetProducts}
-                onClick={syncAssetProductsToDatabase}
-              >
-                {syncingAssetProducts ? "Syncing..." : "Sync asset products to database"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={fillingDescriptions}
+                  onClick={autoFillMissingDescriptions}
+                >
+                  {fillingDescriptions ? "Generating..." : "Generate detailed descriptions (all)"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={syncingAssetProducts}
+                  onClick={syncAssetProductsToDatabase}
+                >
+                  {syncingAssetProducts ? "Syncing..." : "Sync asset products to database"}
+                </Button>
+              </div>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <input
@@ -855,6 +1484,30 @@ function AdminPage() {
                   </option>
                 ))}
               </select>
+              {(() => {
+                const catSlug = categories.find((c) => c.id === newProduct.category_id)?.slug;
+                const subOpts = catSlug ? getSubcategoriesForCategory(catSlug) : [];
+                return (
+                  <>
+                    <input
+                      list={subOpts.length ? "new-product-subcat" : undefined}
+                      value={newProduct.subcategory}
+                      onChange={(e) =>
+                        setNewProduct((p) => ({ ...p, subcategory: e.target.value }))
+                      }
+                      placeholder="Subcategory (optional)"
+                      className="rounded border border-border bg-background px-3 py-2 text-sm"
+                    />
+                    {subOpts.length > 0 && (
+                      <datalist id="new-product-subcat">
+                        {subOpts.map((s) => (
+                          <option key={s} value={s} />
+                        ))}
+                      </datalist>
+                    )}
+                  </>
+                );
+              })()}
               <input
                 type="number"
                 value={newProduct.price}
@@ -930,40 +1583,104 @@ function AdminPage() {
             </div>
           </form>
           <div className="mb-4 rounded-md border border-border bg-card p-4">
-            <p className="mb-3 text-sm font-semibold">Find products quickly</p>
-            <div className="grid gap-3 md:grid-cols-3">
-              <input
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="Search by title or slug"
-                className="rounded border border-border bg-background px-3 py-2 text-sm"
-              />
-              <select
-                value={productCategoryFilter}
-                onChange={(e) => setProductCategoryFilter(e.target.value)}
-                className="rounded border border-border bg-background px-3 py-2 text-sm"
-              >
-                <option value="all">All categories</option>
-                {productCategoryCounts.map(([name, count]) => (
-                  <option key={name} value={name}>
-                    {name} ({count})
-                  </option>
-                ))}
-              </select>
-              <select
-                value={productVisibilityFilter}
-                onChange={(e) =>
-                  setProductVisibilityFilter(e.target.value as "all" | "published" | "draft")
-                }
-                className="rounded border border-border bg-background px-3 py-2 text-sm"
-              >
-                <option value="all">All visibility</option>
-                <option value="published">Published only</option>
-                <option value="draft">Draft only</option>
-              </select>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Browse like the storefront</p>
+                <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+                  <strong>Full inventory</strong> lists every product in the database (default). Use{" "}
+                  <strong>Storefront</strong> to narrow to the same published, in-catalog items shoppers see. Parent
+                  categories and subcategory labels match the site taxonomy; create or rename parent categories in
+                  the{" "}
+                  <button
+                    type="button"
+                    className="font-medium text-gold underline-offset-2 hover:underline"
+                    onClick={() => setActiveTab("categories")}
+                  >
+                    Categories
+                  </button>{" "}
+                  tab.
+                </p>
+              </div>
+              <p className="shrink-0 rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">{storefrontProductCount}</span> live on shop
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Catalog scope
+                <select
+                  value={productCatalogScope}
+                  onChange={(e) =>
+                    setProductCatalogScope(e.target.value as "storefront" | "full")
+                  }
+                  className="rounded border border-border bg-background px-3 py-2 text-sm font-normal text-foreground"
+                >
+                  <option value="full">Full inventory (all products)</option>
+                  <option value="storefront">Storefront only (as shoppers see)</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Category
+                <select
+                  value={productCategorySlugFilter}
+                  onChange={(e) => setProductCategorySlugFilter(e.target.value)}
+                  className="rounded border border-border bg-background px-3 py-2 text-sm font-normal text-foreground"
+                >
+                  <option value="all">All categories</option>
+                  {taxonomyCategoryCounts.map(({ slug, name, count }) => (
+                    <option key={slug} value={slug}>
+                      {name} ({count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Subcategory
+                <select
+                  value={productSubcategoryFilter}
+                  onChange={(e) => setProductSubcategoryFilter(e.target.value)}
+                  disabled={productCategorySlugFilter === "all"}
+                  className="rounded border border-border bg-background px-3 py-2 text-sm font-normal text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="all">All subcategories</option>
+                  {productCategorySlugFilter !== "all" && (
+                    <option value="__none__">Unlabeled / other</option>
+                  )}
+                  {subcategoryFilterOptions.map((label) => (
+                    <option key={label} value={label}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-2 xl:col-span-1">
+                Search
+                <input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Title, slug, or subcategory"
+                  className="rounded border border-border bg-background px-3 py-2 text-sm font-normal text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Visibility
+                <select
+                  value={productVisibilityFilter}
+                  onChange={(e) =>
+                    setProductVisibilityFilter(e.target.value as "all" | "published" | "draft")
+                  }
+                  className="rounded border border-border bg-background px-3 py-2 text-sm font-normal text-foreground"
+                >
+                  <option value="all">All</option>
+                  <option value="published">Published only</option>
+                  <option value="draft">Draft only</option>
+                </select>
+              </label>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              Showing {filteredProducts.length} of {products.length} products.
+              Showing <span className="font-medium text-foreground">{filteredProducts.length}</span> of{" "}
+              <span className="font-medium text-foreground">{products.length}</span> products
+              {productCatalogScope === "storefront" ? " (storefront scope applied)" : ""}.
             </p>
           </div>
           <div className="overflow-x-auto rounded-md border border-border bg-card">
@@ -998,18 +1715,55 @@ function AdminPage() {
                       />
                     </td>
                     <td className="p-3">
-                      <select
-                        value={productDrafts[p.id]?.category_id ?? ""}
-                        onChange={(e) => updateProductDraft(p.id, "category_id", e.target.value)}
-                        className="rounded border border-border bg-background px-2 py-1 text-sm"
-                      >
-                        <option value="">No category</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="space-y-1">
+                        <select
+                          value={productDrafts[p.id]?.category_id ?? ""}
+                          onChange={(e) => updateProductDraft(p.id, "category_id", e.target.value)}
+                          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                        >
+                          <option value="">No category</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const catSlug = categories.find(
+                            (c) => c.id === productDrafts[p.id]?.category_id,
+                          )?.slug as string | undefined;
+                          const subOpts = catSlug ? getSubcategoriesForCategory(catSlug) : [];
+                          return (
+                            <>
+                              <input
+                                list={subOpts.length ? `subcat-${p.id}` : undefined}
+                                value={productDrafts[p.id]?.subcategory ?? ""}
+                                onChange={(e) =>
+                                  updateProductDraft(p.id, "subcategory", e.target.value)
+                                }
+                                placeholder="Subcategory (optional)"
+                                className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                              />
+                              {subOpts.length > 0 && (
+                                <datalist id={`subcat-${p.id}`}>
+                                  {subOpts.map((s) => (
+                                    <option key={s} value={s} />
+                                  ))}
+                                </datalist>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </td>
+                    <td className="p-3 align-top">
+                      <span className="text-xs text-muted-foreground">
+                        {resolveSubcategory(
+                          p.subcategory,
+                          p.categories?.slug,
+                          `${p.title ?? ""} ${p.slug ?? ""}`,
+                        ) ?? "—"}
+                      </span>
                     </td>
                     <td className="p-3">
                       <input
@@ -1100,7 +1854,7 @@ function AdminPage() {
                 ))}
                 {filteredProducts.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-6 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-6 text-center text-muted-foreground">
                       No products match this filter.
                     </td>
                   </tr>
@@ -1153,33 +1907,124 @@ function AdminPage() {
         </TabsContent>
 
         <TabsContent value="inventory">
+          <div className="mb-4 flex justify-end">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={autoCreatingVariants}
+              onClick={autoCreateDefaultVariants}
+            >
+              {autoCreatingVariants ? "Creating..." : "Auto-create default variants"}
+            </Button>
+          </div>
+          <form onSubmit={createVariant} className="mb-4 rounded-md border border-border bg-card p-4">
+            <p className="mb-3 text-sm font-semibold">Add stock variant</p>
+            <div className="grid gap-3 md:grid-cols-5">
+              <select
+                value={newVariant.product_id}
+                onChange={(e) => setNewVariant((v) => ({ ...v, product_id: e.target.value }))}
+                className="rounded border border-border bg-background px-3 py-2 text-sm"
+                required
+              >
+                <option value="">Product</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={newVariant.size}
+                onChange={(e) => setNewVariant((v) => ({ ...v, size: e.target.value }))}
+                placeholder="Size"
+                className="rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+              <input
+                value={newVariant.color}
+                onChange={(e) => setNewVariant((v) => ({ ...v, color: e.target.value }))}
+                placeholder="Color"
+                className="rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+              <input
+                value={newVariant.sku}
+                onChange={(e) => setNewVariant((v) => ({ ...v, sku: e.target.value }))}
+                placeholder="SKU"
+                className="rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={newVariant.stock_quantity}
+                  onChange={(e) => setNewVariant((v) => ({ ...v, stock_quantity: e.target.value }))}
+                  placeholder="Stock"
+                  className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+                  required
+                />
+                <Button type="submit" size="sm">
+                  Add
+                </Button>
+              </div>
+            </div>
+          </form>
+
           <div className="overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-sm">
               <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="p-3">Product</th>
                   <th className="p-3">Size</th>
+                  <th className="p-3">Color</th>
                   <th className="p-3">SKU</th>
                   <th className="p-3">Stock</th>
+                  <th className="p-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {lowStock.map((v) => (
+                {variants.map((v) => (
                   <tr key={v.id} className="border-t border-border">
                     <td className="p-3">{v.products?.title}</td>
-                    <td className="p-3">{v.size}</td>
-                    <td className="p-3 font-mono text-xs">{v.sku}</td>
+                    <td className="p-3">{v.size || "-"}</td>
+                    <td className="p-3">{v.color || "-"}</td>
+                    <td className="p-3 font-mono text-xs">{v.sku || "-"}</td>
                     <td className="p-3">
-                      <span className="rounded bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive">
-                        {v.stock_quantity} left
-                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={variantStockDrafts[v.id] ?? ""}
+                        onChange={(e) =>
+                          setVariantStockDrafts((prev) => ({ ...prev, [v.id]: e.target.value }))
+                        }
+                        className="w-24 rounded border border-border bg-background px-2 py-1 text-sm"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={variantBusyId === v.id}
+                          onClick={() => updateVariantStock(v.id)}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={variantBusyId === v.id}
+                          onClick={() => deleteVariant(v.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
-                {lowStock.length === 0 && (
+                {variants.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="p-6 text-center text-success">
-                      All variants are well stocked.
+                    <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                      No stock variants yet.
                     </td>
                   </tr>
                 )}
@@ -1193,7 +2038,18 @@ function AdminPage() {
             onSubmit={createCategory}
             className="mb-5 rounded-md border border-border bg-card p-4"
           >
-            <p className="mb-3 text-sm font-semibold">Add new category</p>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold">Add new category</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={applyingRequiredTaxonomy}
+                onClick={applyRequiredTaxonomy}
+              >
+                {applyingRequiredTaxonomy ? "Applying..." : "Apply required categories"}
+              </Button>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
               <input
                 value={newCategory.name}
@@ -1228,6 +2084,177 @@ function AdminPage() {
               </Button>
             </div>
           </form>
+
+          <div className="mb-5 rounded-md border border-border bg-card p-4">
+            <p className="text-sm font-semibold">Requested category structure</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {CATALOG_TAXONOMY.map((group) => (
+                <div key={group.slug} className="rounded border border-border/80 p-3">
+                  <p className="text-sm font-semibold">{group.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {group.subcategories.length > 0
+                      ? group.subcategories.join(", ")
+                      : "No subcategories specified."}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-5 rounded-md border border-border bg-card p-4">
+            <p className="text-sm font-semibold">Subcategory placement</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              For categories like <strong>Shoes</strong>, pick the correct subcategory for each product so the shop
+              filters (Formal shoes, Casual, Boots, etc.) match. &quot;Inferred&quot; uses title/slug rules until you
+              set a stored value. Use the chips to jump to the same filter in the Products tab, or edit and{" "}
+              <strong>Save</strong> here.
+            </p>
+            <div className="mt-4 space-y-3">
+              {taxonomyGroupsWithSubcategories.map((group) => {
+                const inGroup = products.filter((p: any) => p.categories?.slug === group.slug);
+                const countResolved = (label: string) =>
+                  inGroup.filter(
+                    (p: any) =>
+                      resolveSubcategory(
+                        p.subcategory,
+                        group.slug,
+                        `${p.title ?? ""} ${p.slug ?? ""}`,
+                      ) === label,
+                  ).length;
+                const unlabeledCount = inGroup.filter(
+                  (p: any) =>
+                    resolveSubcategory(
+                      p.subcategory,
+                      group.slug,
+                      `${p.title ?? ""} ${p.slug ?? ""}`,
+                    ) == null,
+                ).length;
+                return (
+                  <details
+                    key={group.slug}
+                    className="group rounded-lg border border-border open:bg-secondary/20"
+                    open={group.slug === "shoes"}
+                  >
+                    <summary className="cursor-pointer list-none px-4 py-3 font-semibold [&::-webkit-details-marker]:hidden">
+                      <span className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          {group.name}{" "}
+                          <span className="text-xs font-normal text-muted-foreground">
+                            ({inGroup.length} product{inGroup.length === 1 ? "" : "s"})
+                          </span>
+                        </span>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {group.subcategories.map((s) => (
+                            <span key={s} className="mr-2 inline-block">
+                              {s}: {countResolved(s)}
+                            </span>
+                          ))}
+                          {unlabeledCount > 0 && (
+                            <span className="text-amber-700 dark:text-amber-400">
+                              Unlabeled: {unlabeledCount}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </summary>
+                    <div className="border-t border-border px-4 pb-4 pt-2">
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openProductsFilteredBySubcategory(group.slug, "all")}
+                        >
+                          Open in Products (all {group.name})
+                        </Button>
+                        {group.subcategories.map((sub) => (
+                          <Button
+                            key={sub}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openProductsFilteredBySubcategory(group.slug, sub)}
+                          >
+                            {sub}
+                          </Button>
+                        ))}
+                        {unlabeledCount > 0 && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openProductsFilteredBySubcategory(group.slug, "__none__")}
+                          >
+                            Unlabeled only
+                          </Button>
+                        )}
+                      </div>
+                      {inGroup.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No products in this category yet.</p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-md border border-border">
+                          <table className="w-full min-w-[640px] text-sm">
+                            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                              <tr>
+                                <th className="p-2">Product</th>
+                                <th className="p-2">Effective (shop)</th>
+                                <th className="p-2">Assign subcategory</th>
+                                <th className="p-2 w-28">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {inGroup.map((p: any) => {
+                                const effective = resolveSubcategory(
+                                  p.subcategory,
+                                  group.slug,
+                                  `${p.title ?? ""} ${p.slug ?? ""}`,
+                                );
+                                return (
+                                  <tr key={p.id} className="border-t border-border">
+                                    <td className="p-2 font-medium">{p.title}</td>
+                                    <td className="p-2 text-xs text-muted-foreground">
+                                      {effective ?? "—"}
+                                    </td>
+                                    <td className="p-2">
+                                      <select
+                                        className="w-full max-w-xs rounded border border-border bg-background px-2 py-1.5 text-sm"
+                                        value={productDrafts[p.id]?.subcategory ?? ""}
+                                        onChange={(e) =>
+                                          updateProductDraft(p.id, "subcategory", e.target.value)
+                                        }
+                                      >
+                                        <option value="">Inferred from title (no fixed label)</option>
+                                        {group.subcategories.map((s) => (
+                                          <option key={s} value={s}>
+                                            {s}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                    <td className="p-2">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={savingProductId === p.id}
+                                        onClick={() => saveProduct(p.id)}
+                                      >
+                                        {savingProductId === p.id ? "Saving…" : "Save"}
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-sm">
@@ -1306,6 +2333,42 @@ function AdminPage() {
             </table>
           </div>
         </TabsContent>
+        <TabsContent value="super-admin" className="mt-0">
+          <div className="rounded-md border border-border bg-card p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold">Super Admin Finance Console</h3>
+                <p className="text-sm text-muted-foreground">
+                  Finance, weekly and monthly reports, sold-items summary, and stock control.
+                </p>
+              </div>
+              <span className="rounded border border-gold/40 bg-gold/10 px-2 py-1 text-xs font-semibold text-gold">
+                {isSuperAdmin ? "Super Admin Access" : "Admin View"}
+              </span>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded border border-border p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Weekly Sales</p>
+                <p className="mt-1 text-2xl font-bold">{formatKES(financeStats.weeklyRevenue)}</p>
+                <p className="text-xs text-muted-foreground">{financeStats.weeklyOrders} orders</p>
+              </div>
+              <div className="rounded border border-border p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Sales</p>
+                <p className="mt-1 text-2xl font-bold">{formatKES(financeStats.monthlyRevenue)}</p>
+                <p className="text-xs text-muted-foreground">{financeStats.monthlyOrders} orders</p>
+              </div>
+              <div className="rounded border border-border p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Sold Items Summary</p>
+                <p className="mt-1 text-2xl font-bold">{financeStats.itemsSold} items</p>
+                <p className="text-xs text-muted-foreground">Amount: {formatKES(financeStats.soldAmount)}</p>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+            </div>
+          </div>
+        </div>
       </Tabs>
     </div>
   );

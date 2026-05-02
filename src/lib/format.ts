@@ -59,17 +59,17 @@ export const KENYA_COUNTIES = [
 ];
 
 export const STORE_INFO = {
-  name: "Prince Esquare",
+  name: "Prince Esquire",
   tagline: "The Modern Gentleman, Outfitted.",
   address: "Kimathi Street, CBD, Nairobi, Kenya",
-  phone: "+254 714 034067",
-  whatsapp: "254714034067",
-  email: "hello@princeesquare.co.ke",
+  phone: "0724-494089",
+  whatsapp: "254724494089",
+  email: "hello@princeesquire.co.ke",
   hours: "Mon–Sat 9:00 – 19:00 · Sun 10:00 – 17:00",
   socials: {
-    instagram: "https://instagram.com/princeesquare",
-    facebook: "https://facebook.com/princeesquare",
-    tiktok: "https://tiktok.com/@princeesquare",
+    instagram: "https://instagram.com/princeesquire",
+    facebook: "https://facebook.com/princeesquire",
+    tiktok: "https://tiktok.com/@princeesquire",
   },
   mapEmbed:
     "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3988.4!2d36.8219!3d-1.2864!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMcKwMTcnMTEuMCJTIDM2wrA0OScxOC44IkU!5e0!3m2!1sen!2ske!4v1700000000000",

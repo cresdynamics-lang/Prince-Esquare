@@ -1,19 +1,13 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { resolveImage } from "@/lib/assetMap";
+import { fetchPublishedProductsForCategoryPage } from "@/lib/publishedProductsQuery";
+import { getSubcategoriesForCategory, resolveSubcategory } from "@/lib/subcategories";
 
 export const Route = createFileRoute("/category/$slug")({
   component: CategoryPage,
-  notFoundComponent: () => (
-    <div className="container mx-auto px-4 py-24 text-center">
-      <h1 className="font-display text-4xl font-bold">Category not found</h1>
-      <Link to="/shop" className="mt-6 inline-block text-gold hover:underline">
-        Browse all {"->"}
-      </Link>
-    </div>
-  ),
 });
 
 function CategoryPage() {
@@ -28,6 +22,7 @@ function CategoryPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -48,11 +43,13 @@ function CategoryPage() {
 
       setCat(c);
 
-      const { data: ps } = await supabase
-        .from("products")
-        .select("id,slug,title,price,sale_price,product_images(image_url)")
-        .eq("category_id", c.id)
-        .eq("is_published", true);
+      const { data: ps, error: prodErr } = await fetchPublishedProductsForCategoryPage(supabase, c.id);
+      if (prodErr) {
+        console.error("[category] products:", prodErr);
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
 
       const dbCards = (ps ?? []).map((p: any) => ({
         id: p.id,
@@ -62,6 +59,12 @@ function CategoryPage() {
         sale_price: p.sale_price != null ? Number(p.sale_price) : null,
         image: p.product_images?.[0]?.image_url ?? null,
         category_name: c.name,
+        category_slug: slug,
+        subcategory_name: resolveSubcategory(p.subcategory, slug, `${p.title ?? ""} ${p.slug ?? ""}`),
+        stock_quantity_total: (p.product_variants ?? []).reduce(
+          (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+          0,
+        ),
       }));
       setProducts(dbCards);
       setLoading(false);
@@ -70,12 +73,26 @@ function CategoryPage() {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
+    setActiveSubcategory(null);
   }, [slug]);
 
-  const visibleProducts = products.slice(0, visibleCount);
-  const hasMore = !loading && visibleProducts.length < products.length;
+  const subcategories = getSubcategoriesForCategory(slug);
+  const filteredProducts = activeSubcategory
+    ? products.filter((p) => p.subcategory_name === activeSubcategory)
+    : products;
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
+  const hasMore = !loading && visibleProducts.length < filteredProducts.length;
 
-  if (missing) throw notFound();
+  if (missing) {
+    return (
+      <div className="container mx-auto px-4 py-24 text-center">
+        <h1 className="font-display text-4xl font-bold">Category not found</h1>
+        <Link to="/shop" className="mt-6 inline-block text-gold hover:underline">
+          Browse all {"->"}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -101,6 +118,25 @@ function CategoryPage() {
       </section>
 
       <div className="container mx-auto px-4 py-12">
+        {subcategories.length > 0 && (
+          <div className="mb-8 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setActiveSubcategory(null)}
+              className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${activeSubcategory === null ? "border-gold bg-gold text-gold-foreground" : "border-border hover:border-gold"}`}
+            >
+              All {cat?.name ?? ""}
+            </button>
+            {subcategories.map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setActiveSubcategory(subcat)}
+                className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${activeSubcategory === subcat ? "border-gold bg-gold text-gold-foreground" : "border-border hover:border-gold"}`}
+              >
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {loading
             ? Array.from({ length: 8 }).map((_, i) => (
@@ -122,7 +158,7 @@ function CategoryPage() {
           </div>
         )}
 
-        {!loading && products.length === 0 && (
+        {!loading && filteredProducts.length === 0 && (
           <p className="py-16 text-center text-muted-foreground">
             No products in this category yet.
           </p>

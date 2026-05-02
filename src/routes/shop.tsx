@@ -2,6 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
+import { ALLOWED_CATEGORY_SLUGS, CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
+import { fetchPublishedProductsForShopCards } from "@/lib/publishedProductsQuery";
+import { getSubcategoriesForCategory, resolveSubcategory } from "@/lib/subcategories";
 
 export const Route = createFileRoute("/shop")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -9,16 +12,16 @@ export const Route = createFileRoute("/shop")({
   }),
   head: () => ({
     meta: [
-      { title: "Shop All Menswear - Prince Esquare" },
+      { title: "Shop All Menswear - Prince Esquire" },
       {
         name: "description",
         content:
-          "Shop men's fashion in Kenya with Prince Esquare: suits, shirts, shoes, trousers, track suits, belts and socks with Nairobi delivery.",
+          "Shop men's fashion in Kenya with Prince Esquire: suits, shirts, shoes, trousers, track suits, belts and socks with Nairobi delivery.",
       },
       {
         name: "keywords",
         content:
-          "shop menswear kenya, buy suits nairobi, shirts kenya, men's shoes kenya, prince esquare shop",
+          "shop menswear kenya, buy suits nairobi, shirts kenya, men's shoes kenya, prince esquire shop",
       },
     ],
   }),
@@ -32,23 +35,43 @@ function ShopPage() {
   const [productCategoryMap, setProductCategoryMap] = useState<Record<string, string | null>>({});
   const [cats, setCats] = useState<{ id: string; slug: string; name: string }[]>([]);
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: cs }, { data: ps }] = await Promise.all([
+      setFetchError(null);
+      const [{ data: cs }, shopFetch] = await Promise.all([
         supabase.from("categories").select("id,slug,name").order("display_order"),
-        supabase
-          .from("products")
-          .select(
-            "id,slug,title,price,sale_price,category_id,product_images(image_url),categories(name)",
-          )
-          .eq("is_published", true)
-          .order("created_at", { ascending: false }),
+        fetchPublishedProductsForShopCards(supabase),
       ]);
-      const categories = cs ?? [];
+      const ps = shopFetch.data;
+      if (shopFetch.error) {
+        console.error("[shop] products:", shopFetch.error);
+        setFetchError(shopFetch.error.message || "Could not load products.");
+        setProducts([]);
+        setProductCategoryMap({});
+        setCats([]);
+        setLoading(false);
+        return;
+      }
+      const allRows = cs ?? [];
+      const productSlugs = new Set(
+        (ps ?? []).map((p: any) => p.categories?.slug).filter(Boolean) as string[],
+      );
+      const categories = allRows
+        .filter((c) => ALLOWED_CATEGORY_SLUGS.has(c.slug) || productSlugs.has(c.slug))
+        .sort((a, b) => {
+          const ia = CATALOG_TAXONOMY.findIndex((t) => t.slug === a.slug);
+          const ib = CATALOG_TAXONOMY.findIndex((t) => t.slug === b.slug);
+          const ra = ia >= 0 ? ia : 500;
+          const rb = ib >= 0 ? ib : 500;
+          if (ra !== rb) return ra - rb;
+          return a.name.localeCompare(b.name);
+        });
       setCats(categories);
       const dbCards: ProductCardData[] = (ps ?? []).map((p: any) => ({
         id: p.id,
@@ -58,6 +81,16 @@ function ShopPage() {
         sale_price: p.sale_price != null ? Number(p.sale_price) : null,
         image: p.product_images?.[0]?.image_url ?? null,
         category_name: p.categories?.name,
+        category_slug: p.categories?.slug,
+        subcategory_name: resolveSubcategory(
+          p.subcategory,
+          p.categories?.slug,
+          `${p.title ?? ""} ${p.slug ?? ""}`,
+        ),
+        stock_quantity_total: (p.product_variants ?? []).reduce(
+          (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+          0,
+        ),
       }));
 
       const categoryMap: Record<string, string | null> = {};
@@ -80,22 +113,52 @@ function ShopPage() {
             return p.category_slug === cat.slug;
           })
         : products).filter((p) => {
+        if (activeSubcategory && p.subcategory_name !== activeSubcategory) return false;
         const term = q.trim().toLowerCase();
         if (!term) return true;
         const titleMatch = p.title.toLowerCase().includes(term);
         const slugMatch = p.slug.toLowerCase().includes(term);
         const categoryMatch = (p.category_name ?? "").toLowerCase().includes(term);
-        return titleMatch || slugMatch || categoryMatch;
+        const subMatch = (p.subcategory_name ?? "").toLowerCase().includes(term);
+        return titleMatch || slugMatch || categoryMatch || subMatch;
       }),
-    [activeCat, cats, productCategoryMap, products, q],
+    [activeCat, activeSubcategory, cats, productCategoryMap, products, q],
   );
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
+    setActiveSubcategory(null);
   }, [activeCat]);
 
-  const visibleProducts = filtered.slice(0, visibleCount);
-  const hasMore = visibleProducts.length < filtered.length;
+  const activeCategorySlug = activeCat ? cats.find((c) => c.id === activeCat)?.slug ?? null : null;
+  const activeCategorySubcategories = activeCategorySlug
+    ? getSubcategoriesForCategory(activeCategorySlug)
+    : [];
+
+  const groupShopByCategory = activeCat === null && !q.trim();
+
+  const displayOrderedProducts = useMemo(() => {
+    const rank = (slug: string | undefined) => {
+      if (!slug) return 2000;
+      const i = CATALOG_TAXONOMY.findIndex((t) => t.slug === slug);
+      if (i >= 0) return i;
+      return 1000 + slug.charCodeAt(0) % 500;
+    };
+    const list = [...filtered];
+    if (groupShopByCategory) {
+      list.sort((a, b) => {
+        const d = rank(a.category_slug) - rank(b.category_slug);
+        if (d !== 0) return d;
+        return a.title.localeCompare(b.title);
+      });
+    } else {
+      list.sort((a, b) => a.title.localeCompare(b.title));
+    }
+    return list;
+  }, [filtered, groupShopByCategory]);
+
+  const visibleProducts = displayOrderedProducts.slice(0, visibleCount);
+  const hasMore = visibleProducts.length < displayOrderedProducts.length;
 
   return (
     <>
@@ -140,15 +203,63 @@ function ShopPage() {
             </button>
           ))}
         </div>
+        {activeCategorySubcategories.length > 0 && (
+          <div className="mb-8 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setActiveSubcategory(null)}
+              className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${activeSubcategory === null ? "border-gold bg-gold text-gold-foreground" : "border-border hover:border-gold"}`}
+            >
+              All {cats.find((c) => c.id === activeCat)?.name ?? ""}
+            </button>
+            {activeCategorySubcategories.map((subcat) => (
+              <button
+                key={subcat}
+                onClick={() => setActiveSubcategory(subcat)}
+                className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${activeSubcategory === subcat ? "border-gold bg-gold text-gold-foreground" : "border-border hover:border-gold"}`}
+              >
+                {subcat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {fetchError && (
+          <div className="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p className="font-medium">Could not load products from the database.</p>
+            <p className="mt-1 text-xs opacity-90">{fetchError}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Check that Supabase env vars are set, RLS allows public read of published products, and the database
+              is reachable. If you recently added the <code className="rounded bg-muted px-1">subcategory</code>{" "}
+              column, run migrations or the app will retry without it automatically.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {loading
             ? Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
               ))
-            : visibleProducts.map((p, index) => (
-                <ProductCard key={p.id} product={p} eager={index < 1} />
-              ))}
+            : visibleProducts.flatMap((p, index) => {
+                const prev = visibleProducts[index - 1];
+                const showGroupHeading =
+                  groupShopByCategory &&
+                  (!prev || (prev.category_slug ?? "") !== (p.category_slug ?? ""));
+                const heading = showGroupHeading ? (
+                  <div
+                    key={`cat-h-${p.id}`}
+                    className="col-span-2 border-b border-border pb-2 pt-4 md:col-span-3 lg:col-span-4"
+                  >
+                    <h2 className="font-display text-lg font-semibold text-foreground">
+                      {p.category_name?.trim() || "Uncategorized"}
+                    </h2>
+                  </div>
+                ) : null;
+                const card = (
+                  <ProductCard key={p.id} product={p} eager={index < 1} />
+                );
+                return heading ? [heading, card] : [card];
+              })}
         </div>
 
         {!loading && hasMore && (
@@ -163,12 +274,21 @@ function ShopPage() {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && !fetchError && filtered.length === 0 && (
           <p className="py-16 text-center text-muted-foreground">
-            No products in this category yet.{" "}
-            <Link to="/shop" className="text-gold hover:underline">
-              View all
-            </Link>
+            {products.length === 0 ? (
+              <>
+                No published products yet. In the admin dashboard or product quick edit (staff), open a product and
+                enable <strong>Published</strong> so it appears on the shop.
+              </>
+            ) : (
+              <>
+                No products match this filter.{" "}
+                <Link to="/shop" className="text-gold hover:underline">
+                  Clear filters
+                </Link>
+              </>
+            )}
           </p>
         )}
       </div>

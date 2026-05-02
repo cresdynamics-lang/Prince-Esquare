@@ -3,7 +3,7 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/order-confirmation")({
-  head: () => ({ meta: [{ title: "Order Confirmed — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Order Confirmed — Prince Esquire" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     order: (s.order as string) || "",
     paid: (s.paid as string) || "0",

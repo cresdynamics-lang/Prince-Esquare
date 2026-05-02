@@ -22,7 +22,7 @@ const metadataModule = Object.values(
   }),
 )[0] as FashionMetadataFile | undefined;
 
-const catalogImageModules = import.meta.glob("../assets/catalog/*/*.{jpg,jpeg,png,webp,jfif}", {
+const catalogImageModules = import.meta.glob("../assets/catalog/*/*.{jpg,jpeg,png,webp,jfif,avif}", {
   eager: true,
   import: "default",
 }) as Record<string, string>;
@@ -46,7 +46,7 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
   },
   outfits: {
     name: "Outfits",
-    description: "Complete looks styled from the Prince Esquare rails.",
+    description: "Complete looks styled from the Prince Esquire rails.",
   },
   casual: {
     name: "Casual",
@@ -169,7 +169,7 @@ export function getFashionCategoryFallback(slug: string) {
   return {
     name: categoryCopy?.name ?? titleCase(slug),
     description:
-      categoryCopy?.description ?? "Handpicked looks from the Prince Esquare studio collection.",
+      categoryCopy?.description ?? "Handpicked looks from the Prince Esquire studio collection.",
     image_url: items[0]?.image ?? null,
   };
 }

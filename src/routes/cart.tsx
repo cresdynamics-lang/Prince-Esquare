@@ -6,7 +6,7 @@ import { formatKES } from "@/lib/format";
 import { resolveImage } from "@/lib/assetMap";
 
 export const Route = createFileRoute("/cart")({
-  head: () => ({ meta: [{ title: "Your Cart — Prince Esquare" }] }),
+  head: () => ({ meta: [{ title: "Your Cart — Prince Esquire" }] }),
   component: CartPage,
 });
 

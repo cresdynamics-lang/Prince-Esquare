@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Heart, Truck, Store, ShieldCheck, Minus, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,10 @@ import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { fetchProductDetailBySlug } from "@/lib/publishedProductsQuery";
+import { productsUpdateSafe } from "@/lib/productWriteFallback";
+import { getSubcategoriesForCategory } from "@/lib/subcategories";
+import { NotFoundPage } from "@/components/site/NotFoundPage";
 
 export const Route = createFileRoute("/product/$slug")({
   component: ProductPage,
@@ -20,23 +24,29 @@ type Variant = { id: string; size: string | null; color: string | null; stock_qu
 function ProductPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isStaff, loading: authLoading } = useAuth();
   const cart = useCart();
   const wishlist = useWishlist();
   const [product, setProduct] = useState<any>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [activeVariant, setActiveVariant] = useState<Variant | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminUploadingImage, setAdminUploadingImage] = useState(false);
-  const [adminCategories, setAdminCategories] = useState<{ id: string; name: string }[]>([]);
+  const [adminCategories, setAdminCategories] = useState<{ id: string; name: string; slug: string }[]>(
+    [],
+  );
   const [adminDraft, setAdminDraft] = useState({
     title: "",
     slug: "",
     category_id: "",
+    subcategory: "",
+    description: "",
     price: "",
     sale_price: "",
     image_url: "",
@@ -45,18 +55,27 @@ function ProductPage() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     (async () => {
       setLoading(true);
       setMissing(false);
-      const { data: p } = await supabase
-        .from("products")
-        .select(
-          "id,slug,title,description,price,sale_price,is_published,is_featured,categories(name,slug),product_images(image_url),product_variants(id,size,color,stock_quantity)",
-        )
-        .eq("slug", slug)
-        .eq("is_published", true)
-        .maybeSingle();
+      const { data: p, error: fetchErr } = await fetchProductDetailBySlug(supabase, slug, {
+        onlyPublished: !isStaff,
+      });
+      if (fetchErr) {
+        console.error("[product] load failed:", fetchErr);
+        setProduct(null);
+        setMissing(true);
+        setLoading(false);
+        return;
+      }
       if (p) {
+        if (!isStaff && !p.is_published) {
+          setProduct(null);
+          setMissing(true);
+          setLoading(false);
+          return;
+        }
         setProduct(p);
         let categoryId = "";
         if (p.categories?.slug) {
@@ -71,11 +90,16 @@ function ProductPage() {
         setImages(imgs.length > 0 ? imgs : [null as any]);
         const vs = (p.product_variants ?? []) as Variant[];
         setVariants(vs);
-        setActiveVariant(vs.find((v) => v.stock_quantity > 0) ?? vs[0] ?? null);
+        const firstAvailable = vs.find((v) => v.stock_quantity > 0) ?? vs[0] ?? null;
+        setActiveVariant(firstAvailable);
+        setSelectedSize(firstAvailable?.size ?? null);
+        setSelectedColor(firstAvailable?.color ?? null);
         setAdminDraft({
           title: p.title ?? "",
           slug: p.slug ?? "",
           category_id: categoryId,
+          subcategory: (p as { subcategory?: string | null }).subcategory ?? "",
+          description: p.description ?? "",
           price: String(p.price ?? ""),
           sale_price: p.sale_price != null ? String(p.sale_price) : "",
           image_url: p.product_images?.[0]?.image_url ?? "",
@@ -90,20 +114,27 @@ function ProductPage() {
       setMissing(true);
       setLoading(false);
     })();
-  }, [slug]);
+  }, [slug, authLoading, isStaff]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isStaff) return;
     (async () => {
       const { data } = await supabase
         .from("categories")
-        .select("id,name")
+        .select("id,name,slug")
         .order("display_order");
       setAdminCategories(data ?? []);
     })();
-  }, [isAdmin]);
+  }, [isStaff]);
 
-  if (!loading && missing) throw notFound();
+  if (!loading && missing) {
+    return (
+      <NotFoundPage
+        heading="Product not found"
+        description="This product may have been removed or the link is incorrect."
+      />
+    );
+  }
   if (loading) {
     return (
       <div className="container mx-auto grid gap-8 px-4 py-12 md:grid-cols-2">
@@ -133,10 +164,24 @@ function ProductPage() {
   const onSale = product.sale_price != null && Number(product.sale_price) < Number(product.price);
   const displayPrice = onSale ? Number(product.sale_price) : Number(product.price);
   const sizes = [...new Set(variants.map((v) => v.size).filter(Boolean))] as string[];
+  const colors = [
+    ...new Set(
+      variants
+        .filter((v) => (selectedSize ? v.size === selectedSize : true))
+        .map((v) => v.color)
+        .filter(Boolean),
+    ),
+  ] as string[];
   const wished = wishlist.has(product.id);
+  const featureList = [
+    activeVariant?.size ? `Available size selected: ${activeVariant.size}` : "Multiple size options available",
+    activeVariant?.color ? `Color option selected: ${activeVariant.color}` : "Multiple color options available",
+    onSale ? `Current offer price: ${formatKES(displayPrice)}` : `Regular price: ${formatKES(displayPrice)}`,
+    "Fast delivery available across Kenya, with quick Nairobi fulfilment.",
+  ];
 
   const saveAdminChanges = async () => {
-    if (!isAdmin) return;
+    if (!isStaff) return;
     const price = Number(adminDraft.price);
     const sale = adminDraft.sale_price.trim() === "" ? null : Number(adminDraft.sale_price);
     if (!adminDraft.title.trim() || !adminDraft.slug.trim() || Number.isNaN(price)) {
@@ -149,26 +194,30 @@ function ProductPage() {
     }
 
     setAdminBusy(true);
-    const { error } = await supabase
-      .from("products")
-      .update({
-        title: adminDraft.title.trim(),
-        slug: adminDraft.slug
-          .trim()
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, ""),
-        category_id: adminDraft.category_id || null,
-        price,
-        sale_price: sale,
-        is_published: adminDraft.is_published,
-        is_featured: adminDraft.is_featured,
-      })
-      .eq("id", product.id);
+    const { error, omittedSubcategory } = await productsUpdateSafe(supabase, product.id, {
+      title: adminDraft.title.trim(),
+      slug: adminDraft.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, ""),
+      category_id: adminDraft.category_id || null,
+      subcategory: adminDraft.subcategory.trim() || null,
+      description: adminDraft.description.trim() || null,
+      price,
+      sale_price: sale,
+      is_published: adminDraft.is_published,
+      is_featured: adminDraft.is_featured,
+    });
     if (error) {
       setAdminBusy(false);
       toast.error(error.message);
       return;
+    }
+    if (omittedSubcategory) {
+      toast.message(
+        "Saved without subcategory until `products.subcategory` exists in Supabase (run the migration).",
+      );
     }
 
     const existingImage = product.product_images?.[0];
@@ -222,7 +271,7 @@ function ProductPage() {
   };
 
   const deleteProductNow = async () => {
-    if (!isAdmin) return;
+    if (!isStaff) return;
     const confirmed = window.confirm(`Delete "${product.title}" from website?`);
     if (!confirmed) return;
     setAdminBusy(true);
@@ -304,17 +353,24 @@ function ProductPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">{product.categories.name}</p>
           )}
           <h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">{product.title}</h1>
+          {isStaff && !product.is_published && (
+            <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+              Draft — shoppers cannot see this until you enable Published below.
+            </p>
+          )}
           <div className="mt-3 flex items-baseline gap-3">
             <span className="text-2xl font-semibold text-gold">{formatKES(displayPrice)}</span>
             {onSale && <span className="text-sm text-muted-foreground line-through">{formatKES(product.price)}</span>}
           </div>
 
-          <p className="mt-5 text-sm leading-relaxed text-foreground/80">{product.description}</p>
-
-          {isAdmin && (
+          {isStaff && (
             <div className="mt-6 rounded-md border border-gold/40 bg-gold/5 p-4">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gold">
-                Admin Quick Edit
+                Staff quick edit
+              </p>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Assign the correct category and subcategory so this item appears in the right shop group.
+                Save updates the live product—no need to open the admin dashboard.
               </p>
               <div className="grid gap-2 md:grid-cols-2">
                 <input
@@ -341,6 +397,35 @@ function ProductPage() {
                     </option>
                   ))}
                 </select>
+                {(() => {
+                  const selectedCat = adminCategories.find((c) => c.id === adminDraft.category_id);
+                  const subOpts = selectedCat?.slug ? getSubcategoriesForCategory(selectedCat.slug) : [];
+                  return (
+                    <div className="md:col-span-2">
+                      <input
+                        list={subOpts.length > 0 ? "staff-product-subcat" : undefined}
+                        value={adminDraft.subcategory}
+                        onChange={(e) => setAdminDraft((d) => ({ ...d, subcategory: e.target.value }))}
+                        placeholder="Subcategory (matches shop filters)"
+                        className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                      />
+                      {subOpts.length > 0 && (
+                        <datalist id="staff-product-subcat">
+                          {subOpts.map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      )}
+                    </div>
+                  );
+                })()}
+                <textarea
+                  value={adminDraft.description}
+                  onChange={(e) => setAdminDraft((d) => ({ ...d, description: e.target.value }))}
+                  placeholder="Full product description (shown to customers)"
+                  rows={5}
+                  className="rounded border border-border bg-background px-2 py-2 text-sm md:col-span-2"
+                />
                 <input
                   type="number"
                   value={adminDraft.price}
@@ -422,13 +507,22 @@ function ProductPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {sizes.map((s) => {
-                  const v = variants.find((x) => x.size === s);
-                  const active = activeVariant?.size === s;
-                  const oos = !v || v.stock_quantity === 0;
+                  const matching = variants.filter((x) => x.size === s);
+                  const hasInStock = matching.some((x) => x.stock_quantity > 0);
+                  const active = selectedSize === s;
+                  const oos = matching.length === 0 || !hasInStock;
                   return (
                     <button
                       key={s}
-                      onClick={() => v && setActiveVariant(v)}
+                      onClick={() => {
+                        const nextVariant =
+                          variants.find((x) => x.size === s && x.stock_quantity > 0) ??
+                          variants.find((x) => x.size === s) ??
+                          null;
+                        setSelectedSize(s);
+                        setSelectedColor(nextVariant?.color ?? null);
+                        setActiveVariant(nextVariant);
+                      }}
                       disabled={oos}
                       className={cn(
                         "min-w-12 rounded border px-3 py-2 text-sm transition-colors",
@@ -454,6 +548,46 @@ function ProductPage() {
               )}
             </div>
           )}
+          {colors.length > 0 && (
+            <div className="mt-5">
+              <span className="text-xs font-semibold uppercase tracking-wider">Color</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {colors.map((color) => {
+                  const matching = variants.filter(
+                    (x) => x.color === color && (!selectedSize || x.size === selectedSize),
+                  );
+                  const hasInStock = matching.some((x) => x.stock_quantity > 0);
+                  const active = selectedColor === color;
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        const nextVariant =
+                          variants.find(
+                            (x) =>
+                              x.color === color &&
+                              (!selectedSize || x.size === selectedSize) &&
+                              x.stock_quantity > 0,
+                          ) ??
+                          variants.find((x) => x.color === color && (!selectedSize || x.size === selectedSize)) ??
+                          null;
+                        setSelectedColor(color);
+                        setActiveVariant(nextVariant);
+                      }}
+                      disabled={!hasInStock}
+                      className={cn(
+                        "rounded border px-3 py-2 text-sm transition-colors",
+                        active ? "border-gold bg-gold text-gold-foreground" : "border-border hover:border-gold",
+                        !hasInStock && "cursor-not-allowed text-muted-foreground line-through opacity-50",
+                      )}
+                    >
+                      {color}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="mt-6 flex items-center gap-3">
             <div className="flex items-center rounded border border-border">
@@ -471,6 +605,18 @@ function ProductPage() {
             >
               <Heart className={cn("h-5 w-5", wished && "fill-gold text-gold")} />
             </Button>
+          </div>
+
+          <div className="mt-6 rounded-md border border-border bg-card p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gold">Description & Features</h2>
+            <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+              {product.description}
+            </p>
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-foreground/85">
+              {featureList.map((feature, index) => (
+                <li key={`${feature}-${index}`}>{feature}</li>
+              ))}
+            </ol>
           </div>
 
           <div className="mt-8 grid grid-cols-3 gap-4 border-t border-border pt-6 text-center">

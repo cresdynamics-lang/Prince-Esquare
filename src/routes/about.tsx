@@ -4,15 +4,15 @@ import { Sparkles, ShieldCheck, Store } from "lucide-react";
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About Prince Esquare — Premium Menswear in Nairobi" },
+      { title: "About Prince Esquire — Premium Menswear in Nairobi" },
       {
         name: "description",
         content:
-          "Learn about Prince Esquare, a Nairobi-based premium menswear brand in Kenya focused on quality suits, shirts, shoes and timeless gentleman style.",
+          "Learn about Prince Esquire, a Nairobi-based premium menswear brand in Kenya focused on quality suits, shirts, shoes and timeless gentleman style.",
       },
       {
         name: "keywords",
-        content: "about prince esquare, nairobi menswear brand, kenya men fashion, premium suits kenya",
+        content: "about prince esquire, nairobi menswear brand, kenya men fashion, premium suits kenya",
       },
     ],
   }),
@@ -28,7 +28,7 @@ function AboutPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Our Story</p>
           <h1 className="mt-3 font-display text-4xl font-bold md:text-6xl">Crafting the modern gentleman.</h1>
           <p className="mx-auto mt-5 max-w-2xl px-4 text-base text-navy-foreground/70">
-            Prince Esquare was founded on a simple belief: every man deserves clothes that fit him —
+            Prince Esquire was founded on a simple belief: every man deserves clothes that fit him —
             and his ambitions — perfectly.
           </p>
         </div>
@@ -54,7 +54,7 @@ function AboutPage() {
         <div className="rounded-md border border-border bg-card p-6 md:p-8">
           <h2 className="font-display text-2xl font-bold md:text-3xl">Built for Kenya&apos;s modern gentleman</h2>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
-            Prince Esquare serves men who value fit, confidence, and quality. We curate collections for
+            Prince Esquire serves men who value fit, confidence, and quality. We curate collections for
             business, weddings, events, and everyday smart style across Nairobi and beyond.
           </p>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">

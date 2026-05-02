@@ -5,17 +5,17 @@ import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { STORE_INFO } from "@/lib/format";
+import { CATALOG_TAXONOMY, PRIMARY_NAV_CATEGORY_SLUGS } from "@/lib/catalogTaxonomy";
 import logoImg from "@/assets/Prince logo.png";
 
-const NAV = [
-  { type: "route", to: "/shop", label: "Shop All" },
-  { type: "category", slug: "shoes", label: "Shoes" },
-  { type: "category", slug: "suits", label: "Suits" },
-  { type: "category", slug: "shirts", label: "Shirts" },
-  { type: "category", slug: "trousers", label: "Trousers" },
-] as const;
+const NAV = [{ type: "route", to: "/shop", label: "Shop All" }] as const;
+const PRIMARY_CATEGORY_LINKS = CATALOG_TAXONOMY.filter((item) =>
+  PRIMARY_NAV_CATEGORY_SLUGS.includes(item.slug as (typeof PRIMARY_NAV_CATEGORY_SLUGS)[number]),
+).map((item) => ({ type: "category" as const, slug: item.slug, label: item.name }));
 const MORE_NAV = [
-  { type: "category", slug: "socks", label: "Socks" },
+  ...CATALOG_TAXONOMY.filter(
+    (item) => !PRIMARY_NAV_CATEGORY_SLUGS.includes(item.slug as (typeof PRIMARY_NAV_CATEGORY_SLUGS)[number]),
+  ).map((item) => ({ type: "category" as const, slug: item.slug, label: item.name })),
   { type: "route", to: "/booking", label: "Booking" },
   { type: "route", to: "/contact", label: "Contact" },
 ] as const;
@@ -52,14 +52,14 @@ export function Header() {
         <Link to="/" className="flex items-center gap-3 leading-none">
           <img
             src={logoImg}
-            alt="Prince Esquare logo"
+            alt="Prince Esquire logo"
             className="h-10 w-10 rounded-full border border-gold/50 object-cover"
             width={40}
             height={40}
           />
           <span className="flex flex-col">
             <span className="font-display text-xl font-bold tracking-tight md:text-2xl">
-            Prince <span className="text-gold">Esquare</span>
+            Prince <span className="text-gold">Esquire</span>
             </span>
             <span className="hidden text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:inline">
               Menswear - Nairobi
@@ -68,7 +68,7 @@ export function Header() {
         </Link>
 
         <nav className="ml-6 hidden items-center gap-4 xl:gap-5 lg:flex">
-          {NAV.map((n) =>
+          {[...NAV, ...PRIMARY_CATEGORY_LINKS].map((n) =>
             n.type === "route" ? (
               <Link
                 key={n.label}
@@ -120,16 +120,16 @@ export function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1 md:gap-2">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             type="button"
             aria-label="Search"
             className="hidden md:inline-flex"
             onClick={() => setSearchOpen((v) => !v)}
           >
-            <Button variant="ghost" size="icon" type="button">
-              <Search className="h-5 w-5" />
-            </Button>
-          </button>
+            <Search className="h-5 w-5" />
+          </Button>
           <Link to="/wishlist" aria-label="Wishlist">
             <Button variant="ghost" size="icon">
               <Heart className="h-5 w-5" />
@@ -173,7 +173,7 @@ export function Header() {
       {open && (
         <div className="border-t border-border bg-background lg:hidden">
           <nav className="container mx-auto flex flex-col px-4 py-2">
-            {[...NAV, ...MORE_NAV].map((n) =>
+            {[...NAV, ...PRIMARY_CATEGORY_LINKS, ...MORE_NAV].map((n) =>
               n.type === "route" ? (
                 <Link
                   key={n.label}
