@@ -56,6 +56,72 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      attendant_profiles: {
+        Row: {
+          branch_location: string | null
+          created_at: string
+          display_name: string
+          email: string
+          is_active: boolean
+          orders_visibility: string
+          permissions: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          branch_location?: string | null
+          created_at?: string
+          display_name: string
+          email: string
+          is_active?: boolean
+          orders_visibility?: string
+          permissions?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          branch_location?: string | null
+          created_at?: string
+          display_name?: string
+          email?: string
+          is_active?: boolean
+          orders_visibility?: string
+          permissions?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -181,6 +247,9 @@ export type Database = {
           message: string
           name: string
           phone: string | null
+          replied_at: string | null
+          replied_by: string | null
+          staff_reply: string | null
           subject: string
         }
         Insert: {
@@ -191,6 +260,9 @@ export type Database = {
           message: string
           name: string
           phone?: string | null
+          replied_at?: string | null
+          replied_by?: string | null
+          staff_reply?: string | null
           subject: string
         }
         Update: {
@@ -201,6 +273,9 @@ export type Database = {
           message?: string
           name?: string
           phone?: string | null
+          replied_at?: string | null
+          replied_by?: string | null
+          staff_reply?: string | null
           subject?: string
         }
         Relationships: []
@@ -298,6 +373,7 @@ export type Database = {
           delivery_method: Database["public"]["Enums"]["delivery_method"]
           discount_amount: number
           estimated_delivery: string | null
+          fulfillment_branch: string | null
           guest_email: string | null
           guest_name: string | null
           guest_phone: string | null
@@ -321,6 +397,7 @@ export type Database = {
           delivery_method?: Database["public"]["Enums"]["delivery_method"]
           discount_amount?: number
           estimated_delivery?: string | null
+          fulfillment_branch?: string | null
           guest_email?: string | null
           guest_name?: string | null
           guest_phone?: string | null
@@ -344,6 +421,7 @@ export type Database = {
           delivery_method?: Database["public"]["Enums"]["delivery_method"]
           discount_amount?: number
           estimated_delivery?: string | null
+          fulfillment_branch?: string | null
           guest_email?: string | null
           guest_name?: string | null
           guest_phone?: string | null
@@ -447,6 +525,7 @@ export type Database = {
           id: string
           is_featured: boolean
           is_published: boolean
+          low_stock_threshold: number
           meta_description: string | null
           meta_title: string | null
           price: number
@@ -464,6 +543,7 @@ export type Database = {
           id?: string
           is_featured?: boolean
           is_published?: boolean
+          low_stock_threshold?: number
           meta_description?: string | null
           meta_title?: string | null
           price: number
@@ -481,6 +561,7 @@ export type Database = {
           id?: string
           is_featured?: boolean
           is_published?: boolean
+          low_stock_threshold?: number
           meta_description?: string | null
           meta_title?: string | null
           price?: number
@@ -526,6 +607,54 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      stock_adjustments: {
+        Row: {
+          adjustment_type: string
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          reason: string
+          user_id: string | null
+          variant_id: string
+        }
+        Insert: {
+          adjustment_type: string
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          reason: string
+          user_id?: string | null
+          variant_id: string
+        }
+        Update: {
+          adjustment_type?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          reason?: string
+          user_id?: string | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_adjustments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_adjustments_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       promo_codes: {
         Row: {
@@ -662,6 +791,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_stock_adjustment: {
+        Args: {
+          p_adjustment_type: string
+          p_quantity: number
+          p_reason: string
+          p_variant_id: string
+        }
+        Returns: Json
+      }
+      attendant_may_access_admin_panel: { Args: { _user_id: string }; Returns: boolean }
+      attendant_is_active: { Args: { _user_id: string }; Returns: boolean }
+      attendant_permission: { Args: { _key: string; _user_id: string }; Returns: boolean }
+      current_user_may_access_admin_panel: { Args: Record<string, never>; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -670,6 +812,15 @@ export type Database = {
         Returns: boolean
       }
       is_staff_or_admin: { Args: { _user_id: string }; Returns: boolean }
+      log_admin_activity: {
+        Args: {
+          p_action: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "staff" | "customer"
@@ -677,7 +828,9 @@ export type Database = {
       discount_type: "percent" | "fixed"
       order_status:
         | "pending"
+        | "confirmed"
         | "processing"
+        | "dispatched"
         | "shipped"
         | "delivered"
         | "cancelled"
@@ -814,7 +967,9 @@ export const Constants = {
       discount_type: ["percent", "fixed"],
       order_status: [
         "pending",
+        "confirmed",
         "processing",
+        "dispatched",
         "shipped",
         "delivered",
         "cancelled",

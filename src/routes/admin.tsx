@@ -3,12 +3,16 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   ClipboardList,
+  History,
   Mail,
   Menu,
   Package,
   Percent,
+  ScrollText,
   Shield,
   Tag,
+  Truck,
+  Users,
   Warehouse,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -16,18 +20,28 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Enums } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatKES, STORE_INFO } from "@/lib/format";
+import { formatKES } from "@/lib/format";
 import { fashionProductsAsCards } from "@/lib/fashionProducts";
 import { ALLOWED_CATEGORY_SLUGS, CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
 import { defaultCarouselDescription, defaultCarouselTitle, getCategorySubcategoryLinks } from "@/lib/categoryCarousels";
+import { buildProductDescription, inferCategorySlugFromText } from "@/lib/productCopy";
+import { deleteProductCompletely } from "@/lib/productDeletion";
 import { getSubcategoriesForCategory, inferSubcategory, resolveSubcategory } from "@/lib/subcategories";
 import { productsInsertSafe, productsUpdateSafe, productsUpsertSafe } from "@/lib/productWriteFallback";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  AdminActivityLogPanel,
+  AdminStockHistoryPanel,
+  AdminTeamPanel,
+  StockAdjustModal,
+} from "@/components/admin/AdminRbacPanels";
 
 const ORDER_STATUSES: Enums<"order_status">[] = [
   "pending",
+  "confirmed",
   "processing",
+  "dispatched",
   "shipped",
   "delivered",
   "cancelled",
@@ -39,8 +53,65 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, loading, isSuperAdmin, canAccessAdminPanel, attendantProfile, can } = useAuth();
   const navigate = useNavigate();
+
+  const canUpdateProducts = isSuperAdmin || can("update_products");
+  const canEditProductRows = canUpdateProducts;
+  const canCreateProducts = isSuperAdmin;
+  const canDeleteProducts = isSuperAdmin;
+  const canBulkProductOps = isSuperAdmin;
+  const canAutoCreateVariants = isSuperAdmin;
+  const canMarkMessageRead = isSuperAdmin || can("view_messages") || can("respond_messages");
+  const canReplyMessageInApp = isSuperAdmin || can("respond_messages");
+  const canManageBookings = isSuperAdmin;
+  const canManageCatalogTaxonomy = isSuperAdmin;
+
+  const showOrdersTab = isSuperAdmin || can("view_orders") || can("update_order_status");
+  const showProductsTab = isSuperAdmin || can("view_products") || can("update_products");
+  const showMessagesTab = isSuperAdmin || can("view_messages") || can("respond_messages");
+  const canUpdateOrderStatus = isSuperAdmin || can("update_order_status");
+  const showBookingsTab = isSuperAdmin;
+  const showInventoryTab = isSuperAdmin || can("view_products") || can("update_products");
+  const showCategoriesTab = isSuperAdmin;
+  const showPromosTab = isSuperAdmin;
+  const showSuperAdminTab = isSuperAdmin;
+  const showTeamTab = isSuperAdmin;
+  const showStockHistoryTab = isSuperAdmin || can("view_products") || can("update_products");
+  const showActivityTab = canAccessAdminPanel;
+  const showDeliveriesTab = isSuperAdmin || can("view_deliveries");
+  const showStatsFinance = isSuperAdmin || can("view_daily_sales");
+
+  const allowedTabValues = useMemo(() => {
+    const keys: string[] = [];
+    if (showOrdersTab) keys.push("orders");
+    if (showProductsTab) keys.push("products");
+    if (showMessagesTab) keys.push("messages");
+    if (showBookingsTab) keys.push("bookings");
+    if (showDeliveriesTab) keys.push("deliveries");
+    if (showInventoryTab) keys.push("inventory");
+    if (showStockHistoryTab) keys.push("stock-history");
+    if (showCategoriesTab) keys.push("categories");
+    if (showPromosTab) keys.push("promos");
+    if (showTeamTab) keys.push("team");
+    if (showActivityTab) keys.push("activity-log");
+    if (showSuperAdminTab) keys.push("super-admin");
+    return keys;
+  }, [
+    showOrdersTab,
+    showProductsTab,
+    showMessagesTab,
+    showBookingsTab,
+    showDeliveriesTab,
+    showInventoryTab,
+    showStockHistoryTab,
+    showCategoriesTab,
+    showPromosTab,
+    showTeamTab,
+    showActivityTab,
+    showSuperAdminTab,
+  ]);
+
   const [stats, setStats] = useState({
     orders: 0,
     revenue: 0,
@@ -51,8 +122,10 @@ function AdminPage() {
     bookings: 0,
   });
   const [orders, setOrders] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [messageReplyDrafts, setMessageReplyDrafts] = useState<Record<string, string>>({});
   const [bookings, setBookings] = useState<any[]>([]);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
@@ -69,6 +142,9 @@ function AdminPage() {
   });
   const [promos, setPromos] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("orders");
+  const [stockAdjustTarget, setStockAdjustTarget] = useState<{ variantId: string; title: string } | null>(
+    null,
+  );
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true,
   );
@@ -169,6 +245,10 @@ function AdminPage() {
   };
 
   const uploadNewProductImage = async (file: File) => {
+    if (!canCreateProducts) {
+      toast.error("Only Super Admin can add product images here.");
+      return;
+    }
     try {
       setUploadingNewProductImage(true);
       const publicUrl = await uploadImageToStorage(file);
@@ -182,6 +262,10 @@ function AdminPage() {
   };
 
   const uploadDraftProductImage = async (productId: string, file: File) => {
+    if (!canEditProductRows) {
+      toast.error("You do not have permission to change product images.");
+      return;
+    }
     try {
       setUploadingProductImageId(productId);
       const publicUrl = await uploadImageToStorage(file);
@@ -195,17 +279,24 @@ function AdminPage() {
   };
 
   useEffect(() => {
-    if (!loading && !isAdmin) navigate({ to: "/" });
-  }, [loading, isAdmin, navigate]);
+    if (!loading && !canAccessAdminPanel) navigate({ to: "/" });
+  }, [loading, canAccessAdminPanel, navigate]);
+
+  useEffect(() => {
+    if (loading || !canAccessAdminPanel) return;
+    if (allowedTabValues.length === 0) return;
+    if (!allowedTabValues.includes(activeTab)) {
+      setActiveTab(allowedTabValues[0]);
+    }
+  }, [loading, canAccessAdminPanel, allowedTabValues, activeTab]);
 
   const loadAll = async () => {
-    if (!isAdmin) return;
+    if (!canAccessAdminPanel) return;
     const [
       { data: os },
       { data: ps },
       { data: ms },
       { data: bs },
-      { data: vs },
       { data: allVariants },
       { data: pr },
       { data: cs },
@@ -215,18 +306,20 @@ function AdminPage() {
       await Promise.all([
         supabase
           .from("orders")
-          .select("id, order_number, status, total, created_at, guest_name")
+          .select(
+            "id, order_number, status, total, created_at, guest_name, payment_method, fulfillment_branch",
+          )
           .order("created_at", { ascending: false })
-          .limit(20),
+          .limit(50),
         supabase
           .from("products")
           .select(
-            "id, title, slug, category_id, subcategory, price, sale_price, is_published, is_featured, categories(name,slug), product_images(id,image_url,display_order)",
+            "id, title, slug, category_id, subcategory, price, sale_price, is_published, is_featured, low_stock_threshold, categories(name,slug), product_images(id,image_url,display_order)",
           )
           .order("created_at", { ascending: false }),
         supabase
           .from("contact_messages")
-          .select("id, name, email, subject, message, is_read, created_at")
+          .select("id, name, email, subject, message, is_read, created_at, staff_reply, replied_at")
           .order("created_at", { ascending: false })
           .limit(20),
         (supabase as any)
@@ -236,23 +329,36 @@ function AdminPage() {
           .limit(50),
         supabase
           .from("product_variants")
-          .select("id, sku, size, stock_quantity, products(title)")
-          .lt("stock_quantity", 5)
-          .order("stock_quantity"),
-        supabase
-          .from("product_variants")
-          .select("id, product_id, sku, size, color, stock_quantity, products(title)")
+          .select("id, product_id, sku, size, color, stock_quantity, products(title,low_stock_threshold)")
           .order("created_at", { ascending: false }),
         supabase.from("promo_codes").select("*").order("created_at", { ascending: false }),
         supabase.from("categories").select("id,name,slug").order("display_order"),
         supabase.from("category_carousels").select("category_id,title,description,image_url,is_active"),
-        supabase.from("order_items").select("quantity,line_total,created_at"),
+        supabase.from("order_items").select("order_id,product_title,quantity,line_total,created_at"),
       ]);
-    setOrders(os ?? []);
+    let orderList = os ?? [];
+    if (
+      !isSuperAdmin &&
+      attendantProfile?.orders_visibility === "branch" &&
+      attendantProfile?.branch_location
+    ) {
+      const b = attendantProfile.branch_location;
+      orderList = orderList.filter(
+        (o: any) => !o.fulfillment_branch || String(o.fulfillment_branch) === b,
+      );
+    }
+    const visibleOrderIds = new Set(orderList.map((o: any) => o.id));
+    const visibleItems = (oi ?? []).filter((item: any) => visibleOrderIds.has(item.order_id));
+    const thresholdLowStock = (allVariants ?? []).filter((v: any) => {
+      const threshold = Number(v.products?.low_stock_threshold ?? 5);
+      return Number(v.stock_quantity ?? 0) <= threshold;
+    });
+    setOrders(orderList);
+    setOrderItems(visibleItems);
     setProducts(ps ?? []);
     setMessages(ms ?? []);
     setBookings(bs ?? []);
-    setLowStock(vs ?? []);
+    setLowStock(thresholdLowStock);
     setVariants(allVariants ?? []);
     setPromos(pr ?? []);
     setCategories(cs ?? []);
@@ -318,34 +424,148 @@ function AdminPage() {
       vDrafts[v.id] = String(v.stock_quantity ?? "0");
     });
     setVariantStockDrafts(vDrafts);
-    const totalRev = (os ?? []).reduce((s, o: any) => s + Number(o.total ?? 0), 0);
+    const allowFinance = isSuperAdmin || can("view_daily_sales");
+    const totalRev = orderList.reduce((s, o: any) => s + Number(o.total ?? 0), 0);
     const liveProducts = (ps ?? []).filter((p: any) => p.is_published).length;
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const weeklyOrders = (os ?? []).filter((o: any) => new Date(o.created_at).getTime() >= weekAgo);
-    const monthlyOrders = (os ?? []).filter((o: any) => new Date(o.created_at).getTime() >= monthAgo);
+    const weeklyOrders = orderList.filter((o: any) => new Date(o.created_at).getTime() >= weekAgo);
+    const monthlyOrders = orderList.filter((o: any) => new Date(o.created_at).getTime() >= monthAgo);
     setFinanceStats({
-      weeklyRevenue: weeklyOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0),
-      monthlyRevenue: monthlyOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0),
-      weeklyOrders: weeklyOrders.length,
-      monthlyOrders: monthlyOrders.length,
-      itemsSold: (oi ?? []).reduce((sum: number, item: any) => sum + Number(item.quantity ?? 0), 0),
-      soldAmount: (oi ?? []).reduce((sum: number, item: any) => sum + Number(item.line_total ?? 0), 0),
+      weeklyRevenue: allowFinance
+        ? weeklyOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0)
+        : 0,
+      monthlyRevenue: allowFinance
+        ? monthlyOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0)
+        : 0,
+      weeklyOrders: allowFinance ? weeklyOrders.length : 0,
+      monthlyOrders: allowFinance ? monthlyOrders.length : 0,
+      itemsSold: allowFinance
+        ? visibleItems.reduce((sum: number, item: any) => sum + Number(item.quantity ?? 0), 0)
+        : 0,
+      soldAmount: allowFinance
+        ? visibleItems.reduce((sum: number, item: any) => sum + Number(item.line_total ?? 0), 0)
+        : 0,
     });
     setStats({
-      orders: (os ?? []).length,
-      revenue: totalRev,
+      orders: orderList.length,
+      revenue: allowFinance ? totalRev : 0,
       liveProducts,
       totalProducts: (ps ?? []).length,
-      lowStock: (vs ?? []).length,
+      lowStock: thresholdLowStock.length,
       messages: (ms ?? []).filter((m: any) => !m.is_read).length,
       bookings: (bs ?? []).filter((b: any) => b.status === "pending").length,
     });
   };
 
+  const logAdminActivity = async (
+    action: string,
+    entityType?: string,
+    entityId?: string,
+    metadata?: Record<string, unknown>,
+  ) => {
+    await supabase.rpc("log_admin_activity", {
+      p_action: action,
+      p_entity_type: entityType,
+      p_entity_id: entityId,
+      p_metadata: (metadata as any) ?? undefined,
+    });
+  };
+
+  const exportOrdersCsv = () => {
+    if (!showOrdersTab) return;
+    const esc = (v: unknown) => {
+      const s = String(v ?? "").replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const header = [
+      "order_number",
+      "guest_name",
+      "created_at",
+      "total_kes",
+      "status",
+      "payment_method",
+      "fulfillment_branch",
+    ];
+    const rows = orders.map((o: any) =>
+      [
+        esc(o.order_number),
+        esc(o.guest_name),
+        esc(o.created_at),
+        showStatsFinance ? esc(o.total) : esc(""),
+        esc(o.status),
+        showStatsFinance ? esc(o.payment_method) : esc(""),
+        esc(o.fulfillment_branch),
+      ].join(","),
+    );
+    const csv = [header.join(","), ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `prince-esquire-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    void logAdminActivity("export_orders_csv", "orders", undefined, { count: orders.length });
+    toast.success(`Exported ${orders.length} order row(s) to CSV.`);
+  };
+
+  const exportSalesCsv = () => {
+    if (!showStatsFinance) {
+      toast.error("You do not have permission to export sales reports.");
+      return;
+    }
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const summaryRows = [
+      ["metric", "value"],
+      ["daily_sales_kes", String(todaysRevenue)],
+      ["weekly_sales_kes", String(financeStats.weeklyRevenue)],
+      ["monthly_sales_kes", String(financeStats.monthlyRevenue)],
+      ["total_revenue_kes", String(stats.revenue)],
+      ["total_orders", String(stats.orders)],
+      ["average_order_value_kes", String(Math.round(averageOrderValue * 100) / 100)],
+      ["items_sold", String(financeStats.itemsSold)],
+    ].map((row) => row.map(esc).join(","));
+    const paymentRows = [
+      "",
+      "revenue_by_payment_method",
+      ["method", "total_kes"].map(esc).join(","),
+      ...revenueByPaymentMethod.map((row) => [row.method, String(row.total)].map(esc).join(",")),
+      "",
+      "top_selling_products",
+      ["product", "quantity", "revenue_kes"].map(esc).join(","),
+      ...productSales.top.map((row) =>
+        [row.title, String(row.quantity), String(row.revenue)].map(esc).join(","),
+      ),
+      "",
+      "least_selling_products",
+      ["product", "quantity", "revenue_kes"].map(esc).join(","),
+      ...productSales.least.map((row) =>
+        [row.title, String(row.quantity), String(row.revenue)].map(esc).join(","),
+      ),
+    ];
+    const csv = [...summaryRows, ...paymentRows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `prince-esquire-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    void logAdminActivity("export_sales_csv", "sales_report", undefined, { orders: orders.length });
+    toast.success("Sales report exported.");
+  };
+
   useEffect(() => {
-    if (isAdmin) loadAll();
-  }, [isAdmin]);
+    if (canAccessAdminPanel) void loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAll reads latest auth; avoid rebinding whole loader
+  }, [canAccessAdminPanel, isSuperAdmin, attendantProfile?.orders_visibility, attendantProfile?.branch_location]);
 
   useEffect(() => {
     setProductSubcategoryFilter("all");
@@ -433,8 +653,48 @@ function AdminPage() {
     productSearch,
   ]);
 
+  const todaysRevenue = useMemo(() => {
+    if (!showStatsFinance) return 0;
+    const today = new Date().toDateString();
+    return orders
+      .filter((order: any) => new Date(order.created_at).toDateString() === today)
+      .reduce((sum: number, order: any) => sum + Number(order.total ?? 0), 0);
+  }, [orders, showStatsFinance]);
+
+  const averageOrderValue = useMemo(() => {
+    if (!showStatsFinance || orders.length === 0) return 0;
+    return orders.reduce((sum: number, order: any) => sum + Number(order.total ?? 0), 0) / orders.length;
+  }, [orders, showStatsFinance]);
+
+  const revenueByPaymentMethod = useMemo(() => {
+    if (!showStatsFinance) return [];
+    const totals = new Map<string, number>();
+    orders.forEach((order: any) => {
+      const method = String(order.payment_method ?? "unknown").trim() || "unknown";
+      totals.set(method, (totals.get(method) ?? 0) + Number(order.total ?? 0));
+    });
+    return Array.from(totals.entries())
+      .map(([method, total]) => ({ method, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [orders, showStatsFinance]);
+
+  const productSales = useMemo(() => {
+    if (!showStatsFinance) return { top: [], least: [] };
+    const totals = new Map<string, { title: string; quantity: number; revenue: number }>();
+    orderItems.forEach((item: any) => {
+      const title = String(item.product_title ?? "Unknown product");
+      const current = totals.get(title) ?? { title, quantity: 0, revenue: 0 };
+      current.quantity += Number(item.quantity ?? 0);
+      current.revenue += Number(item.line_total ?? 0);
+      totals.set(title, current);
+    });
+    const sorted = Array.from(totals.values()).sort((a, b) => b.quantity - a.quantity);
+    const least = [...sorted].reverse().slice(0, 5);
+    return { top: sorted.slice(0, 5), least };
+  }, [orderItems, showStatsFinance]);
+
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canAccessAdminPanel) return;
     const channel = supabase
       .channel("admin-products-live")
       .on(
@@ -477,29 +737,75 @@ function AdminPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin]);
+  }, [canAccessAdminPanel]);
 
   const updateOrderStatus = async (id: string, status: Enums<"order_status">) => {
+    if (!canUpdateOrderStatus) {
+      toast.error("You do not have permission to change order status.");
+      return;
+    }
     const { error } = await supabase.from("orders").update({ status }).eq("id", id);
     if (error) {
       toast.error(error.message);
       return;
     }
+    await logAdminActivity("order_status_update", "order", id, { status });
     toast.success("Order updated");
     loadAll();
   };
 
   const markMessageRead = async (id: string) => {
+    if (!canMarkMessageRead) {
+      toast.error("You do not have permission to update messages.");
+      return;
+    }
     await supabase.from("contact_messages").update({ is_read: true }).eq("id", id);
+    await logAdminActivity("message_mark_read", "contact_message", id);
+    loadAll();
+  };
+
+  const saveMessageReply = async (id: string) => {
+    if (!canReplyMessageInApp) {
+      toast.error("You do not have permission to reply to messages.");
+      return;
+    }
+    if (!user) return;
+    const text = (messageReplyDrafts[id] ?? "").trim();
+    if (!text) {
+      toast.error("Write a reply first.");
+      return;
+    }
+    const { error } = await supabase.from("contact_messages").update({
+      staff_reply: text,
+      replied_at: new Date().toISOString(),
+      replied_by: user.id,
+      is_read: true,
+    }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await logAdminActivity("message_reply", "contact_message", id, { length: text.length });
+    setMessageReplyDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    toast.success("Reply saved.");
     loadAll();
   };
 
   const updateBookingStatus = async (id: string, status: "pending" | "confirmed" | "completed" | "cancelled") => {
+    if (!canManageBookings) {
+      toast.error("You do not have permission to manage bookings.");
+      return;
+    }
     const { error } = await (supabase as any).from("bookings").update({ status }).eq("id", id);
     if (error) {
       toast.error(error.message);
       return;
     }
+    await logAdminActivity("booking_status_update", "booking", id, { status });
     toast.success("Booking updated");
     loadAll();
   };
@@ -509,6 +815,7 @@ function AdminPage() {
     key: "title" | "slug" | "category_id" | "subcategory" | "is_published" | "is_featured" | "image_url",
     value: string | boolean,
   ) => {
+    if (!canEditProductRows) return;
     setProductDrafts((prev) => ({
       ...prev,
       [id]: {
@@ -519,6 +826,10 @@ function AdminPage() {
   };
 
   const saveProduct = async (id: string) => {
+    if (!canEditProductRows) {
+      toast.error("You do not have permission to edit products.");
+      return;
+    }
     const draft = productDrafts[id];
     if (!draft) return;
     const price = Number(priceDrafts[id]);
@@ -586,10 +897,14 @@ function AdminPage() {
   };
 
   const deleteProduct = async (id: string, title: string) => {
+    if (!canDeleteProducts) {
+      toast.error("Only Super Admin can delete products.");
+      return;
+    }
     const confirmed = window.confirm(`Delete "${title}"? This cannot be undone.`);
     if (!confirmed) return;
     setDeletingProductId(id);
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    const { error } = await deleteProductCompletely(supabase, id);
     setDeletingProductId(null);
     if (error) {
       toast.error(error.message);
@@ -601,6 +916,10 @@ function AdminPage() {
 
   const createProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateProducts) {
+      toast.error("Only Super Admin can create new products.");
+      return;
+    }
     setCreatingProduct(true);
     const slug =
       newProduct.slug.trim() ||
@@ -654,6 +973,10 @@ function AdminPage() {
   };
 
   const syncAssetProductsToDatabase = async () => {
+    if (!canBulkProductOps) {
+      toast.error("Only Super Admin can sync asset products.");
+      return;
+    }
     setSyncingAssetProducts(true);
     try {
       const fashionCards = fashionProductsAsCards();
@@ -796,6 +1119,10 @@ function AdminPage() {
   };
 
   const updateCategoryName = async (id: string) => {
+    if (!canManageCatalogTaxonomy) {
+      toast.error("You do not have permission to edit categories.");
+      return;
+    }
     const name = (categoryNameDrafts[id] ?? "").trim();
     if (!name) {
       toast.error("Category name is required.");
@@ -816,6 +1143,10 @@ function AdminPage() {
 
   const createCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageCatalogTaxonomy) {
+      toast.error("You do not have permission to create categories.");
+      return;
+    }
     setCreatingCategory(true);
     const name = newCategory.name.trim();
     const slug =
@@ -855,6 +1186,10 @@ function AdminPage() {
   };
 
   const uploadCarouselImage = async (categoryId: string, file: File) => {
+    if (!canManageCatalogTaxonomy) {
+      toast.error("You do not have permission to update carousels.");
+      return;
+    }
     try {
       setUploadingCarouselCategoryId(categoryId);
       const publicUrl = await uploadImageToStorage(file);
@@ -891,24 +1226,14 @@ function AdminPage() {
   };
 
   const inferCategorySlug = (text: string) => {
-    const t = text.toLowerCase();
-    if (t.includes("polo")) return "polo-t-shirts";
-    if (/(shoe|loafer|oxford|boot|sandal)/.test(t)) return "shoes";
-    if (/(three-piece|two-piece|wedding suit|suit)/.test(t) && !t.includes("track")) return "suits";
-    if (t.includes("blazer")) return "blazers";
-    if (/(track|jogger|athleisure)/.test(t)) return "track-suits";
-    if (/(jacket|coat|bomber)/.test(t)) return "jackets";
-    if (/(khaki|chino|jean|gurkha|trouser|pant)/.test(t)) return "trousers";
-    if (t.includes("linen")) return "linen";
-    if (/(cap|hat)/.test(t)) return "caps-hats";
-    if (/(belt|tie)/.test(t)) return "belts-ties";
-    if (/(sweater|knitwear|cardigan|pullover)/.test(t)) return "sweaters";
-    if (/(t-shirt|tee|sweat-shirt|round-neck|v-neck)/.test(t)) return "t-shirts";
-    if (/(shirt|presidential)/.test(t)) return "shirts";
-    return "shirts";
+    return inferCategorySlugFromText(text);
   };
 
   const applyRequiredTaxonomy = async () => {
+    if (!canManageCatalogTaxonomy) {
+      toast.error("Only Super Admin can apply required taxonomy.");
+      return;
+    }
     setApplyingRequiredTaxonomy(true);
     try {
       const requiredRows = CATALOG_TAXONOMY.map((cat, index) => ({
@@ -972,6 +1297,10 @@ function AdminPage() {
   };
 
   const updateVariantStock = async (variantId: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Use Adjust Stock (with a reason) unless you are Super Admin.");
+      return;
+    }
     const stock = Number(variantStockDrafts[variantId]);
     if (Number.isNaN(stock) || stock < 0) {
       toast.error("Stock must be a valid non-negative number.");
@@ -987,11 +1316,16 @@ function AdminPage() {
       toast.error(error.message);
       return;
     }
+    await logAdminActivity("variant_stock_set", "product_variant", variantId, { stock });
     toast.success("Stock updated.");
     loadAll();
   };
 
   const deleteVariant = async (variantId: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Only Super Admin can delete stock rows.");
+      return;
+    }
     const confirmed = window.confirm("Delete this stock variant?");
     if (!confirmed) return;
     setVariantBusyId(variantId);
@@ -1001,12 +1335,17 @@ function AdminPage() {
       toast.error(error.message);
       return;
     }
+    await logAdminActivity("variant_deleted", "product_variant", variantId);
     toast.success("Variant deleted.");
     loadAll();
   };
 
   const createVariant = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      toast.error("Only Super Admin can add new stock rows.");
+      return;
+    }
     const stock = Number(newVariant.stock_quantity || 0);
     if (!newVariant.product_id) {
       toast.error("Choose a product for this stock row.");
@@ -1027,12 +1366,22 @@ function AdminPage() {
       toast.error(error.message);
       return;
     }
+    await logAdminActivity("variant_created", "product", newVariant.product_id, {
+      size: newVariant.size || null,
+      color: newVariant.color || null,
+      sku: newVariant.sku || null,
+      stock,
+    });
     toast.success("Variant added.");
     setNewVariant({ product_id: "", size: "", color: "", sku: "", stock_quantity: "" });
     loadAll();
   };
 
   const autoCreateDefaultVariants = async () => {
+    if (!canAutoCreateVariants) {
+      toast.error("Only Super Admin can auto-create default variants.");
+      return;
+    }
     setAutoCreatingVariants(true);
     try {
       const { data: allProducts, error: productsError } = await supabase
@@ -1057,7 +1406,7 @@ function AdminPage() {
         if (productsWithVariants.has(p.id)) continue;
         const text = `${p.slug ?? ""} ${p.title ?? ""} ${p.categories?.name ?? ""}`.toLowerCase();
         const isShoes = /(shoe|loafer|oxford|boot|sandal)/.test(text);
-        const isAccessory = /(cap|hat|belt|tie)/.test(text);
+        const isAccessory = /(cap|hat|belt|tie|sock)/.test(text);
         const sizes = isAccessory ? ["One Size"] : isShoes ? ["40", "41", "42", "43"] : ["S", "M", "L", "XL"];
         const colors = ["Black", "Navy", "Brown"];
         const baseSku = String(p.slug ?? "item")
@@ -1099,6 +1448,10 @@ function AdminPage() {
   };
 
   const autoFillMissingDescriptions = async () => {
+    if (!canBulkProductOps) {
+      toast.error("Only Super Admin can bulk-generate descriptions.");
+      return;
+    }
     setFillingDescriptions(true);
     try {
       const { data: allProducts, error: readError } = await supabase
@@ -1109,123 +1462,14 @@ function AdminPage() {
         return;
       }
 
-      const categoryPitch = (categoryName: string) => {
-        const key = categoryName.toLowerCase();
-        if (key.includes("suit")) {
-          return {
-            material: "premium suiting blend",
-            fit: "structured tailored fit",
-            occasion: "weddings, business meetings, and formal events",
-            care: "Dry clean recommended to preserve shape and finish",
-          };
-        }
-        if (key.includes("shirt") || key.includes("polo")) {
-          return {
-            material: "soft breathable cotton blend",
-            fit: "modern regular fit",
-            occasion: "office, dinner, and polished casual wear",
-            care: "Machine wash cold and warm iron for a crisp look",
-          };
-        }
-        if (key.includes("shoe")) {
-          return {
-            material: "quality leather-look upper with durable sole",
-            fit: "comfort-focused foot shape",
-            occasion: "workdays, events, and smart weekend outfits",
-            care: "Wipe clean and store with shoe support",
-          };
-        }
-        if (key.includes("trouser") || key.includes("linen")) {
-          return {
-            material: "lightweight woven fabric with breathable comfort",
-            fit: "clean tapered silhouette",
-            occasion: "daily office wear, travel, and smart casual dressing",
-            care: "Gentle wash and low-heat pressing for best results",
-          };
-        }
-        if (key.includes("jacket") || key.includes("blazer") || key.includes("sweater")) {
-          return {
-            material: "premium textured outerwear fabric",
-            fit: "layer-friendly modern cut",
-            occasion: "cool-weather styling, office layering, and evening outings",
-            care: "Follow garment label care and avoid high-heat drying",
-          };
-        }
-        if (key.includes("cap") || key.includes("hat") || key.includes("belt") || key.includes("tie")) {
-          return {
-            material: "durable accessory-grade construction",
-            fit: "practical everyday profile",
-            occasion: "finishing touch for formal and smart-casual looks",
-            care: "Spot clean and store away from direct heat",
-          };
-        }
-        return {
-          material: "quality menswear fabric",
-          fit: "balanced modern fit",
-          occasion: "versatile day-to-evening styling",
-          care: "Follow basic garment care for long-term durability",
-        };
-      };
-
-      const keywordOverrides = (title: string) => {
-        const t = title.toLowerCase();
-        const out: Partial<{
-          material: string;
-          fit: string;
-          occasion: string;
-          care: string;
-        }> = {};
-
-        if (t.includes("linen")) {
-          out.material = "premium breathable linen blend";
-          out.occasion = "warm-weather business, events, and refined casual settings";
-          out.care = "Gentle wash or dry clean to preserve the natural linen texture";
-        }
-        if (t.includes("wedding")) {
-          out.occasion = "weddings, receptions, and premium celebration dressing";
-        }
-        if (t.includes("formal")) {
-          out.fit = "sharp formal profile with clean lines";
-          out.occasion = "boardroom meetings, ceremonies, and formal occasions";
-        }
-        if (t.includes("casual")) {
-          out.fit = "relaxed modern fit for all-day comfort";
-          out.occasion = "smart-casual days, travel, and weekend plans";
-        }
-        if (t.includes("track")) {
-          out.material = "lightweight performance-inspired fabric";
-          out.fit = "athletic modern cut with easy movement";
-          out.occasion = "travel, active days, and clean streetwear styling";
-          out.care = "Machine wash cold and air dry for best longevity";
-        }
-        if (t.includes("polo")) {
-          out.material = "soft knitted cotton blend";
-        }
-        if (t.includes("boot") || t.includes("loafer") || t.includes("oxford")) {
-          out.material = "structured premium upper with durable grip sole";
-          out.fit = "supportive footwear profile for extended wear";
-        }
-        if (t.includes("sweater")) {
-          out.material = "soft knit fabric with warm breathable feel";
-          out.care = "Hand wash or gentle cycle to maintain knit quality";
-        }
-        return out;
-      };
-
-      const baseCopy = (categoryName: string, title: string) => {
-        const profile = categoryPitch(categoryName);
-        const override = keywordOverrides(title);
-        const material = override.material ?? profile.material;
-        const fit = override.fit ?? profile.fit;
-        const occasion = override.occasion ?? profile.occasion;
-        const care = override.care ?? profile.care;
-        return `${title} is part of our ${categoryName} collection, created for men who want polished style with everyday comfort. Made from ${material}, it features a ${fit} that looks clean and confident. Ideal for ${occasion}, this piece pairs easily with both formal and smart-casual outfits. Care: ${care}. We deliver across Kenya, with fast Nairobi fulfilment for a smooth shopping experience.`;
-      };
-
       let updated = 0;
       for (const p of allProducts ?? []) {
         const categoryName = String(p.categories?.name ?? "menswear");
-        const description = baseCopy(categoryName, p.title);
+        const description = buildProductDescription({
+          title: p.title,
+          categoryName,
+          categorySlug: inferCategorySlugFromText(`${p.title ?? ""} ${categoryName}`),
+        });
         const { error } = await supabase.from("products").update({ description }).eq("id", p.id);
         if (error) {
           toast.error(error.message);
@@ -1245,15 +1489,18 @@ function AdminPage() {
     }
   };
 
-  if (loading || !isAdmin) {
+  const taxonomyGroupsWithSubcategories = useMemo(
+    () => CATALOG_TAXONOMY.filter((g) => g.subcategories.length > 0),
+    [],
+  );
+
+  if (loading || !canAccessAdminPanel) {
     return (
       <div className="container mx-auto py-24 text-center text-muted-foreground">
         Checking permissions...
       </div>
     );
   }
-
-  const isSuperAdmin = Boolean(user?.email && user.email.toLowerCase() === STORE_INFO.email.toLowerCase());
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -1273,11 +1520,6 @@ function AdminPage() {
     }
   };
 
-  const taxonomyGroupsWithSubcategories = useMemo(
-    () => CATALOG_TAXONOMY.filter((g) => g.subcategories.length > 0),
-    [],
-  );
-
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-[60] flex h-14 items-center gap-3 border-b border-border bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 md:px-4">
@@ -1296,7 +1538,8 @@ function AdminPage() {
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-lg font-bold leading-tight md:text-xl">Admin Dashboard</h1>
           <p className="truncate text-xs text-muted-foreground">
-            {user?.email} {isSuperAdmin ? "· Super Admin" : "· Admin"}
+            {user?.email}{" "}
+            {isSuperAdmin ? "· Super Admin" : attendantProfile ? "· Shop attendant" : "· Admin"}
           </p>
         </div>
         <Link to="/" className="shrink-0">
@@ -1329,62 +1572,78 @@ function AdminPage() {
             </span>
           </div>
           <TabsList className="h-auto flex-1 flex-col items-stretch justify-start gap-0.5 overflow-y-auto rounded-none border-0 bg-transparent p-2">
-            <TabsTrigger
-              value="orders"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <ClipboardList className="h-4 w-4 shrink-0 opacity-70" />
-              Orders
-            </TabsTrigger>
-            <TabsTrigger
-              value="products"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Package className="h-4 w-4 shrink-0 opacity-70" />
-              Products
-            </TabsTrigger>
-            <TabsTrigger
-              value="messages"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Mail className="h-4 w-4 shrink-0 opacity-70" />
-              Messages
-            </TabsTrigger>
-            <TabsTrigger
-              value="bookings"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Calendar className="h-4 w-4 shrink-0 opacity-70" />
-              Bookings
-            </TabsTrigger>
-            <TabsTrigger
-              value="inventory"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Warehouse className="h-4 w-4 shrink-0 opacity-70" />
-              Inventory
-            </TabsTrigger>
-            <TabsTrigger
-              value="categories"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Tag className="h-4 w-4 shrink-0 opacity-70" />
-              Categories
-            </TabsTrigger>
-            <TabsTrigger
-              value="promos"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Percent className="h-4 w-4 shrink-0 opacity-70" />
-              Promos
-            </TabsTrigger>
-            <TabsTrigger
-              value="super-admin"
-              className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground"
-            >
-              <Shield className="h-4 w-4 shrink-0 opacity-70" />
-              Super Admin
-            </TabsTrigger>
+            {showOrdersTab && (
+              <TabsTrigger value="orders" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <ClipboardList className="h-4 w-4 shrink-0 opacity-70" />
+                Orders
+              </TabsTrigger>
+            )}
+            {showProductsTab && (
+              <TabsTrigger value="products" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Package className="h-4 w-4 shrink-0 opacity-70" />
+                Products
+              </TabsTrigger>
+            )}
+            {showMessagesTab && (
+              <TabsTrigger value="messages" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Mail className="h-4 w-4 shrink-0 opacity-70" />
+                Messages
+              </TabsTrigger>
+            )}
+            {showBookingsTab && (
+              <TabsTrigger value="bookings" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Calendar className="h-4 w-4 shrink-0 opacity-70" />
+                Bookings
+              </TabsTrigger>
+            )}
+            {showDeliveriesTab && (
+              <TabsTrigger value="deliveries" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Truck className="h-4 w-4 shrink-0 opacity-70" />
+                Deliveries
+              </TabsTrigger>
+            )}
+            {showInventoryTab && (
+              <TabsTrigger value="inventory" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Warehouse className="h-4 w-4 shrink-0 opacity-70" />
+                Inventory
+              </TabsTrigger>
+            )}
+            {showStockHistoryTab && (
+              <TabsTrigger value="stock-history" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <History className="h-4 w-4 shrink-0 opacity-70" />
+                Stock History
+              </TabsTrigger>
+            )}
+            {showCategoriesTab && (
+              <TabsTrigger value="categories" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Tag className="h-4 w-4 shrink-0 opacity-70" />
+                Categories
+              </TabsTrigger>
+            )}
+            {showPromosTab && (
+              <TabsTrigger value="promos" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Percent className="h-4 w-4 shrink-0 opacity-70" />
+                Promos
+              </TabsTrigger>
+            )}
+            {showTeamTab && (
+              <TabsTrigger value="team" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Users className="h-4 w-4 shrink-0 opacity-70" />
+                Team
+              </TabsTrigger>
+            )}
+            {showActivityTab && (
+              <TabsTrigger value="activity-log" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <ScrollText className="h-4 w-4 shrink-0 opacity-70" />
+                Activity Log
+              </TabsTrigger>
+            )}
+            {showSuperAdminTab && (
+              <TabsTrigger value="super-admin" className="w-full justify-start gap-2 rounded-md px-3 py-2.5 text-left data-[state=active]:bg-gold/15 data-[state=active]:text-foreground">
+                <Shield className="h-4 w-4 shrink-0 opacity-70" />
+                Super Admin
+              </TabsTrigger>
+            )}
           </TabsList>
         </aside>
 
@@ -1398,7 +1657,10 @@ function AdminPage() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               {[
                 { label: "Recent Orders", value: stats.orders },
-                { label: "Recent Revenue", value: formatKES(stats.revenue) },
+                {
+                  label: "Recent Revenue",
+                  value: showStatsFinance ? formatKES(stats.revenue) : "Restricted",
+                },
                 { label: "Live Products", value: stats.liveProducts, sub: `Total: ${stats.totalProducts}` },
                 { label: "Pending Bookings", value: stats.bookings, accent: stats.bookings > 0 },
                 { label: "Low Stock", value: stats.lowStock, accent: stats.lowStock > 0 },
@@ -1416,6 +1678,11 @@ function AdminPage() {
 
             <div className="mt-8 space-y-4">
         <TabsContent value="orders" className="mt-0">
+          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => exportOrdersCsv()}>
+              Export orders CSV
+            </Button>
+          </div>
           <div className="overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-sm">
               <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -1424,6 +1691,8 @@ function AdminPage() {
                   <th className="p-3">Customer</th>
                   <th className="p-3">Date</th>
                   <th className="p-3">Total</th>
+                  <th className="p-3">Payment</th>
+                  <th className="p-3">Branch</th>
                   <th className="p-3">Status</th>
                 </tr>
               </thead>
@@ -1433,10 +1702,15 @@ function AdminPage() {
                     <td className="p-3 font-mono text-xs">{o.order_number}</td>
                     <td className="p-3">{o.guest_name ?? "Customer"}</td>
                     <td className="p-3">{new Date(o.created_at).toLocaleDateString()}</td>
-                    <td className="p-3 font-semibold">{formatKES(o.total)}</td>
+                    <td className="p-3 font-semibold">
+                      {showStatsFinance ? formatKES(o.total) : "—"}
+                    </td>
+                    <td className="p-3 text-xs">{showStatsFinance ? (o.payment_method ?? "—") : "—"}</td>
+                    <td className="p-3 text-xs">{o.fulfillment_branch ?? "—"}</td>
                     <td className="p-3">
                       <select
                         value={o.status}
+                        disabled={!canUpdateOrderStatus}
                         onChange={(e) =>
                           updateOrderStatus(o.id, e.target.value as Enums<"order_status">)
                         }
@@ -1453,8 +1727,40 @@ function AdminPage() {
                 ))}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-muted-foreground">
+                    <td colSpan={7} className="p-6 text-center text-muted-foreground">
                       No orders yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="deliveries" className="mt-0">
+          <div className="overflow-x-auto rounded-md border border-border bg-card">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="p-3">Order</th>
+                  <th className="p-3">Customer</th>
+                  <th className="p-3">Branch</th>
+                  <th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o) => (
+                  <tr key={o.id} className="border-t border-border">
+                    <td className="p-3 font-mono text-xs">{o.order_number}</td>
+                    <td className="p-3">{o.guest_name ?? "Customer"}</td>
+                    <td className="p-3">{o.fulfillment_branch ?? "—"}</td>
+                    <td className="p-3 capitalize">{o.status}</td>
+                  </tr>
+                ))}
+                {orders.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                      No deliveries yet.
                     </td>
                   </tr>
                 )}
@@ -1497,6 +1803,7 @@ function AdminPage() {
                     <td className="p-3">
                       <select
                         value={b.status}
+                        disabled={!canManageBookings}
                         onChange={(e) =>
                           updateBookingStatus(
                             b.id,
@@ -1526,6 +1833,7 @@ function AdminPage() {
         </TabsContent>
 
         <TabsContent value="products">
+          {canCreateProducts && (
           <form
             onSubmit={createProduct}
             className="mb-5 rounded-md border border-border bg-card p-4"
@@ -1677,6 +1985,7 @@ function AdminPage() {
               </Button>
             </div>
           </form>
+          )}
           <div className="mb-4 rounded-md border border-border bg-card p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -1686,13 +1995,17 @@ function AdminPage() {
                   <strong>Storefront</strong> to narrow to the same published, in-catalog items shoppers see. Parent
                   categories and subcategory labels match the site taxonomy; create or rename parent categories in
                   the{" "}
-                  <button
-                    type="button"
-                    className="font-medium text-gold underline-offset-2 hover:underline"
-                    onClick={() => setActiveTab("categories")}
-                  >
-                    Categories
-                  </button>{" "}
+                  {canManageCatalogTaxonomy ? (
+                    <button
+                      type="button"
+                      className="font-medium text-gold underline-offset-2 hover:underline"
+                      onClick={() => setActiveTab("categories")}
+                    >
+                      Categories
+                    </button>
+                  ) : (
+                    <span className="font-medium text-foreground">Categories</span>
+                  )}{" "}
                   tab.
                 </p>
               </div>
@@ -1798,6 +2111,7 @@ function AdminPage() {
                     <td className="p-3">
                       <input
                         value={productDrafts[p.id]?.title ?? ""}
+                        disabled={!canEditProductRows}
                         onChange={(e) => updateProductDraft(p.id, "title", e.target.value)}
                         className="w-52 rounded border border-border bg-background px-2 py-1 text-sm"
                       />
@@ -1805,6 +2119,7 @@ function AdminPage() {
                     <td className="p-3">
                       <input
                         value={productDrafts[p.id]?.slug ?? ""}
+                        disabled={!canEditProductRows}
                         onChange={(e) => updateProductDraft(p.id, "slug", e.target.value)}
                         className="w-44 rounded border border-border bg-background px-2 py-1 text-sm"
                       />
@@ -1813,6 +2128,7 @@ function AdminPage() {
                       <div className="space-y-1">
                         <select
                           value={productDrafts[p.id]?.category_id ?? ""}
+                          disabled={!canEditProductRows}
                           onChange={(e) => updateProductDraft(p.id, "category_id", e.target.value)}
                           className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
                         >
@@ -1833,6 +2149,7 @@ function AdminPage() {
                               <input
                                 list={subOpts.length ? `subcat-${p.id}` : undefined}
                                 value={productDrafts[p.id]?.subcategory ?? ""}
+                                disabled={!canEditProductRows}
                                 onChange={(e) =>
                                   updateProductDraft(p.id, "subcategory", e.target.value)
                                 }
@@ -1864,9 +2181,11 @@ function AdminPage() {
                       <input
                         type="number"
                         value={priceDrafts[p.id] ?? ""}
-                        onChange={(e) =>
-                          setPriceDrafts((s) => ({ ...s, [p.id]: e.target.value }))
-                        }
+                        disabled={!canEditProductRows}
+                        onChange={(e) => {
+                          if (!canEditProductRows) return;
+                          setPriceDrafts((s) => ({ ...s, [p.id]: e.target.value }));
+                        }}
                         className="w-28 rounded border border-border bg-background px-2 py-1 text-sm"
                       />
                     </td>
@@ -1874,9 +2193,11 @@ function AdminPage() {
                       <input
                         type="number"
                         value={salePriceDrafts[p.id] ?? ""}
-                        onChange={(e) =>
-                          setSalePriceDrafts((s) => ({ ...s, [p.id]: e.target.value }))
-                        }
+                        disabled={!canEditProductRows}
+                        onChange={(e) => {
+                          if (!canEditProductRows) return;
+                          setSalePriceDrafts((s) => ({ ...s, [p.id]: e.target.value }));
+                        }}
                         className="w-28 rounded border border-border bg-background px-2 py-1 text-sm"
                         placeholder="none"
                       />
@@ -1885,6 +2206,7 @@ function AdminPage() {
                       <div className="space-y-2">
                         <input
                           value={productDrafts[p.id]?.image_url ?? ""}
+                          disabled={!canEditProductRows}
                           onChange={(e) => updateProductDraft(p.id, "image_url", e.target.value)}
                           placeholder="/src/assets/... or https://..."
                           className="w-56 rounded border border-border bg-background px-2 py-1 text-sm"
@@ -1892,6 +2214,7 @@ function AdminPage() {
                         <input
                           type="file"
                           accept="image/*"
+                          disabled={!canEditProductRows}
                           className="w-56 rounded border border-border bg-background px-2 py-1 text-xs"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
@@ -1910,6 +2233,7 @@ function AdminPage() {
                         <label className="inline-flex items-center gap-2">
                           <input
                             type="checkbox"
+                            disabled={!canEditProductRows}
                             checked={Boolean(productDrafts[p.id]?.is_published)}
                             onChange={(e) => updateProductDraft(p.id, "is_published", e.target.checked)}
                           />
@@ -1918,6 +2242,7 @@ function AdminPage() {
                         <label className="inline-flex items-center gap-2">
                           <input
                             type="checkbox"
+                            disabled={!canEditProductRows}
                             checked={Boolean(productDrafts[p.id]?.is_featured)}
                             onChange={(e) => updateProductDraft(p.id, "is_featured", e.target.checked)}
                           />
@@ -1930,7 +2255,7 @@ function AdminPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={savingProductId === p.id}
+                          disabled={!canEditProductRows || savingProductId === p.id}
                           onClick={() => saveProduct(p.id)}
                         >
                           {savingProductId === p.id ? "Saving..." : "Save"}
@@ -1938,7 +2263,7 @@ function AdminPage() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          disabled={deletingProductId === p.id}
+                          disabled={!canDeleteProducts || deletingProductId === p.id}
                           onClick={() => deleteProduct(p.id, p.title)}
                         >
                           {deletingProductId === p.id ? "Deleting..." : "Delete"}
@@ -1967,7 +2292,7 @@ function AdminPage() {
                 className={`rounded-md border bg-card p-4 ${m.is_read ? "border-border" : "border-gold"}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold">{m.subject}</p>
                     <p className="text-xs text-muted-foreground">
                       {m.name} -{" "}
@@ -1977,18 +2302,60 @@ function AdminPage() {
                       - {new Date(m.created_at).toLocaleString()}
                     </p>
                     <p className="mt-3 whitespace-pre-wrap text-sm">{m.message}</p>
+                    {m.staff_reply && (
+                      <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Staff reply
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap">{m.staff_reply}</p>
+                        {m.replied_at && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {new Date(m.replied_at).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {canReplyMessageInApp && (
+                      <div className="mt-3">
+                        <label className="text-xs font-medium text-muted-foreground">Reply in admin</label>
+                        <textarea
+                          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                          rows={3}
+                          value={messageReplyDrafts[m.id] ?? ""}
+                          onChange={(e) =>
+                            setMessageReplyDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))
+                          }
+                          placeholder="Write your reply…"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => void saveMessageReply(m.id)}
+                        >
+                          Save reply
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex shrink-0 flex-col gap-2">
                     {!m.is_read && (
-                      <Button size="sm" variant="outline" onClick={() => markMessageRead(m.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!canMarkMessageRead}
+                        onClick={() => markMessageRead(m.id)}
+                      >
                         Mark read
                       </Button>
                     )}
-                    <a href={`mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject)}`}>
-                      <Button size="sm" variant="default">
-                        Reply
-                      </Button>
-                    </a>
+                    {canReplyMessageInApp && (
+                      <a href={`mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject)}`}>
+                        <Button size="sm" variant="default" type="button">
+                          Open in email
+                        </Button>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2007,12 +2374,13 @@ function AdminPage() {
               type="button"
               size="sm"
               variant="outline"
-              disabled={autoCreatingVariants}
+              disabled={autoCreatingVariants || !canAutoCreateVariants}
               onClick={autoCreateDefaultVariants}
             >
               {autoCreatingVariants ? "Creating..." : "Auto-create default variants"}
             </Button>
           </div>
+          {isSuperAdmin && (
           <form onSubmit={createVariant} className="mb-4 rounded-md border border-border bg-card p-4">
             <p className="mb-3 text-sm font-semibold">Add stock variant</p>
             <div className="grid gap-3 md:grid-cols-5">
@@ -2063,6 +2431,7 @@ function AdminPage() {
               </div>
             </div>
           </form>
+          )}
 
           <div className="overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-sm">
@@ -2077,8 +2446,11 @@ function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {variants.map((v) => (
-                  <tr key={v.id} className="border-t border-border">
+                {variants.map((v) => {
+                  const lowStockThreshold = Number(v.products?.low_stock_threshold ?? 5);
+                  const isLowStock = Number(v.stock_quantity ?? 0) <= lowStockThreshold;
+                  return (
+                  <tr key={v.id} className={`border-t border-border ${isLowStock ? "bg-gold/10" : ""}`}>
                     <td className="p-3">{v.products?.title}</td>
                     <td className="p-3">{v.size || "-"}</td>
                     <td className="p-3">{v.color || "-"}</td>
@@ -2088,26 +2460,42 @@ function AdminPage() {
                         type="number"
                         min={0}
                         value={variantStockDrafts[v.id] ?? ""}
+                        disabled={!isSuperAdmin}
                         onChange={(e) =>
                           setVariantStockDrafts((prev) => ({ ...prev, [v.id]: e.target.value }))
                         }
                         className="w-24 rounded border border-border bg-background px-2 py-1 text-sm"
                       />
+                      {isLowStock && (
+                        <p className="mt-1 text-[11px] font-medium text-gold">
+                          Low stock: threshold {lowStockThreshold}
+                        </p>
+                      )}
                     </td>
                     <td className="p-3">
                       <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={variantBusyId === v.id}
+                          disabled={!isSuperAdmin || variantBusyId === v.id}
                           onClick={() => updateVariantStock(v.id)}
                         >
                           Save
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
+                          disabled={!canUpdateProducts}
+                          onClick={() =>
+                            setStockAdjustTarget({ variantId: v.id, title: v.products?.title ?? "Product" })
+                          }
+                        >
+                          Adjust Stock
+                        </Button>
+                        <Button
+                          size="sm"
                           variant="destructive"
-                          disabled={variantBusyId === v.id}
+                          disabled={!isSuperAdmin || variantBusyId === v.id}
                           onClick={() => deleteVariant(v.id)}
                         >
                           Delete
@@ -2115,7 +2503,8 @@ function AdminPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {variants.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-6 text-center text-muted-foreground">
@@ -2508,6 +2897,15 @@ function AdminPage() {
             </table>
           </div>
         </TabsContent>
+        <TabsContent value="stock-history" className="mt-0">
+          <AdminStockHistoryPanel />
+        </TabsContent>
+        <TabsContent value="team" className="mt-0">
+          <AdminTeamPanel />
+        </TabsContent>
+        <TabsContent value="activity-log" className="mt-0">
+          <AdminActivityLogPanel isSuperAdmin={isSuperAdmin} />
+        </TabsContent>
         <TabsContent value="super-admin" className="mt-0">
           <div className="rounded-md border border-border bg-card p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -2517,12 +2915,22 @@ function AdminPage() {
                   Finance, weekly and monthly reports, sold-items summary, and stock control.
                 </p>
               </div>
-              <span className="rounded border border-gold/40 bg-gold/10 px-2 py-1 text-xs font-semibold text-gold">
-                {isSuperAdmin ? "Super Admin Access" : "Admin View"}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={exportSalesCsv}>
+                  Export sales CSV
+                </Button>
+                <span className="rounded border border-gold/40 bg-gold/10 px-2 py-1 text-xs font-semibold text-gold">
+                  {isSuperAdmin ? "Super Admin Access" : "Admin View"}
+                </span>
+              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded border border-border p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Daily Sales</p>
+                <p className="mt-1 text-2xl font-bold">{formatKES(todaysRevenue)}</p>
+                <p className="text-xs text-muted-foreground">Today</p>
+              </div>
               <div className="rounded border border-border p-3">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Weekly Sales</p>
                 <p className="mt-1 text-2xl font-bold">{formatKES(financeStats.weeklyRevenue)}</p>
@@ -2538,12 +2946,74 @@ function AdminPage() {
                 <p className="mt-1 text-2xl font-bold">{financeStats.itemsSold} items</p>
                 <p className="text-xs text-muted-foreground">Amount: {formatKES(financeStats.soldAmount)}</p>
               </div>
+              <div className="rounded border border-border p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Average Order Value</p>
+                <p className="mt-1 text-2xl font-bold">{formatKES(averageOrderValue)}</p>
+                <p className="text-xs text-muted-foreground">{stats.orders} recent orders</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="rounded border border-border p-3">
+                <p className="mb-3 text-sm font-semibold">Revenue by payment method</p>
+                <div className="space-y-2">
+                  {revenueByPaymentMethod.map((row) => (
+                    <div key={row.method} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="capitalize text-muted-foreground">{row.method}</span>
+                      <span className="font-semibold">{formatKES(row.total)}</span>
+                    </div>
+                  ))}
+                  {revenueByPaymentMethod.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No payment rows yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="rounded border border-border p-3">
+                <p className="mb-3 text-sm font-semibold">Top selling products</p>
+                <div className="space-y-2">
+                  {productSales.top.map((row) => (
+                    <div key={row.title} className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-muted-foreground">{row.title}</span>
+                      <span className="whitespace-nowrap font-semibold">{row.quantity} sold</span>
+                    </div>
+                  ))}
+                  {productSales.top.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No sold products yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="rounded border border-border p-3">
+                <p className="mb-3 text-sm font-semibold">Least selling products</p>
+                <div className="space-y-2">
+                  {productSales.least.map((row) => (
+                    <div key={row.title} className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-muted-foreground">{row.title}</span>
+                      <span className="whitespace-nowrap font-semibold">{row.quantity} sold</span>
+                    </div>
+                  ))}
+                  {productSales.least.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No sold products yet.</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>
             </div>
           </div>
         </div>
+        <StockAdjustModal
+          open={Boolean(stockAdjustTarget)}
+          onOpenChange={(open) => {
+            if (!open) setStockAdjustTarget(null);
+          }}
+          variantId={stockAdjustTarget?.variantId ?? null}
+          productTitle={stockAdjustTarget?.title ?? "Product"}
+          onApplied={() => {
+            setStockAdjustTarget(null);
+            void loadAll();
+          }}
+        />
       </Tabs>
     </div>
   );

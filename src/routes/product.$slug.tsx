@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Heart, Truck, Store, ShieldCheck, Minus, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { resolveImage } from "@/lib/assetMap";
+import { hasResolvableAssetSourcePath, resolveImage } from "@/lib/assetMap";
 import { formatKES, STORE_INFO } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
@@ -11,9 +11,11 @@ import { useWishlist } from "@/lib/wishlist";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchProductDetailBySlug } from "@/lib/publishedProductsQuery";
+import { deleteProductCompletely } from "@/lib/productDeletion";
 import { productsUpdateSafe } from "@/lib/productWriteFallback";
 import { getSubcategoriesForCategory } from "@/lib/subcategories";
 import { NotFoundPage } from "@/components/site/NotFoundPage";
+import { getCatalogFallbackForProduct } from "@/lib/fashionProducts";
 
 export const Route = createFileRoute("/product/$slug")({
   component: ProductPage,
@@ -24,7 +26,7 @@ type Variant = { id: string; size: string | null; color: string | null; stock_qu
 function ProductPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
-  const { isStaff, loading: authLoading } = useAuth();
+  const { isStaff, isSuperAdmin, loading: authLoading } = useAuth();
   const cart = useCart();
   const wishlist = useWishlist();
   const [product, setProduct] = useState<any>(null);
@@ -59,24 +61,82 @@ function ProductPage() {
     (async () => {
       setLoading(true);
       setMissing(false);
+      const slugFallback = getCatalogFallbackForProduct({ slug });
       const { data: p, error: fetchErr } = await fetchProductDetailBySlug(supabase, slug, {
         onlyPublished: !isStaff,
       });
       if (fetchErr) {
         console.error("[product] load failed:", fetchErr);
+        if (slugFallback) {
+          setProduct({
+            id: slugFallback.id,
+            slug: slugFallback.slug,
+            title: slugFallback.title,
+            description: slugFallback.description,
+            price: slugFallback.price,
+            sale_price: slugFallback.salePrice,
+            subcategory: slugFallback.subcategoryName ?? null,
+            is_published: true,
+            is_featured: false,
+            categories: { name: slugFallback.categoryName, slug: slugFallback.categorySlug },
+            product_images: [{ image_url: slugFallback.image }],
+            product_variants: [],
+          });
+          setImages([slugFallback.image]);
+          setVariants([]);
+          setActiveVariant(null);
+          setSelectedSize(null);
+          setSelectedColor(null);
+          setAdminDraft({
+            title: slugFallback.title,
+            slug: slugFallback.slug,
+            category_id: "",
+            subcategory: slugFallback.subcategoryName ?? "",
+            description: slugFallback.description,
+            price: String(slugFallback.price),
+            sale_price: "",
+            image_url: slugFallback.image,
+            is_published: true,
+            is_featured: false,
+          });
+          setLoading(false);
+          return;
+        }
         setProduct(null);
         setMissing(true);
         setLoading(false);
         return;
       }
       if (p) {
+        const assetFallback = getCatalogFallbackForProduct({
+          slug,
+          title: p.title,
+          image: p.product_images?.[0]?.image_url ?? null,
+          categorySlug: p.categories?.slug ?? null,
+          categoryName: p.categories?.name ?? null,
+          subcategoryName: (p as { subcategory?: string | null }).subcategory ?? null,
+        });
         if (!isStaff && !p.is_published) {
           setProduct(null);
           setMissing(true);
           setLoading(false);
           return;
         }
-        setProduct(p);
+        setProduct({
+          ...p,
+          title: p.title?.trim() || assetFallback?.title || p.title,
+          description:
+            (typeof p.description === "string" && p.description.trim().length >= 80
+              ? p.description
+              : assetFallback?.description || p.description),
+          categories:
+            p.categories ??
+            (assetFallback
+              ? { name: assetFallback.categoryName, slug: assetFallback.categorySlug }
+              : null),
+          subcategory:
+            (p as { subcategory?: string | null }).subcategory || assetFallback?.subcategoryName || null,
+        });
         let categoryId = "";
         if (p.categories?.slug) {
           const { data: catRow } = await supabase
@@ -86,8 +146,22 @@ function ProductPage() {
             .maybeSingle();
           categoryId = catRow?.id ?? "";
         }
-        const imgs = (p.product_images ?? []).map((i: any) => i.image_url);
-        setImages(imgs.length > 0 ? imgs : [null as any]);
+        const rawImages = (p.product_images ?? []).map((i: any) => i.image_url).filter(Boolean);
+        const fallbackImage = assetFallback?.image ?? null;
+        const imgs = Array.from(
+          new Set(
+            (rawImages.length > 0 ? rawImages : fallbackImage ? [fallbackImage] : []).map((imageUrl) => {
+              if (
+                imageUrl?.startsWith("/src/assets/") &&
+                !hasResolvableAssetSourcePath(imageUrl)
+              ) {
+                return fallbackImage;
+              }
+              return imageUrl;
+            }),
+          ),
+        ).filter(Boolean) as string[];
+        setImages(imgs.length > 0 ? imgs : fallbackImage ? [fallbackImage] : [null as any]);
         const vs = (p.product_variants ?? []) as Variant[];
         setVariants(vs);
         const firstAvailable = vs.find((v) => v.stock_quantity > 0) ?? vs[0] ?? null;
@@ -105,6 +179,42 @@ function ProductPage() {
           image_url: p.product_images?.[0]?.image_url ?? "",
           is_published: Boolean(p.is_published ?? true),
           is_featured: Boolean(p.is_featured ?? false),
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (slugFallback) {
+        setProduct({
+          id: slugFallback.id,
+          slug: slugFallback.slug,
+          title: slugFallback.title,
+          description: slugFallback.description,
+          price: slugFallback.price,
+          sale_price: slugFallback.salePrice,
+          subcategory: slugFallback.subcategoryName ?? null,
+          is_published: true,
+          is_featured: false,
+          categories: { name: slugFallback.categoryName, slug: slugFallback.categorySlug },
+          product_images: [{ image_url: slugFallback.image }],
+          product_variants: [],
+        });
+        setImages([slugFallback.image]);
+        setVariants([]);
+        setActiveVariant(null);
+        setSelectedSize(null);
+        setSelectedColor(null);
+        setAdminDraft({
+          title: slugFallback.title,
+          slug: slugFallback.slug,
+          category_id: "",
+          subcategory: slugFallback.subcategoryName ?? "",
+          description: slugFallback.description,
+          price: String(slugFallback.price),
+          sale_price: "",
+          image_url: slugFallback.image,
+          is_published: true,
+          is_featured: false,
         });
         setLoading(false);
         return;
@@ -173,6 +283,7 @@ function ProductPage() {
     ),
   ] as string[];
   const wished = wishlist.has(product.id);
+  const isAssetOnlyProduct = String(product.id).startsWith("asset:");
   const featureList = [
     activeVariant?.size ? `Available size selected: ${activeVariant.size}` : "Multiple size options available",
     activeVariant?.color ? `Color option selected: ${activeVariant.color}` : "Multiple color options available",
@@ -181,7 +292,7 @@ function ProductPage() {
   ];
 
   const saveAdminChanges = async () => {
-    if (!isStaff) return;
+    if (!isStaff || isAssetOnlyProduct) return;
     const price = Number(adminDraft.price);
     const sale = adminDraft.sale_price.trim() === "" ? null : Number(adminDraft.sale_price);
     if (!adminDraft.title.trim() || !adminDraft.slug.trim() || Number.isNaN(price)) {
@@ -271,11 +382,11 @@ function ProductPage() {
   };
 
   const deleteProductNow = async () => {
-    if (!isStaff) return;
-    const confirmed = window.confirm(`Delete "${product.title}" from website?`);
+    if (!isSuperAdmin) return;
+    const confirmed = window.confirm(`Delete "${product.title}" completely? This cannot be undone.`);
     if (!confirmed) return;
     setAdminBusy(true);
-    const { error } = await supabase.from("products").delete().eq("id", product.id);
+    const { error } = await deleteProductCompletely(supabase, product.id);
     setAdminBusy(false);
     if (error) {
       toast.error(error.message);
@@ -363,7 +474,7 @@ function ProductPage() {
             {onSale && <span className="text-sm text-muted-foreground line-through">{formatKES(product.price)}</span>}
           </div>
 
-          {isStaff && (
+          {isStaff && !isAssetOnlyProduct && (
             <div className="mt-6 rounded-md border border-gold/40 bg-gold/5 p-4">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gold">
                 Staff quick edit
@@ -492,9 +603,11 @@ function ProductPage() {
                 <Button size="sm" variant="outline" disabled={adminBusy} onClick={saveAdminChanges}>
                   {adminBusy ? "Saving..." : "Save changes"}
                 </Button>
-                <Button size="sm" variant="destructive" disabled={adminBusy} onClick={deleteProductNow}>
-                  Delete product
-                </Button>
+                {isSuperAdmin && (
+                  <Button size="sm" variant="destructive" disabled={adminBusy} onClick={deleteProductNow}>
+                    Delete product
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -595,7 +708,7 @@ function ProductPage() {
               <span className="w-10 text-center text-sm font-medium">{qty}</span>
               <button onClick={() => setQty((q) => q + 1)} className="px-3 py-2"><Plus className="h-3 w-3" /></button>
             </div>
-            <Button variant="default" size="lg" onClick={handleAdd} className="flex-1">Add to cart</Button>
+            <Button variant="default" size="lg" onClick={handleAdd} disabled={!activeVariant} className="flex-1">Add to cart</Button>
             <Button
               variant="outline"
               size="icon"
