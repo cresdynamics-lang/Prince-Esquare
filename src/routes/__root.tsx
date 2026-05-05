@@ -7,7 +7,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { WhatsAppFab } from "@/components/site/WhatsAppFab";
 import { NotFoundPage } from "@/components/site/NotFoundPage";
-import brandLogo from "@/assets/Prince logo.webp";
+import brandLogo from "@/assets/Prince logo.png";
 
 export const Route = createRootRoute({
   head: () => ({

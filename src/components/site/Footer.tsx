@@ -16,7 +16,7 @@ const SHOP_CATEGORIES = CATALOG_TAXONOMY.map((category) => ({
 }));
 
 export function Footer() {
-  const { isStaff } = useAuth();
+  const { canAccessAdminPanel } = useAuth();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -168,7 +168,7 @@ export function Footer() {
             </p>
             <div className="flex justify-center">
               <Link
-                to={isStaff ? "/admin" : "/admin-login"}
+                to={canAccessAdminPanel ? "/admin" : "/admin-login"}
                 aria-label="Admin"
                 className="rounded-full border border-navy-foreground/20 p-2 text-gold transition-colors hover:border-gold hover:bg-gold/10"
               >

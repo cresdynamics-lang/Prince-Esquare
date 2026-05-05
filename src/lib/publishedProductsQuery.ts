@@ -27,16 +27,37 @@ export const PUBLISHED_PRODUCT_CARD_SELECT_FALLBACK =
 
 type Client = SupabaseClient<Database>;
 
+async function selectAllPages<T>(
+  runPage: (from: number, to: number) => Promise<{ data: T[] | null; error: PostgrestError | null }>,
+  pageSize = 1000,
+) {
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const page = await runPage(from, to);
+    if (page.error) {
+      return { data: null as T[] | null, error: page.error };
+    }
+    const pageRows = page.data ?? [];
+    rows.push(...pageRows);
+    if (pageRows.length < pageSize) break;
+  }
+  return { data: rows, error: null as PostgrestError | null };
+}
+
 /**
  * Loads published products for storefront grids. Retries without `subcategory` if the
  * first query fails (e.g. remote DB missing migration `20260502120000_products_subcategory.sql`).
  */
 export async function fetchPublishedProductsForShopCards(client: Client) {
-  const first = await client
-    .from("products")
-    .select(PUBLISHED_PRODUCT_CARD_SELECT_WITH_SUB)
-    .eq("is_published", true)
-    .order("created_at", { ascending: false });
+  const first = await selectAllPages((from, to) =>
+    client
+      .from("products")
+      .select(PUBLISHED_PRODUCT_CARD_SELECT_WITH_SUB)
+      .eq("is_published", true)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  );
 
   if (!first.error) {
     return { data: first.data, error: null as null, usedFallback: false };
@@ -47,11 +68,14 @@ export async function fetchPublishedProductsForShopCards(client: Client) {
     first.error.message,
   );
 
-  const second = await client
-    .from("products")
-    .select(PUBLISHED_PRODUCT_CARD_SELECT_FALLBACK)
-    .eq("is_published", true)
-    .order("created_at", { ascending: false });
+  const second = await selectAllPages((from, to) =>
+    client
+      .from("products")
+      .select(PUBLISHED_PRODUCT_CARD_SELECT_FALLBACK)
+      .eq("is_published", true)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  );
 
   return {
     data: second.data,
@@ -67,11 +91,14 @@ const CATEGORY_PAGE_SELECT_FALLBACK =
   "id,slug,title,price,sale_price,product_images(image_url),product_variants(stock_quantity)";
 
 export async function fetchPublishedProductsForCategoryPage(client: Client, categoryId: string) {
-  const first = await client
-    .from("products")
-    .select(CATEGORY_PAGE_SELECT_WITH_SUB)
-    .eq("category_id", categoryId)
-    .eq("is_published", true);
+  const first = await selectAllPages((from, to) =>
+    client
+      .from("products")
+      .select(CATEGORY_PAGE_SELECT_WITH_SUB)
+      .eq("category_id", categoryId)
+      .eq("is_published", true)
+      .range(from, to),
+  );
 
   if (!first.error) {
     return { data: first.data, error: null as null };
@@ -82,11 +109,14 @@ export async function fetchPublishedProductsForCategoryPage(client: Client, cate
     first.error.message,
   );
 
-  const second = await client
-    .from("products")
-    .select(CATEGORY_PAGE_SELECT_FALLBACK)
-    .eq("category_id", categoryId)
-    .eq("is_published", true);
+  const second = await selectAllPages((from, to) =>
+    client
+      .from("products")
+      .select(CATEGORY_PAGE_SELECT_FALLBACK)
+      .eq("category_id", categoryId)
+      .eq("is_published", true)
+      .range(from, to),
+  );
   return { data: second.data, error: second.error };
 }
 

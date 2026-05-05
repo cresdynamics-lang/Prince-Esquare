@@ -4,7 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { ALLOWED_CATEGORY_SLUGS, CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
 import { fetchPublishedProductsForShopCards } from "@/lib/publishedProductsQuery";
+import {
+  dedupeProductCardsStable,
+  dedupeProductsBySlugPreferOrder,
+  fashionProductsAsCards,
+  mergeCatalogFallbackIntoCard,
+} from "@/lib/fashionProducts";
 import { getSubcategoriesForCategory, resolveSubcategory } from "@/lib/subcategories";
+import { siteHeroSuitUrl } from "@/lib/assetMap";
 
 export const Route = createFileRoute("/shop")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -73,32 +80,34 @@ function ShopPage() {
           return a.name.localeCompare(b.name);
         });
       setCats(categories);
-      const dbCards: ProductCardData[] = (ps ?? []).map((p: any) => ({
-        id: p.id,
-        slug: p.slug,
-        title: p.title,
-        price: Number(p.price),
-        sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-        image: p.product_images?.[0]?.image_url ?? null,
-        category_name: p.categories?.name,
-        category_slug: p.categories?.slug,
-        subcategory_name: resolveSubcategory(
-          p.subcategory,
-          p.categories?.slug,
-          `${p.title ?? ""} ${p.slug ?? ""}`,
-        ),
-        stock_quantity_total: (p.product_variants ?? []).reduce(
-          (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-          0,
-        ),
-      }));
+      const dbCards: ProductCardData[] = dedupeProductCardsStable(
+        (ps ?? []).map((p: any) => mergeCatalogFallbackIntoCard({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          price: Number(p.price),
+          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+          image: p.product_images?.[0]?.image_url ?? null,
+          category_name: p.categories?.name,
+          category_slug: p.categories?.slug,
+          subcategory_name: resolveSubcategory(
+            p.subcategory,
+            p.categories?.slug,
+            `${p.title ?? ""} ${p.slug ?? ""}`,
+          ),
+          stock_quantity_total: (p.product_variants ?? []).reduce(
+            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+            0,
+          ),
+        })),
+      );
 
       const categoryMap: Record<string, string | null> = {};
       (ps ?? []).forEach((p: any) => {
         categoryMap[p.id] = p.category_id ?? null;
       });
       setProductCategoryMap(categoryMap);
-      setProducts(dbCards);
+      setProducts(dedupeProductsBySlugPreferOrder([...dbCards, ...fashionProductsAsCards()]));
       setLoading(false);
     })();
   }, []);
@@ -166,7 +175,7 @@ function ShopPage() {
         <section className="relative mb-10 overflow-hidden rounded-md bg-navy py-14 text-center text-navy-foreground md:py-16">
           <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
-            style={{ backgroundImage: "url('/hero-suit.jpg')" }}
+            style={{ backgroundImage: `url(${siteHeroSuitUrl})` }}
           />
           <div className="relative z-10">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">The Collection</p>

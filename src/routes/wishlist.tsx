@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWishlist } from "@/lib/wishlist";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
+import { dedupeProductCardsStable, mergeCatalogFallbackIntoCard } from "@/lib/fashionProducts";
 import { resolveSubcategory } from "@/lib/subcategories";
 import { Button } from "@/components/ui/button";
 
@@ -29,25 +30,27 @@ function WishlistPage() {
         .in("id", [...ids])
         .eq("is_published", true);
       setItems(
-        (data ?? []).map((p: any) => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          price: Number(p.price),
-          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-          image: p.product_images?.[0]?.image_url ?? null,
-          category_name: p.categories?.name,
-          category_slug: p.categories?.slug,
-          subcategory_name: resolveSubcategory(
-            p.subcategory,
-            p.categories?.slug,
-            `${p.title ?? ""} ${p.slug ?? ""}`,
-          ),
-          stock_quantity_total: (p.product_variants ?? []).reduce(
-            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-            0,
-          ),
-        })),
+        dedupeProductCardsStable(
+          (data ?? []).map((p: any) => mergeCatalogFallbackIntoCard({
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            price: Number(p.price),
+            sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+            image: p.product_images?.[0]?.image_url ?? null,
+            category_name: p.categories?.name,
+            category_slug: p.categories?.slug,
+            subcategory_name: resolveSubcategory(
+              p.subcategory,
+              p.categories?.slug,
+              `${p.title ?? ""} ${p.slug ?? ""}`,
+            ),
+            stock_quantity_total: (p.product_variants ?? []).reduce(
+              (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+              0,
+            ),
+          })),
+        ),
       );
       setLoading(false);
     })();

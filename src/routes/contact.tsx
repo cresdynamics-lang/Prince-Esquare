@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { STORE_INFO } from "@/lib/format";
+import { siteHeroSuitUrl } from "@/lib/assetMap";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -68,7 +69,7 @@ function ContactPage() {
   return (
     <div>
       <section className="relative bg-navy py-16 text-center text-navy-foreground md:py-20">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: "url('/hero-suit.jpg')" }} />
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: `url(${siteHeroSuitUrl})` }} />
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">We'd love to hear from you</p>
           <h1 className="mt-3 font-display text-4xl font-bold md:text-5xl">Contact Prince Esquire</h1>

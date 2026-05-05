@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { siteHeroSuitUrl } from "@/lib/assetMap";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/booking")({
@@ -97,7 +98,7 @@ function BookingPage() {
       <section className="relative bg-navy py-16 text-center text-navy-foreground md:py-20">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
-          style={{ backgroundImage: "url('/hero-suit.jpg')" }}
+          style={{ backgroundImage: `url(${siteHeroSuitUrl})` }}
         />
         <div className="relative z-10 px-4">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Appointments</p>

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Sparkles, ShieldCheck, Store } from "lucide-react";
+import { siteHeroSuitUrl } from "@/lib/assetMap";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -23,7 +24,7 @@ function AboutPage() {
   return (
     <div>
       <section className="relative bg-navy py-20 text-center text-navy-foreground md:py-28">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: "url('/hero-suit.jpg')" }} />
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30" style={{ backgroundImage: `url(${siteHeroSuitUrl})` }} />
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Our Story</p>
           <h1 className="mt-3 font-display text-4xl font-bold md:text-6xl">Crafting the modern gentleman.</h1>

@@ -20,9 +20,8 @@ function AdminLoginPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-      const hasAdminRole = (roles ?? []).some((r: any) => r.role === "admin");
-      if (hasAdminRole) navigate({ to: "/admin" });
+      const { data: canAccess } = await supabase.rpc("current_user_may_access_admin_panel");
+      if (canAccess) navigate({ to: "/admin" });
     })();
   }, [navigate]);
 
@@ -69,12 +68,11 @@ function AdminLoginPage() {
       return;
     }
 
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", signedUser.id);
-    const hasAdminRole = (roles ?? []).some((r: any) => r.role === "admin");
-    if (!hasAdminRole) {
+    const { data: canAccess } = await supabase.rpc("current_user_may_access_admin_panel");
+    if (!canAccess) {
       await supabase.auth.signOut();
       setBusy(false);
-      toast.error("Admin credentials not recognized in database.");
+      toast.error("This account has no admin-panel permissions.");
       return;
     }
 

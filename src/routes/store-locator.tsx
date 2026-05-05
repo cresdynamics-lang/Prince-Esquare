@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MapPin, Phone, Clock } from "lucide-react";
 import { STORE_INFO } from "@/lib/format";
+import { siteHeroSuitUrl } from "@/lib/assetMap";
 
 export const Route = createFileRoute("/store-locator")({
   head: () => ({
@@ -26,7 +27,7 @@ function StoreLocatorPage() {
       <section className="relative bg-navy py-16 text-center text-navy-foreground md:py-20">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
-          style={{ backgroundImage: "url('/hero-suit.jpg')" }}
+          style={{ backgroundImage: `url(${siteHeroSuitUrl})` }}
         />
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Visit Us</p>

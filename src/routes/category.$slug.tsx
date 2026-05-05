@@ -4,6 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { resolveImage } from "@/lib/assetMap";
 import { defaultCarouselDescription, defaultCarouselTitle, getCategorySubcategoryLinks } from "@/lib/categoryCarousels";
+import {
+  dedupeProductCardsStable,
+  dedupeProductsBySlugPreferOrder,
+  fashionProductsForCategorySlug,
+  mergeCatalogFallbackIntoCard,
+} from "@/lib/fashionProducts";
+import { getFashionCategoryFallback } from "@/lib/fashionGallery";
 import { fetchPublishedProductsForCategoryPage } from "@/lib/publishedProductsQuery";
 import { getSubcategoriesForCategory, resolveSubcategory } from "@/lib/subcategories";
 
@@ -41,6 +48,8 @@ function CategoryPage() {
     (async () => {
       setLoading(true);
       setMissing(false);
+      const fallbackCategory = getFashionCategoryFallback(slug);
+      const fallbackProducts = fashionProductsForCategorySlug(slug);
 
       const { data: c } = await supabase
         .from("categories")
@@ -49,12 +58,28 @@ function CategoryPage() {
         .maybeSingle();
 
       if (!c) {
-        setMissing(true);
+        if (!fallbackCategory) {
+          setMissing(true);
+          setLoading(false);
+          return;
+        }
+        setCat({
+          id: "",
+          name: fallbackCategory.name,
+          description: fallbackCategory.description,
+          image_url: fallbackCategory.image_url,
+        });
+        setCarousel(null);
+        setProducts(fallbackProducts);
         setLoading(false);
         return;
       }
 
-      setCat(c);
+      setCat({
+        ...c,
+        description: c.description || fallbackCategory?.description || null,
+        image_url: c.image_url || fallbackCategory?.image_url || null,
+      });
       const { data: carouselRow } = await supabase
         .from("category_carousels")
         .select("title,description,image_url,is_active")
@@ -65,27 +90,29 @@ function CategoryPage() {
       const { data: ps, error: prodErr } = await fetchPublishedProductsForCategoryPage(supabase, c.id);
       if (prodErr) {
         console.error("[category] products:", prodErr);
-        setProducts([]);
+        setProducts(fallbackProducts);
         setLoading(false);
         return;
       }
 
-      const dbCards = (ps ?? []).map((p: any) => ({
-        id: p.id,
-        slug: p.slug,
-        title: p.title,
-        price: Number(p.price),
-        sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-        image: p.product_images?.[0]?.image_url ?? null,
-        category_name: c.name,
-        category_slug: slug,
-        subcategory_name: resolveSubcategory(p.subcategory, slug, `${p.title ?? ""} ${p.slug ?? ""}`),
-        stock_quantity_total: (p.product_variants ?? []).reduce(
-          (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-          0,
-        ),
-      }));
-      setProducts(dbCards);
+      const dbCards = dedupeProductCardsStable(
+        (ps ?? []).map((p: any) => mergeCatalogFallbackIntoCard({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          price: Number(p.price),
+          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+          image: p.product_images?.[0]?.image_url ?? null,
+          category_name: c.name,
+          category_slug: slug,
+          subcategory_name: resolveSubcategory(p.subcategory, slug, `${p.title ?? ""} ${p.slug ?? ""}`),
+          stock_quantity_total: (p.product_variants ?? []).reduce(
+            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+            0,
+          ),
+        })),
+      );
+      setProducts(dedupeProductsBySlugPreferOrder([...dbCards, ...fallbackProducts]));
       setLoading(false);
     })();
   }, [slug]);
@@ -112,8 +139,8 @@ function CategoryPage() {
     }
     return carouselSubcategoryLinks.map((subcat) => ({
       key: subcat,
-      heading,
-      body,
+      heading: `${heading} - ${subcat}`,
+      body: `${body} Browse ${subcat.toLowerCase()} options within this collection.`,
       image,
       subcategory: subcat,
     }));

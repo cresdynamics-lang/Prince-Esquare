@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Heart } from "lucide-react";
-import { resolveImage } from "@/lib/assetMap";
+import { hasResolvableAssetSourcePath, resolveImage } from "@/lib/assetMap";
+import { getRepresentativeImageForCategory } from "@/lib/catalogAssets";
 import { formatKES } from "@/lib/format";
 import { useWishlist } from "@/lib/wishlist";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,15 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDa
     product.sale_price != null &&
     Number(product.sale_price) < Number(product.price);
   const isSoldOut = (product.stock_quantity_total ?? 1) <= 0;
+  const categoryFallbackImage = product.category_slug
+    ? getRepresentativeImageForCategory(product.category_slug)
+    : null;
+  const displayImage =
+    !product.image
+      ? categoryFallbackImage
+      : product.image.startsWith("/src/assets/") && !hasResolvableAssetSourcePath(product.image)
+        ? categoryFallbackImage ?? product.image
+        : product.image;
 
   return (
     <div className="product-card group relative overflow-hidden rounded-md border border-border bg-card">
@@ -41,7 +51,7 @@ export function ProductCard({ product, eager = false }: { product: ProductCardDa
       >
         <div className="relative aspect-[4/5] overflow-hidden bg-muted">
           <img
-            src={resolveImage(product.image)}
+            src={resolveImage(displayImage)}
             alt={product.title}
             loading={eager ? "eager" : "lazy"}
             decoding="async"

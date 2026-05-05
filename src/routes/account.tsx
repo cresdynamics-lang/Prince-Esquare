@@ -11,7 +11,7 @@ export const Route = createFileRoute("/account")({
 });
 
 function AccountPage() {
-  const { user, loading, signOut, isStaff } = useAuth();
+  const { user, loading, signOut, canAccessAdminPanel } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -45,7 +45,7 @@ function AccountPage() {
           <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
         </div>
         <div className="flex gap-2">
-          {isStaff && <Link to="/admin"><Button variant="outline">Admin Dashboard</Button></Link>}
+          {canAccessAdminPanel && <Link to="/admin"><Button variant="outline">Admin Dashboard</Button></Link>}
           <Button variant="ghost" onClick={() => signOut()}>Sign out</Button>
         </div>
       </div>

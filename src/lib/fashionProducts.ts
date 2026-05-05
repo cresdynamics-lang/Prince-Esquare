@@ -1,34 +1,30 @@
 import type { ProductCardData } from "@/components/site/ProductCard";
-import { fashionGalleryItems, getFashionGalleryForSlug } from "@/lib/fashionGallery";
+import { canonicalizeAssetSourcePath } from "@/lib/assetMap";
+import { catalogAssets, getCatalogAssetsForCategory } from "@/lib/catalogAssets";
+import { buildProductDescription, inferCategorySlugFromText } from "@/lib/productCopy";
 
-/**
- * URL slug aligned with `scripts/sync-image-products-to-db.cjs`: stem + extension token so
- * the same image in `.webp` / `.jfif` / `.avif` does not collapse to one product.
- */
-export function fashionSlugFromFilename(newName: string): string {
-  const stem = newName.replace(/\.[^.]+$/i, "");
-  const ext = (newName.match(/\.([^.]+)$/i)?.[1] ?? "").toLowerCase();
-  const combined = ext ? `${stem}-${ext}` : stem;
-  return combined
+export function fashionSlugFromFilename(value: string) {
+  return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
 const PRICE_RANGE_BY_CATEGORY: Record<string, { min: number; max: number }> = {
-  shoes: { min: 10000, max: 18000 },
-  suits: { min: 18000, max: 45000 },
-  shirts: { min: 3000, max: 6000 },
-  "t-shirts": { min: 1500, max: 3500 },
-  jackets: { min: 8000, max: 15000 },
-  outfits: { min: 12000, max: 22000 },
-  casual: { min: 4500, max: 9000 },
-  formal: { min: 10000, max: 20000 },
-  trousers: { min: 4000, max: 8000 },
-  "khaki-pants": { min: 4500, max: 9000 },
-  "track-suits": { min: 6000, max: 14000 },
-  belts: { min: 1500, max: 4500 },
-  socks: { min: 500, max: 1800 },
+  "polo-t-shirts": { min: 2200, max: 5200 },
+  shoes: { min: 8500, max: 22000 },
+  shirts: { min: 2500, max: 8500 },
+  suits: { min: 15000, max: 55000 },
+  blazers: { min: 10000, max: 30000 },
+  "track-suits": { min: 5500, max: 18000 },
+  jackets: { min: 7000, max: 28000 },
+  trousers: { min: 3200, max: 12000 },
+  linen: { min: 3800, max: 18000 },
+  "caps-hats": { min: 900, max: 4500 },
+  "belts-ties": { min: 1200, max: 6000 },
+  socks: { min: 500, max: 2500 },
+  sweaters: { min: 2500, max: 12000 },
+  "t-shirts": { min: 1500, max: 6000 },
 };
 
 function hashSeed(value: string): number {
@@ -46,144 +42,172 @@ function estimateFashionPrice(category: string, slug: string): number {
   return range.min + stepIndex * 500;
 }
 
-const staticAssetProducts: ProductCardData[] = [
-  {
-    id: "asset:cat-suits",
-    slug: "cat-suits",
-    title: "Tailored Suits Collection",
-    price: estimateFashionPrice("formal", "cat-suits"),
-    sale_price: null,
-    image: "/src/assets/cat-suits.jpg",
-    category_name: "Suits",
-    category_slug: "suits",
-  },
-  {
-    id: "asset:cat-shirts",
-    slug: "cat-shirts",
-    title: "Premium Shirts Collection",
-    price: estimateFashionPrice("shirts", "cat-shirts"),
-    sale_price: null,
-    image: "/src/assets/cat-shirts.jpg",
-    category_name: "Shirts",
-    category_slug: "shirts",
-  },
-  {
-    id: "asset:cat-trousers",
-    slug: "cat-trousers",
-    title: "Smart Trousers Collection",
-    price: estimateFashionPrice("trousers", "cat-trousers"),
-    sale_price: null,
-    image: "/src/assets/cat-trousers.jpg",
-    category_name: "Trousers",
-    category_slug: "trousers",
-  },
-  {
-    id: "asset:cat-shoes",
-    slug: "cat-shoes",
-    title: "Leather Shoes Collection",
-    price: estimateFashionPrice("shoes", "cat-shoes"),
-    sale_price: null,
-    image: "/src/assets/cat-shoes.jpg",
-    category_name: "Shoes",
-    category_slug: "shoes",
-  },
-  {
-    id: "asset:cat-belts",
-    slug: "cat-belts",
-    title: "Belts Collection",
-    price: estimateFashionPrice("formal", "cat-belts"),
-    sale_price: null,
-    image: "/src/assets/cat-belts.jpg",
-    category_name: "Belts",
-    category_slug: "belts",
-  },
-  {
-    id: "asset:cat-socks",
-    slug: "cat-socks",
-    title: "Socks Collection",
-    price: estimateFashionPrice("casual", "cat-socks"),
-    sale_price: null,
-    image: "/src/assets/cat-socks.jpg",
-    category_name: "Socks",
-    category_slug: "socks",
-  },
-  {
-    id: "asset:cat-casual",
-    slug: "cat-casual",
-    title: "Casual Collection",
-    price: estimateFashionPrice("casual", "cat-casual"),
-    sale_price: null,
-    image: "/src/assets/cat-casual.jpg",
-    category_name: "Casual",
-    category_slug: "casual",
-  },
-  {
-    id: "asset:cat-formal",
-    slug: "cat-formal",
-    title: "Formal Collection",
-    price: estimateFashionPrice("formal", "cat-formal"),
-    sale_price: null,
-    image: "/src/assets/cat-formal.jpg",
-    category_name: "Formal",
-    category_slug: "formal",
-  },
-  {
-    id: "asset:cat-sportswear",
-    slug: "cat-sportswear",
-    title: "Sportswear Collection",
-    price: estimateFashionPrice("casual", "cat-sportswear"),
-    sale_price: null,
-    image: "/src/assets/cat-sportswear.jpg",
-    category_name: "Sportswear",
-    category_slug: "sportswear",
-  },
-  {
-    id: "asset:hero-suit",
-    slug: "hero-suit",
-    title: "Signature Hero Suit Look",
-    price: estimateFashionPrice("formal", "hero-suit"),
-    sale_price: null,
-    image: "/src/assets/hero-suit.jpg",
-    category_name: "Formal",
-    category_slug: "formal",
-  },
-];
-
-/** Every image in `src/assets/fashions` (via metadata) as a shop product card. */
-export function fashionProductsAsCards(): ProductCardData[] {
-  const fromFashions = fashionGalleryItems.map((item) => {
-    const slug = fashionSlugFromFilename(item.id);
-    return {
-      id: `fashion:${slug}`,
-      slug,
-      title: item.description,
-      price: estimateFashionPrice(item.category, slug),
-      sale_price: null,
-      image: item.image,
-      category_name: item.categoryLabel,
-      category_slug: item.category,
-    };
-  });
-  return dedupeProductsBySlugPreferOrder([...fromFashions, ...staticAssetProducts]);
+function normalizeLookupText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-/** Products from the fashions folder that belong on a category collection page. */
+function buildGroupKey(categorySlug: string, subcategoryName: string | null | undefined) {
+  return `${categorySlug}::${normalizeLookupText(subcategoryName) || "all"}`;
+}
+
+function assetToProductCard(asset: (typeof catalogAssets)[number]): ProductCardData {
+  const slug = fashionSlugFromFilename(asset.slugKey);
+  return {
+    id: `asset:${slug}`,
+    slug,
+    title: asset.title,
+    price: estimateFashionPrice(asset.categorySlug, slug),
+    sale_price: null,
+    image: asset.image,
+    category_name: asset.categoryName,
+    category_slug: asset.categorySlug,
+    subcategory_name: asset.subcategoryName,
+  };
+}
+
+function assetToProductDetail(asset: (typeof catalogAssets)[number]): FashionProductDetail {
+  const slug = fashionSlugFromFilename(asset.slugKey);
+  const price = estimateFashionPrice(asset.categorySlug, slug);
+  return {
+    kind: "fashion",
+    id: `asset:${slug}`,
+    slug,
+    title: asset.title,
+    description: buildProductDescription({
+      title: asset.title,
+      categorySlug: asset.categorySlug,
+      categoryName: asset.categoryName,
+      subcategoryName: asset.subcategoryName,
+    }),
+    image: asset.image,
+    price,
+    salePrice: null,
+    categorySlug: asset.categorySlug,
+    categoryName: asset.categoryName,
+    subcategoryName: asset.subcategoryName,
+  };
+}
+
+const catalogProductDetailBySlug = new Map(
+  catalogAssets.map((asset) => {
+    const detail = assetToProductDetail(asset);
+    return [detail.slug, detail] as const;
+  }),
+);
+
+const catalogProductDetailByImage = new Map(
+  Array.from(catalogProductDetailBySlug.values()).map((detail) => [
+    canonicalizeAssetSourcePath(detail.image) ?? detail.image,
+    detail,
+  ]),
+);
+
+const catalogProductDetailsByCategory = new Map<string, FashionProductDetail[]>();
+const catalogProductDetailsByCategoryAndSubcategory = new Map<string, FashionProductDetail[]>();
+for (const detail of catalogProductDetailBySlug.values()) {
+  const categoryList = catalogProductDetailsByCategory.get(detail.categorySlug) ?? [];
+  categoryList.push(detail);
+  catalogProductDetailsByCategory.set(detail.categorySlug, categoryList);
+
+  const groupKey = buildGroupKey(detail.categorySlug, detail.subcategoryName);
+  const groupList = catalogProductDetailsByCategoryAndSubcategory.get(groupKey) ?? [];
+  groupList.push(detail);
+  catalogProductDetailsByCategoryAndSubcategory.set(groupKey, groupList);
+}
+
+export type FashionProductLookup = {
+  slug?: string | null;
+  title?: string | null;
+  image?: string | null;
+  categorySlug?: string | null;
+  categoryName?: string | null;
+  subcategoryName?: string | null;
+};
+
+function pickBestDetailFromList(
+  list: FashionProductDetail[],
+  lookup: FashionProductLookup,
+): FashionProductDetail | null {
+  if (list.length === 0) return null;
+
+  const titleText = normalizeLookupText(lookup.title);
+  if (titleText) {
+    const exact = list.find((detail) => normalizeLookupText(detail.title) === titleText);
+    if (exact) return exact;
+
+    const tokens = titleText.split(" ").filter((token) => token.length >= 3);
+    let best: FashionProductDetail | null = null;
+    let bestScore = 0;
+
+    for (const detail of list) {
+      const haystack = normalizeLookupText(detail.title);
+      let score = 0;
+      for (const token of tokens) {
+        if (haystack.includes(token)) score += 1;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = detail;
+      }
+    }
+
+    if (best && bestScore >= Math.min(2, tokens.length || 0)) {
+      return best;
+    }
+  }
+
+  const seed = `${lookup.slug ?? ""} ${lookup.title ?? ""} ${lookup.image ?? ""}`.trim() || list[0]?.slug;
+  return list[hashSeed(seed) % list.length] ?? list[0] ?? null;
+}
+
+export function getCatalogFallbackForProduct(lookup: FashionProductLookup): FashionProductDetail | null {
+  const slug = lookup.slug?.trim();
+  if (slug) {
+    const direct = catalogProductDetailBySlug.get(slug);
+    if (direct) return direct;
+  }
+
+  const image = canonicalizeAssetSourcePath(lookup.image);
+  if (image) {
+    const direct = catalogProductDetailByImage.get(image);
+    if (direct) return direct;
+  }
+
+  const categorySlug =
+    lookup.categorySlug?.trim() ||
+    inferCategorySlugFromText(
+      `${lookup.title ?? ""} ${lookup.categoryName ?? ""} ${lookup.subcategoryName ?? ""}`,
+    );
+  const normalizedSubcategory = normalizeLookupText(lookup.subcategoryName);
+  if (categorySlug) {
+    if (normalizedSubcategory) {
+      const grouped = catalogProductDetailsByCategoryAndSubcategory.get(
+        buildGroupKey(categorySlug, normalizedSubcategory),
+      );
+      const groupedMatch = pickBestDetailFromList(grouped ?? [], lookup);
+      if (groupedMatch) return groupedMatch;
+    }
+
+    const categoryMatch = pickBestDetailFromList(
+      catalogProductDetailsByCategory.get(categorySlug) ?? [],
+      lookup,
+    );
+    if (categoryMatch) return categoryMatch;
+  }
+
+  return pickBestDetailFromList(Array.from(catalogProductDetailBySlug.values()), lookup);
+}
+
+export function fashionProductsAsCards(): ProductCardData[] {
+  return dedupeProductsBySlugPreferOrder(catalogAssets.map(assetToProductCard));
+}
+
 export function fashionProductsForCategorySlug(pageSlug: string): ProductCardData[] {
-  const fromFashions = getFashionGalleryForSlug(pageSlug).map((item) => {
-    const slug = fashionSlugFromFilename(item.id);
-    return {
-      id: `fashion:${slug}`,
-      slug,
-      title: item.description,
-      price: estimateFashionPrice(item.category, slug),
-      sale_price: null,
-      image: item.image,
-      category_name: item.categoryLabel,
-      category_slug: item.category,
-    };
-  });
-  const fromStaticAssets = staticAssetProducts.filter((p) => p.category_slug === pageSlug);
-  return dedupeProductsBySlugPreferOrder([...fromFashions, ...fromStaticAssets]);
+  return dedupeProductsBySlugPreferOrder(getCatalogAssetsForCategory(pageSlug).map(assetToProductCard));
 }
 
 export type FashionProductDetail = {
@@ -193,48 +217,58 @@ export type FashionProductDetail = {
   title: string;
   description: string;
   image: string;
+  price: number;
+  salePrice: number | null;
   categorySlug: string;
   categoryName: string;
+  subcategoryName?: string | null;
 };
 
 export function getFashionProductBySlug(slug: string): FashionProductDetail | null {
-  const item = fashionGalleryItems.find((i) => fashionSlugFromFilename(i.id) === slug);
-  if (item) {
-    const s = fashionSlugFromFilename(item.id);
-    return {
-      kind: "fashion",
-      id: `fashion:${s}`,
-      slug: s,
-      title: item.description,
-      description: item.description,
-      image: item.image,
-      categorySlug: item.category,
-      categoryName: item.categoryLabel,
-    };
-  }
+  return catalogProductDetailBySlug.get(slug) ?? null;
+}
 
-  const staticProduct = staticAssetProducts.find((p) => p.slug === slug);
-  if (!staticProduct) return null;
+export function mergeCatalogFallbackIntoCard(product: ProductCardData): ProductCardData {
+  const fallback = getCatalogFallbackForProduct({
+    slug: product.slug,
+    title: product.title,
+    image: product.image,
+    categorySlug: product.category_slug,
+    categoryName: product.category_name,
+    subcategoryName: product.subcategory_name,
+  });
+  if (!fallback) return product;
+
+  const shouldPreferAssetImage =
+    !product.image || product.image.startsWith("/src/assets/");
+
   return {
-    kind: "fashion",
-    id: staticProduct.id,
-    slug: staticProduct.slug,
-    title: staticProduct.title,
-    description: staticProduct.title,
-    image: staticProduct.image ?? "/src/assets/cat-suits.jpg",
-    categorySlug: staticProduct.category_slug ?? "formal",
-    categoryName: staticProduct.category_name ?? "Collection",
+    ...product,
+    title: product.title?.trim() || fallback.title,
+    image: shouldPreferAssetImage ? fallback.image : product.image,
+    category_name: product.category_name ?? fallback.categoryName,
+    category_slug: product.category_slug ?? fallback.categorySlug,
+    subcategory_name: product.subcategory_name ?? fallback.subcategoryName ?? null,
   };
 }
 
-/** First occurrence wins; later rows with the same `slug` are skipped (DB can shadow fashions). */
 export function dedupeProductsBySlugPreferOrder(products: ProductCardData[]): ProductCardData[] {
   const seen = new Set<string>();
   const out: ProductCardData[] = [];
-  for (const p of products) {
-    if (seen.has(p.slug)) continue;
-    seen.add(p.slug);
-    out.push(p);
+  for (const product of products) {
+    if (seen.has(product.slug)) continue;
+    seen.add(product.slug);
+    out.push(product);
   }
   return out;
+}
+
+export function dedupeProductCardsStable(products: ProductCardData[]): ProductCardData[] {
+  const seenIds = new Set<string>();
+  const byId = products.filter((product) => {
+    if (seenIds.has(product.id)) return false;
+    seenIds.add(product.id);
+    return true;
+  });
+  return dedupeProductsBySlugPreferOrder(byId);
 }

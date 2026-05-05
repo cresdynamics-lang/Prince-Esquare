@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button";
 import { FashionGallery } from "@/components/site/FashionGallery";
 import { ProductCard, type ProductCardData } from "@/components/site/ProductCard";
 import { fashionGalleryItems } from "@/lib/fashionGallery";
-import { dedupeProductsBySlugPreferOrder, fashionProductsAsCards } from "@/lib/fashionProducts";
+import { getRepresentativeAssetUrlForCategory } from "@/lib/catalogAssets";
+import { CATALOG_TAXONOMY } from "@/lib/catalogTaxonomy";
+import {
+  dedupeProductCardsStable,
+  dedupeProductsBySlugPreferOrder,
+  fashionProductsAsCards,
+  mergeCatalogFallbackIntoCard,
+} from "@/lib/fashionProducts";
 import { resolveSubcategory } from "@/lib/subcategories";
-import heroImg from "@/assets/hero-suit.jpg";
-import catSuitsImg from "@/assets/cat-suits.jpg";
-import catShoesImg from "@/assets/cat-shoes.jpg";
-import carouselShirtsImg from "@/assets/catalog/shirts/shirts-material-polyester-fibershirts-type-casual.avif";
-import carouselTrackSuitsImg from "@/assets/catalog/track-suits/track-suits-mens-track-suits-2-piece-the-track-suit-consists.webp";
+import { siteHeroSuitUrl as heroImg } from "@/lib/assetMap";
 
 function pickMixedCategories(products: ProductCardData[], limit: number): ProductCardData[] {
   if (products.length <= limit) return products;
@@ -62,47 +65,14 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const HOME_SECTION_SIZE = 8;
   const SOCKS_SECTION_SIZE = 4;
-  const heroSlides = [
-    {
-      image: heroImg,
-      title: "The Modern Gentleman, Outfitted.",
-      body: "Master tailoring, considered fabrics, and timeless silhouettes - crafted for Nairobi&apos;s most discerning men.",
-      ctaTo: "/shop" as const,
-      ctaLabel: "Shop the Collection",
-    },
-    {
-      image: catSuitsImg,
-      title: "Signature Suits Collection",
-      body: "Sharp lines, rich textures, and refined silhouettes for events, office, and formal evenings.",
-      ctaTo: "/category/$slug" as const,
-      ctaLabel: "Explore Suits",
-      ctaParams: { slug: "suits" as const },
-    },
-    {
-      image: catShoesImg,
-      title: "Premium Footwear Edit",
-      body: "From polished Oxfords to statement loafers, complete every look with confidence.",
-      ctaTo: "/category/$slug" as const,
-      ctaLabel: "Shop Shoes",
-      ctaParams: { slug: "shoes" as const },
-    },
-    {
-      image: carouselShirtsImg,
-      title: "New Shirts Drop",
-      body: "Fresh casual and formal shirt styles now available as ready-to-shop products.",
-      ctaTo: "/category/$slug" as const,
-      ctaLabel: "Shop Shirts",
-      ctaParams: { slug: "shirts" as const },
-    },
-    {
-      image: carouselTrackSuitsImg,
-      title: "Track Suit Essentials",
-      body: "Comfort-first matching sets with clean cuts for training, travel, and everyday style.",
-      ctaTo: "/category/$slug" as const,
-      ctaLabel: "Shop Track Suits",
-      ctaParams: { slug: "track-suits" as const },
-    },
-  ];
+  const heroSlides = CATALOG_TAXONOMY.map((category) => ({
+    image: getRepresentativeAssetUrlForCategory(category.slug) ?? heroImg,
+    title: category.heroTitle,
+    body: category.heroBody,
+    ctaTo: "/category/$slug" as const,
+    ctaLabel: `Shop ${category.name}`,
+    ctaParams: { slug: category.slug },
+  }));
   const [curated, setCurated] = useState<ProductCardData[]>([]);
   const [featured, setFeatured] = useState<ProductCardData[]>([]);
   const [socksHighlights, setSocksHighlights] = useState<ProductCardData[]>([]);
@@ -151,44 +121,52 @@ function HomePage() {
           prods = latestProducts ?? [];
         }
 
-        const mappedCurated = (curatedProds ?? []).map((p: any) => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          price: Number(p.price),
-          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-          image: p.product_images?.[0]?.image_url ?? null,
-          category_name: p.categories?.name,
-          category_slug: p.categories?.slug,
-          subcategory_name: resolveSubcategory(
-            p.subcategory,
-            p.categories?.slug,
-            `${p.title ?? ""} ${p.slug ?? ""}`,
+        const mappedCurated = dedupeProductCardsStable(
+          (curatedProds ?? []).map((p: any) =>
+            mergeCatalogFallbackIntoCard({
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            price: Number(p.price),
+            sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+            image: p.product_images?.[0]?.image_url ?? null,
+            category_name: p.categories?.name,
+            category_slug: p.categories?.slug,
+            subcategory_name: resolveSubcategory(
+              p.subcategory,
+              p.categories?.slug,
+              `${p.title ?? ""} ${p.slug ?? ""}`,
+            ),
+            stock_quantity_total: (p.product_variants ?? []).reduce(
+              (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+              0,
+            ),
+            }),
           ),
-          stock_quantity_total: (p.product_variants ?? []).reduce(
-            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-            0,
+        );
+        const mappedFeatured = dedupeProductCardsStable(
+          prods.map((p: any) =>
+            mergeCatalogFallbackIntoCard({
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            price: Number(p.price),
+            sale_price: p.sale_price != null ? Number(p.sale_price) : null,
+            image: p.product_images?.[0]?.image_url ?? null,
+            category_name: p.categories?.name,
+            category_slug: p.categories?.slug,
+            subcategory_name: resolveSubcategory(
+              p.subcategory,
+              p.categories?.slug,
+              `${p.title ?? ""} ${p.slug ?? ""}`,
+            ),
+            stock_quantity_total: (p.product_variants ?? []).reduce(
+              (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
+              0,
+            ),
+            }),
           ),
-        }));
-        const mappedFeatured = prods.map((p: any) => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          price: Number(p.price),
-          sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-          image: p.product_images?.[0]?.image_url ?? null,
-          category_name: p.categories?.name,
-          category_slug: p.categories?.slug,
-          subcategory_name: resolveSubcategory(
-            p.subcategory,
-            p.categories?.slug,
-            `${p.title ?? ""} ${p.slug ?? ""}`,
-          ),
-          stock_quantity_total: (p.product_variants ?? []).reduce(
-            (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-            0,
-          ),
-        }));
+        );
         const fashionCards = fashionProductsAsCards();
         const curatedMerged = dedupeProductsBySlugPreferOrder([...mappedCurated, ...fashionCards]);
         const featuredMerged = dedupeProductsBySlugPreferOrder([...mappedFeatured, ...fashionCards]);
@@ -244,38 +222,27 @@ function HomePage() {
               Autumn Collection - 2026
             </p>
             <h1 className="mt-4 font-display text-4xl font-bold leading-[1.05] md:text-6xl lg:text-7xl">
-              {heroSlides[activeSlide]?.title.includes("Gentleman") ? (
-                <>
-                  The Modern <span className="text-gold">Gentleman</span>, Outfitted.
-                </>
-              ) : (
-                heroSlides[activeSlide]?.title
-              )}
+              {heroSlides[activeSlide]?.title}
             </h1>
             <p className="mt-5 max-w-md text-base text-navy-foreground/80 md:text-lg">
               {heroSlides[activeSlide]?.body}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              {heroSlides[activeSlide]?.ctaTo === "/shop" ? (
-                <Link to="/shop">
-                  <Button variant="hero" size="lg">
-                    {heroSlides[activeSlide]?.ctaLabel} <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </Link>
-              ) : (
-                <Link to="/category/$slug" params={heroSlides[activeSlide]?.ctaParams ?? { slug: "suits" }}>
-                  <Button variant="hero" size="lg">
-                    {heroSlides[activeSlide]?.ctaLabel} <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </Link>
-              )}
-              <Link to="/category/$slug" params={{ slug: "suits" }}>
+              <Link
+                to="/category/$slug"
+                params={heroSlides[activeSlide]?.ctaParams ?? { slug: "suits" }}
+              >
+                <Button variant="hero" size="lg">
+                  {heroSlides[activeSlide]?.ctaLabel} <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/shop">
                 <Button
                   variant="outline"
                   size="lg"
                   className="border-navy-foreground/30 bg-transparent text-navy-foreground hover:bg-navy-foreground/10"
                 >
-                  Explore Suits
+                  Browse All Categories
                 </Button>
               </Link>
             </div>
@@ -404,9 +371,9 @@ function HomePage() {
       <FashionGallery
         items={fashionGalleryItems}
         limit={8}
-        eyebrow="Studio Gallery"
-        title="Fresh From The Fashion Rail"
-        description="The same looks from your fashions folder are listed as products in the shop. This grid is an extra visual browse of the rail."
+        eyebrow="Visual Browse"
+        title="Fresh From The Current Catalogue"
+        description="A quick visual sweep of the latest catalogue images, grouped into the same categories and subcategories used across the storefront."
       />
 
       <section className="container mx-auto px-4 py-16 md:py-24">
