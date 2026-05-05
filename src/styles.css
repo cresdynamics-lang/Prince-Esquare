@@ -208,24 +208,29 @@
     border-color: var(--color-gold);
   }
   .gold-divider {
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--color-gold),
-      transparent
-    );
+    background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
     height: 1px;
   }
   .product-card {
     transition:
       transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
       box-shadow 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform;
   }
   .product-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-6px);
     box-shadow:
       0 25px 50px -20px color-mix(in oklab, var(--navy) 25%, transparent),
       0 0 0 1px color-mix(in oklab, var(--gold) 15%, transparent);
+  }
+  .reveal-section {
+    animation: section-rise 0.7s ease-out both;
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 900px;
+  }
+  .card-stagger > * {
+    animation: card-rise 0.5s ease-out both;
+    animation-delay: calc(var(--card-index, 0) * 55ms);
   }
   .fade-in {
     animation: fade-in 0.5s ease-out;
@@ -238,6 +243,46 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+  @keyframes section-rise {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes card-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @supports (animation-timeline: view()) {
+    .reveal-section {
+      animation-timeline: view();
+      animation-range: entry 0% cover 28%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in,
+    .reveal-section,
+    .card-stagger > * {
+      animation: none;
+    }
+    .product-card,
+    .product-card img {
+      transition: none;
+    }
+    .product-card:hover {
+      transform: none;
     }
   }
 }

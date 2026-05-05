@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { ArrowRight, Truck, Store, Sparkles, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,106 @@ function pickMixedCategories(products: ProductCardData[], limit: number): Produc
   }
 
   return picked;
+}
+
+function isPresidentialShirt(product: ProductCardData) {
+  const text = `${product.title} ${product.subcategory_name ?? ""}`.toLowerCase();
+  return product.category_slug === "shirts" && text.includes("presidential");
+}
+
+function productImageKey(product: ProductCardData) {
+  return product.image ?? `${product.category_slug ?? "uncategorized"}:${product.slug}`;
+}
+
+function productIdentityKey(product: ProductCardData) {
+  return `${product.slug}:${productImageKey(product)}`;
+}
+
+function pickHomepageCategoryMix(products: ProductCardData[], limit: number): ProductCardData[] {
+  const priorityBuckets: Array<(product: ProductCardData) => boolean> = [
+    (product) => product.category_slug === "suits",
+    isPresidentialShirt,
+    (product) => product.category_slug === "shirts" && !isPresidentialShirt(product),
+    (product) => product.category_slug === "shoes",
+    (product) => product.category_slug === "trousers",
+    (product) => product.category_slug === "blazers",
+    (product) => product.category_slug === "linen",
+    (product) => product.category_slug === "jackets",
+  ];
+  const used = new Set<string>();
+  const buckets = priorityBuckets.map((matches) =>
+    products.filter((product) => {
+      const key = productIdentityKey(product);
+      if (used.has(key) || !matches(product)) return false;
+      used.add(key);
+      return true;
+    }),
+  );
+  const picked: ProductCardData[] = [];
+
+  while (picked.length < limit && buckets.some((bucket) => bucket.length > 0)) {
+    for (const bucket of buckets) {
+      if (picked.length >= limit) break;
+      const next = bucket.shift();
+      if (next) picked.push(next);
+    }
+  }
+
+  const selectedImages = new Set(picked.map(productImageKey));
+  for (const product of products) {
+    if (picked.length >= limit) break;
+    if (selectedImages.has(productImageKey(product))) continue;
+    picked.push(product);
+    selectedImages.add(productImageKey(product));
+  }
+
+  return picked;
+}
+
+function excludeProductsByImages(products: ProductCardData[], excluded: ProductCardData[]) {
+  const excludedImages = new Set(excluded.map(productImageKey));
+  const excludedSlugs = new Set(excluded.map((product) => product.slug));
+  return products.filter(
+    (product) => !excludedImages.has(productImageKey(product)) && !excludedSlugs.has(product.slug),
+  );
+}
+
+function cardRevealStyle(index: number): CSSProperties {
+  return { "--card-index": index } as CSSProperties;
+}
+
+type HomepageProductRow = {
+  id: string;
+  slug: string;
+  title: string;
+  price: number | string;
+  sale_price: number | string | null;
+  subcategory?: string | null;
+  product_images?: Array<{ image_url: string | null }> | null;
+  product_variants?: Array<{ stock_quantity: number | string | null }> | null;
+  categories?: { name: string | null; slug: string | null } | null;
+};
+
+function homepageRowAsCard(product: HomepageProductRow): ProductCardData {
+  return mergeCatalogFallbackIntoCard({
+    id: product.id,
+    slug: product.slug,
+    title: product.title,
+    price: Number(product.price),
+    sale_price: product.sale_price != null ? Number(product.sale_price) : null,
+    image: product.product_images?.[0]?.image_url ?? null,
+    category_name: product.categories?.name ?? undefined,
+    category_slug: product.categories?.slug ?? undefined,
+    subcategory_name: resolveSubcategory(
+      product.subcategory,
+      product.categories?.slug,
+      `${product.title ?? ""} ${product.slug ?? ""}`,
+    ),
+    stock_quantity_total: (product.product_variants ?? []).reduce(
+      (sum, variant) => sum + Number(variant.stock_quantity ?? 0),
+      0,
+    ),
+  });
 }
 
 export const Route = createFileRoute("/")({
@@ -95,14 +195,16 @@ function HomePage() {
           supabase
             .from("products")
             .select(
-              "id,slug,title,price,sale_price,is_featured,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
+              "id,slug,title,price,sale_price,subcategory,is_featured,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
             )
             .eq("is_published", true)
             .eq("is_featured", true)
             .limit(16),
           supabase
             .from("products")
-            .select("id,slug,title,price,sale_price,product_images(image_url),product_variants(stock_quantity),categories(name,slug)")
+            .select(
+              "id,slug,title,price,sale_price,subcategory,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
+            )
             .eq("is_published", true)
             .order("created_at", { ascending: false })
             .limit(16),
@@ -113,7 +215,7 @@ function HomePage() {
           const { data: latestProducts } = await supabase
             .from("products")
             .select(
-              "id,slug,title,price,sale_price,is_featured,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
+              "id,slug,title,price,sale_price,subcategory,is_featured,product_images(image_url),product_variants(stock_quantity),categories(name,slug)",
             )
             .eq("is_published", true)
             .order("created_at", { ascending: false })
@@ -122,56 +224,23 @@ function HomePage() {
         }
 
         const mappedCurated = dedupeProductCardsStable(
-          (curatedProds ?? []).map((p: any) =>
-            mergeCatalogFallbackIntoCard({
-            id: p.id,
-            slug: p.slug,
-            title: p.title,
-            price: Number(p.price),
-            sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-            image: p.product_images?.[0]?.image_url ?? null,
-            category_name: p.categories?.name,
-            category_slug: p.categories?.slug,
-            subcategory_name: resolveSubcategory(
-              p.subcategory,
-              p.categories?.slug,
-              `${p.title ?? ""} ${p.slug ?? ""}`,
-            ),
-            stock_quantity_total: (p.product_variants ?? []).reduce(
-              (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-              0,
-            ),
-            }),
-          ),
+          ((curatedProds ?? []) as HomepageProductRow[]).map(homepageRowAsCard),
         );
         const mappedFeatured = dedupeProductCardsStable(
-          prods.map((p: any) =>
-            mergeCatalogFallbackIntoCard({
-            id: p.id,
-            slug: p.slug,
-            title: p.title,
-            price: Number(p.price),
-            sale_price: p.sale_price != null ? Number(p.sale_price) : null,
-            image: p.product_images?.[0]?.image_url ?? null,
-            category_name: p.categories?.name,
-            category_slug: p.categories?.slug,
-            subcategory_name: resolveSubcategory(
-              p.subcategory,
-              p.categories?.slug,
-              `${p.title ?? ""} ${p.slug ?? ""}`,
-            ),
-            stock_quantity_total: (p.product_variants ?? []).reduce(
-              (sum: number, v: any) => sum + Number(v.stock_quantity ?? 0),
-              0,
-            ),
-            }),
-          ),
+          (prods as HomepageProductRow[]).map(homepageRowAsCard),
         );
         const fashionCards = fashionProductsAsCards();
-        const curatedMerged = dedupeProductsBySlugPreferOrder([...mappedCurated, ...fashionCards]);
-        const featuredMerged = dedupeProductsBySlugPreferOrder([...mappedFeatured, ...fashionCards]);
-        const curatedList = pickMixedCategories(curatedMerged, 16);
-        const featuredList = pickMixedCategories(featuredMerged, 16);
+        const curatedMerged = dedupeProductsBySlugPreferOrder([...fashionCards, ...mappedCurated]);
+        const featuredMerged = dedupeProductsBySlugPreferOrder([
+          ...mappedFeatured,
+          ...fashionCards,
+        ]);
+        const curatedList = pickHomepageCategoryMix(curatedMerged, 16);
+        const featuredPool = excludeProductsByImages(featuredMerged, curatedList);
+        const featuredList = pickMixedCategories(
+          featuredPool.length >= HOME_SECTION_SIZE ? featuredPool : featuredMerged,
+          16,
+        );
         const socksList = [...featuredMerged, ...curatedMerged]
           .filter((product) => {
             const slugMatch = product.category_slug?.toLowerCase() === "socks";
@@ -261,15 +330,13 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-16 md:py-24">
+      <section className="reveal-section container mx-auto px-4 py-16 md:py-24">
         <div className="mb-10 flex items-end justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
               Curated Edits
             </p>
-            <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">
-              Shop by Category
-            </h2>
+            <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">Shop by Category</h2>
           </div>
           <Link
             to="/shop"
@@ -278,13 +345,19 @@ function HomePage() {
             View all {"->"}
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="card-stagger grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {loading
             ? Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
+                <div
+                  key={i}
+                  className="aspect-[4/5] animate-pulse rounded-md bg-muted"
+                  style={cardRevealStyle(i)}
+                />
               ))
             : visibleCurated.map((p, index) => (
-                <ProductCard key={p.id} product={p} eager={index < 1} />
+                <div key={p.id} style={cardRevealStyle(index)}>
+                  <ProductCard product={p} eager={index < 1} />
+                </div>
               ))}
         </div>
         {hasMoreCurated && (
@@ -300,24 +373,28 @@ function HomePage() {
         )}
       </section>
 
-      <section className="bg-secondary/40 py-16 md:py-24">
+      <section className="reveal-section bg-secondary/40 py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="mb-10 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
               Hand-picked
             </p>
-            <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">
-              Featured Pieces
-            </h2>
+            <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">Featured Pieces</h2>
             <div className="gold-divider mx-auto mt-4 w-24" />
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="card-stagger grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {loading
               ? Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="aspect-[4/5] animate-pulse rounded-md bg-muted" />
+                  <div
+                    key={i}
+                    className="aspect-[4/5] animate-pulse rounded-md bg-muted"
+                    style={cardRevealStyle(i)}
+                  />
                 ))
               : visibleFeatured.map((p, index) => (
-                  <ProductCard key={p.id} product={p} eager={index < 1} />
+                  <div key={p.id} style={cardRevealStyle(index)}>
+                    <ProductCard product={p} />
+                  </div>
                 ))}
           </div>
           {hasMoreFeatured && (
@@ -342,15 +419,13 @@ function HomePage() {
       </section>
 
       {!loading && socksHighlights.length > 0 && (
-        <section className="container mx-auto px-4 pb-6 pt-14 md:pt-16">
+        <section className="reveal-section container mx-auto px-4 pb-6 pt-14 md:pt-16">
           <div className="mb-8 flex items-end justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
                 Essentials
               </p>
-              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">
-                Socks Highlights
-              </h2>
+              <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">Socks Highlights</h2>
             </div>
             <Link
               to="/category/$slug"
@@ -360,9 +435,11 @@ function HomePage() {
               Shop socks {"->"}
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="card-stagger grid grid-cols-2 gap-4 md:grid-cols-4">
             {socksHighlights.map((p, index) => (
-              <ProductCard key={p.id} product={p} eager={index < 1} />
+              <div key={p.id} style={cardRevealStyle(index)}>
+                <ProductCard product={p} />
+              </div>
             ))}
           </div>
         </section>
@@ -376,14 +453,12 @@ function HomePage() {
         description="A quick visual sweep of the latest catalogue images, grouped into the same categories and subcategories used across the storefront."
       />
 
-      <section className="container mx-auto px-4 py-16 md:py-24">
+      <section className="reveal-section container mx-auto px-4 py-16 md:py-24">
         <div className="mb-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
             The Esquire Promise
           </p>
-          <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">
-            Why Prince Esquire
-          </h2>
+          <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">Why Prince Esquire</h2>
         </div>
         <div className="grid gap-8 md:grid-cols-4">
           {[

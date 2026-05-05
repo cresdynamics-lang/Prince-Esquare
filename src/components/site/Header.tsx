@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { STORE_INFO } from "@/lib/format";
 import { CATALOG_TAXONOMY, PRIMARY_NAV_CATEGORY_SLUGS } from "@/lib/catalogTaxonomy";
-import logoImg from "@/assets/Prince logo.png";
+import logoImg from "@/assets/prince-logo-mark.webp";
 
 const NAV = [{ type: "route", to: "/shop", label: "Shop All" }] as const;
 const PRIMARY_CATEGORY_LINKS = CATALOG_TAXONOMY.filter((item) =>
@@ -14,7 +14,10 @@ const PRIMARY_CATEGORY_LINKS = CATALOG_TAXONOMY.filter((item) =>
 ).map((item) => ({ type: "category" as const, slug: item.slug, label: item.name }));
 const MORE_NAV = [
   ...CATALOG_TAXONOMY.filter(
-    (item) => !PRIMARY_NAV_CATEGORY_SLUGS.includes(item.slug as (typeof PRIMARY_NAV_CATEGORY_SLUGS)[number]),
+    (item) =>
+      !PRIMARY_NAV_CATEGORY_SLUGS.includes(
+        item.slug as (typeof PRIMARY_NAV_CATEGORY_SLUGS)[number],
+      ),
   ).map((item) => ({ type: "category" as const, slug: item.slug, label: item.name })),
   { type: "route", to: "/booking", label: "Booking" },
   { type: "route", to: "/contact", label: "Contact" },
@@ -41,25 +44,24 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="container mx-auto flex h-16 items-center gap-4 px-4 md:h-20">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="lg:hidden"
-          aria-label="Toggle menu"
-        >
+        <button onClick={() => setOpen((v) => !v)} className="lg:hidden" aria-label="Toggle menu">
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
 
-        <Link to="/" className="flex items-center gap-3 leading-none">
+        <Link to="/" className="flex min-w-0 items-center gap-3 leading-none">
           <img
             src={logoImg}
             alt="Prince Esquire logo"
-            className="h-10 w-10 rounded-full border border-gold/50 object-cover"
-            width={40}
-            height={40}
+            className="h-10 w-auto max-w-[104px] object-contain md:h-12 md:max-w-[132px]"
+            width={320}
+            height={186}
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
           />
-          <span className="flex flex-col">
+          <span className="flex min-w-0 flex-col">
             <span className="font-display text-xl font-bold tracking-tight md:text-2xl">
-            Prince <span className="text-gold">Esquire</span>
+              Prince <span className="text-gold">Esquire</span>
             </span>
             <span className="hidden text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:inline">
               Menswear - Nairobi
