@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model banners {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title      String?   @db.VarChar(255)
+  subtitle   String?   @db.VarChar(255)
+  image      String    @db.VarChar(255)
+  link       String?   @db.VarChar(255)
+  position   String?   @default("home_hero") @db.VarChar(50)
+  is_active  Boolean?  @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model brands {
+  id          String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String     @db.VarChar(255)
+  slug        String     @unique @db.VarChar(255)
+  logo        String?    @db.VarChar(255)
+  description String?
+  is_featured Boolean?   @default(false)
+  created_at  DateTime?  @default(now()) @db.Timestamp(6)
+  products    products[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cart_items {
+  id               String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id          String?           @db.Uuid
+  product_id       String?           @db.Uuid
+  variant_id       String?           @db.Uuid
+  quantity         Int
+  created_at       DateTime?         @default(now()) @db.Timestamp(6)
+  products         products?         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users            users?            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_variants product_variants? @relation(fields: [variant_id], references: [id], onUpdate: NoAction)
+}
+
+model categories {
+  id               String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name             String       @db.VarChar(255)
+  slug             String       @unique @db.VarChar(255)
+  description      String?
+  image            String?      @db.VarChar(255)
+  parent_id        String?      @db.Uuid
+  is_featured      Boolean?     @default(false)
+  created_at       DateTime?    @default(now()) @db.Timestamp(6)
+  categories       categories?  @relation("categoriesTocategories", fields: [parent_id], references: [id], onUpdate: NoAction)
+  other_categories categories[] @relation("categoriesTocategories")
+  products         products[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model coupons {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  code           String    @unique @db.VarChar(50)
+  discount_type  String?   @db.VarChar(20)
+  discount_value Decimal   @db.Decimal(10, 2)
+  min_purchase   Decimal?  @default(0.0) @db.Decimal(10, 2)
+  expiry_date    DateTime  @db.Timestamp(6)
+  is_active      Boolean?  @default(true)
+  usage_limit    Int?
+  usage_count    Int?      @default(0)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  orders         orders[]
+}
+
+model newsletter_subscribers {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email      String    @unique @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model notifications {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  title      String    @db.VarChar(255)
+  message    String
+  is_read    Boolean?  @default(false)
+  type       String?   @default("system") @db.VarChar(50)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model order_items {
+  id               String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  order_id         String?           @db.Uuid
+  product_id       String?           @db.Uuid
+  variant_id       String?           @db.Uuid
+  quantity         Int
+  price            Decimal           @db.Decimal(10, 2)
+  created_at       DateTime?         @default(now()) @db.Timestamp(6)
+  orders           orders?           @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products         products?         @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  product_variants product_variants? @relation(fields: [variant_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orders {
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id          String?       @db.Uuid
+  total_amount     Decimal       @db.Decimal(10, 2)
+  tax_amount       Decimal?      @default(0.0) @db.Decimal(10, 2)
+  shipping_amount  Decimal?      @default(0.0) @db.Decimal(10, 2)
+  discount_amount  Decimal?      @default(0.0) @db.Decimal(10, 2)
+  coupon_id        String?       @db.Uuid
+  status           String?       @default("pending") @db.VarChar(20)
+  payment_status   String?       @default("pending") @db.VarChar(20)
+  payment_method   String?       @db.VarChar(50)
+  shipping_address Json
+  billing_address  Json?
+  tracking_number  String?       @db.VarChar(100)
+  created_at       DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?     @default(now()) @db.Timestamp(6)
+  order_items      order_items[]
+  coupons          coupons?      @relation(fields: [coupon_id], references: [id], onUpdate: NoAction)
+  users            users?        @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model product_variants {
+  id             String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id     String?       @db.Uuid
+  name           String        @db.VarChar(100)
+  value          String        @db.VarChar(100)
+  price_modifier Decimal?      @default(0.0) @db.Decimal(10, 2)
+  stock_quantity Int?          @default(0)
+  created_at     DateTime?     @default(now()) @db.Timestamp(6)
+  cart_items     cart_items[]
+  order_items    order_items[]
+  products       products?     @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model products {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name             String             @db.VarChar(255)
+  slug             String             @unique @db.VarChar(255)
+  description      String?
+  price            Decimal            @db.Decimal(10, 2)
+  discount_price   Decimal?           @db.Decimal(10, 2)
+  category_id      String?            @db.Uuid
+  brand_id         String?            @db.Uuid
+  stock_quantity   Int?               @default(0)
+  is_featured      Boolean?           @default(false)
+  is_active        Boolean?           @default(true)
+  thumbnail        String?            @db.VarChar(255)
+  images           Json?              @default("[]")
+  ratings_avg      Decimal?           @default(0.0) @db.Decimal(3, 2)
+  ratings_count    Int?               @default(0)
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(6)
+  cart_items       cart_items[]
+  order_items      order_items[]
+  product_variants product_variants[]
+  brands           brands?            @relation(fields: [brand_id], references: [id], onUpdate: NoAction)
+  categories       categories?        @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  reviews          reviews[]
+  wishlist         wishlist[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reviews {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id  String?   @db.Uuid
+  user_id     String?   @db.Uuid
+  rating      Int?
+  comment     String?
+  is_approved Boolean?  @default(false)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  products    products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                  String          @db.VarChar(255)
+  email                 String          @unique @db.VarChar(255)
+  password              String          @db.VarChar(255)
+  role                  String?         @default("customer") @db.VarChar(20)
+  avatar                String?         @db.VarChar(255)
+  is_verified           Boolean?        @default(false)
+  reset_password_token  String?         @db.VarChar(255)
+  reset_password_expire DateTime?       @db.Timestamp(6)
+  created_at            DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?       @default(now()) @db.Timestamp(6)
+  cart_items            cart_items[]
+  notifications         notifications[]
+  orders                orders[]
+  reviews               reviews[]
+  wishlist              wishlist[]
+}
+
+model wishlist {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  product_id String?   @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, product_id])
+}

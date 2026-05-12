@@ -27,16 +27,42 @@ app.use('/api/', limiter);
 // Serve static files from uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes (Placeholders)
+// --- CUSTOMER ROUTES ---
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/products', require('./routes/productRoutes'));
+app.use('/api/categories', require('./routes/categoryRoutes'));
+app.use('/api/brands', require('./routes/brandRoutes'));
+app.use('/api/cart', require('./routes/cartRoutes'));
+app.use('/api/wishlist', require('./routes/wishlistRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/profile', require('./routes/profileRoutes'));
+app.use('/api/reviews', require('./routes/reviewRoutes'));
+app.use('/api/coupons', require('./routes/couponRoutes')); // Note: Reference has /api/coupons/validate
+app.use('/api/banners', require('./routes/bannerRoutes'));
+app.use('/api/newsletter', require('./routes/newsletterRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/search', require('./routes/searchRoutes'));
+app.get('/api/homepage', require('./controllers/bannerController').getHomepageData);
+
+// --- ADMIN ROUTES ---
+app.use('/api/admin/auth', require('./routes/adminAuthRoutes'));
+app.use('/api/admin/products', require('./routes/adminProductRoutes'));
+app.use('/api/admin/variants', require('./routes/variantRoutes'));
+app.use('/api/admin/categories', require('./routes/adminCategoryRoutes'));
+app.use('/api/admin/brands', require('./routes/adminBrandRoutes'));
+app.use('/api/admin/orders', require('./routes/adminOrderRoutes'));
+app.use('/api/admin/reviews', require('./routes/adminReviewRoutes'));
+app.use('/api/admin/coupons', require('./routes/adminCouponRoutes'));
+app.use('/api/admin/banners', require('./routes/adminBannerRoutes'));
+app.use('/api/admin/customers', require('./routes/customerRoutes'));
+app.use('/api/admin/dashboard', require('./routes/analyticsRoutes'));
+app.use('/api/admin/subscribers', require('./controllers/newsletterController').adminGetSubscribers);
+
+// Root route
 app.get('/', (req, res) => {
     res.json({ message: 'Welcome to Prince Esquare API' });
 });
-
-// Admin Routes
-app.use('/api/admin', require('./routes/admin'));
-
-// Customer Routes
-app.use('/api/customer', require('./routes/customer'));
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

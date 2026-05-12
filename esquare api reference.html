@@ -1,0 +1,334 @@
+
+<style>
+  .wrap { padding: 1rem 0; font-size: 14px; color: var(--color-text-primary); }
+  .section { margin-bottom: 2rem; }
+  .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .section-title { font-size: 15px; font-weight: 500; }
+  .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; }
+  .badge-customer { background: #E6F1FB; color: #0C447C; }
+  .badge-admin { background: #FAEEDA; color: #633806; }
+  .badge-both { background: #EAF3DE; color: #27500A; }
+  .route-list { display: flex; flex-direction: column; gap: 6px; }
+  .route { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--border-radius-md); background: var(--color-background-secondary); }
+  .method { font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px; text-align: center; font-family: var(--font-mono); }
+  .get    { background: #EAF3DE; color: #3B6D11; }
+  .post   { background: #E6F1FB; color: #185FA5; }
+  .put    { background: #FAEEDA; color: #854F0B; }
+  .patch  { background: #EEEDFE; color: #3C3489; }
+  .delete { background: #FCEBEB; color: #A32D2D; }
+  .path   { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-primary); }
+  .desc   { font-size: 12px; color: var(--color-text-secondary); text-align: right; }
+  .cols   { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 500px) { .cols { grid-template-columns: 1fr; } .route { grid-template-columns: 54px 1fr; } .desc { display: none; } }
+</style>
+
+<div class="wrap">
+
+  <!-- AUTH -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-lock" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Auth</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method post">POST</span><span class="path">/api/auth/register</span><span class="desc">Register new customer</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/auth/login</span><span class="desc">Customer login</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/auth/logout</span><span class="desc">Invalidate token</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/auth/refresh-token</span><span class="desc">Refresh JWT</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/auth/forgot-password</span><span class="desc">Send reset email</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/auth/reset-password</span><span class="desc">Reset with token</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/auth/verify-email/:token</span><span class="desc">Verify email address</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/admin/auth/login</span><span class="desc">Admin login</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/admin/auth/logout</span><span class="desc">Admin logout</span></div>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-shoe" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Products</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="cols">
+      <div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px;">Customer</p>
+        <div class="route-list">
+          <div class="route"><span class="method get">GET</span><span class="path">/api/products</span><span class="desc">List + filter + search</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/products/:slug</span><span class="desc">Single product detail</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/products/featured</span><span class="desc">Featured products</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/products/new-arrivals</span><span class="desc">New arrivals</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/products/best-sellers</span><span class="desc">Best sellers</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/products/:id/related</span><span class="desc">Related products</span></div>
+        </div>
+      </div>
+      <div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px;">Admin</p>
+        <div class="route-list">
+          <div class="route"><span class="method get">GET</span><span class="path">/api/admin/products</span><span class="desc">All products + stats</span></div>
+          <div class="route"><span class="method post">POST</span><span class="path">/api/admin/products</span><span class="desc">Create product</span></div>
+          <div class="route"><span class="method put">PUT</span><span class="path">/api/admin/products/:id</span><span class="desc">Update product</span></div>
+          <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/products/:id</span><span class="desc">Delete product</span></div>
+          <div class="route"><span class="method post">POST</span><span class="path">/api/admin/products/:id/images</span><span class="desc">Upload images</span></div>
+          <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/products/:id/images/:imgId</span><span class="desc">Delete image</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIANTS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-color-swatch" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Variants (sizes & colors)</span>
+      <span class="badge badge-admin">admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/products/:id/variants</span><span class="desc">List variants</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/admin/products/:id/variants</span><span class="desc">Add variant</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/admin/variants/:variantId</span><span class="desc">Update size/stock/price</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/variants/:variantId</span><span class="desc">Remove variant</span></div>
+    </div>
+  </div>
+
+  <!-- CATEGORIES & BRANDS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-tag" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Categories & Brands</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="cols">
+      <div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px;">Categories</p>
+        <div class="route-list">
+          <div class="route"><span class="method get">GET</span><span class="path">/api/categories</span><span class="desc">All categories</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/categories/:slug/products</span><span class="desc">Products by category</span></div>
+          <div class="route"><span class="method post">POST</span><span class="path">/api/admin/categories</span><span class="desc">Create</span></div>
+          <div class="route"><span class="method put">PUT</span><span class="path">/api/admin/categories/:id</span><span class="desc">Update</span></div>
+          <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/categories/:id</span><span class="desc">Delete</span></div>
+        </div>
+      </div>
+      <div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px;">Brands</p>
+        <div class="route-list">
+          <div class="route"><span class="method get">GET</span><span class="path">/api/brands</span><span class="desc">All brands</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/brands/:slug/products</span><span class="desc">Products by brand</span></div>
+          <div class="route"><span class="method post">POST</span><span class="path">/api/admin/brands</span><span class="desc">Create</span></div>
+          <div class="route"><span class="method put">PUT</span><span class="path">/api/admin/brands/:id</span><span class="desc">Update</span></div>
+          <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/brands/:id</span><span class="desc">Delete</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CART -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-shopping-cart" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Cart</span>
+      <span class="badge badge-customer">customer</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/cart</span><span class="desc">Get current cart</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/cart/items</span><span class="desc">Add item to cart</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/cart/items/:itemId</span><span class="desc">Update quantity</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/cart/items/:itemId</span><span class="desc">Remove item</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/cart/clear</span><span class="desc">Clear cart</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/cart/apply-coupon</span><span class="desc">Apply coupon code</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/cart/remove-coupon</span><span class="desc">Remove coupon</span></div>
+    </div>
+  </div>
+
+  <!-- WISHLIST -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-heart" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Wishlist</span>
+      <span class="badge badge-customer">customer</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/wishlist</span><span class="desc">Get wishlist</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/wishlist/:productId</span><span class="desc">Add to wishlist</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/wishlist/:productId</span><span class="desc">Remove from wishlist</span></div>
+    </div>
+  </div>
+
+  <!-- ORDERS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-package" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Orders</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="cols">
+      <div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px;">Customer</p>
+        <div class="route-list">
+          <div class="route"><span class="method post">POST</span><span class="path">/api/orders/checkout</span><span class="desc">Place order</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/orders</span><span class="desc">My orders</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/orders/:orderNumber</span><span class="desc">Order detail</span></div>
+          <div class="route"><span class="method post">POST</span><span class="path">/api/orders/:id/cancel</span><span class="desc">Cancel order</span></div>
+        </div>
+      </div>
+      <div>
+        <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 8px;">Admin</p>
+        <div class="route-list">
+          <div class="route"><span class="method get">GET</span><span class="path">/api/admin/orders</span><span class="desc">All orders + filters</span></div>
+          <div class="route"><span class="method get">GET</span><span class="path">/api/admin/orders/:id</span><span class="desc">Order detail</span></div>
+          <div class="route"><span class="method patch">PATCH</span><span class="path">/api/admin/orders/:id/status</span><span class="desc">Update status</span></div>
+          <div class="route"><span class="method patch">PATCH</span><span class="path">/api/admin/orders/:id/payment</span><span class="desc">Update payment status</span></div>
+          <div class="route"><span class="method post">POST</span><span class="path">/api/admin/orders/:id/refund</span><span class="desc">Issue refund</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAYMENTS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-credit-card" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Payments</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method post">POST</span><span class="path">/api/payments/mpesa/stk-push</span><span class="desc">Initiate M-Pesa STK push</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/payments/mpesa/callback</span><span class="desc">M-Pesa callback (Safaricom)</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/payments/mpesa/status/:checkoutId</span><span class="desc">Query STK push status</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/payments/verify/:orderId</span><span class="desc">Manually verify payment</span></div>
+    </div>
+  </div>
+
+  <!-- USER PROFILE & ADDRESSES -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-user-circle" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Profile & Addresses</span>
+      <span class="badge badge-customer">customer</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/profile</span><span class="desc">Get my profile</span></div>
+      <div class="route"><span class="method put">PUT</span><span class="path">/api/profile</span><span class="desc">Update profile</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/profile/change-password</span><span class="desc">Change password</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/profile/avatar</span><span class="desc">Upload avatar</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/profile/addresses</span><span class="desc">My saved addresses</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/profile/addresses</span><span class="desc">Add address</span></div>
+      <div class="route"><span class="method put">PUT</span><span class="path">/api/profile/addresses/:id</span><span class="desc">Update address</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/profile/addresses/:id</span><span class="desc">Delete address</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/profile/addresses/:id/default</span><span class="desc">Set as default</span></div>
+    </div>
+  </div>
+
+  <!-- REVIEWS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-star" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Reviews</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/products/:id/reviews</span><span class="desc">Get product reviews</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/products/:id/reviews</span><span class="desc">Submit review</span></div>
+      <div class="route"><span class="method put">PUT</span><span class="path">/api/reviews/:id</span><span class="desc">Edit my review</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/reviews/:id</span><span class="desc">Delete my review</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/reviews</span><span class="desc">All reviews (pending/approved)</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/admin/reviews/:id/approve</span><span class="desc">Approve review</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/reviews/:id</span><span class="desc">Remove review</span></div>
+    </div>
+  </div>
+
+  <!-- COUPONS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-discount" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Coupons</span>
+      <span class="badge badge-admin">admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/coupons</span><span class="desc">List all coupons</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/admin/coupons</span><span class="desc">Create coupon</span></div>
+      <div class="route"><span class="method put">PUT</span><span class="path">/api/admin/coupons/:id</span><span class="desc">Update coupon</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/coupons/:id</span><span class="desc">Delete coupon</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/coupons/validate</span><span class="desc">Validate a coupon code</span></div>
+    </div>
+  </div>
+
+  <!-- BANNERS & HOMEPAGE -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-photo" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Banners & Homepage</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/banners</span><span class="desc">Active banners (hero/promo)</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/homepage</span><span class="desc">All homepage data in one call</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/banners</span><span class="desc">All banners</span></div>
+      <div class="route"><span class="method post">POST</span><span class="path">/api/admin/banners</span><span class="desc">Create banner</span></div>
+      <div class="route"><span class="method put">PUT</span><span class="path">/api/admin/banners/:id</span><span class="desc">Update banner</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/admin/banners/:id</span><span class="desc">Delete banner</span></div>
+    </div>
+  </div>
+
+  <!-- CUSTOMERS (admin) -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-users" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Customers</span>
+      <span class="badge badge-admin">admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/customers</span><span class="desc">List all customers</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/customers/:id</span><span class="desc">Customer detail + order history</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/admin/customers/:id/status</span><span class="desc">Ban / activate account</span></div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-chart-bar" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Analytics & Dashboard</span>
+      <span class="badge badge-admin">admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/dashboard/stats</span><span class="desc">Revenue, orders, customers overview</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/dashboard/sales-chart</span><span class="desc">Sales over time (daily/weekly/monthly)</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/dashboard/top-products</span><span class="desc">Best-selling products</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/dashboard/low-stock</span><span class="desc">Low stock alerts</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/reports/orders</span><span class="desc">Order report export</span></div>
+    </div>
+  </div>
+
+  <!-- NEWSLETTER & NOTIFICATIONS -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-bell" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Newsletter & Notifications</span>
+      <span class="badge badge-both">customer + admin</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method post">POST</span><span class="path">/api/newsletter/subscribe</span><span class="desc">Subscribe to newsletter</span></div>
+      <div class="route"><span class="method delete">DEL</span><span class="path">/api/newsletter/unsubscribe</span><span class="desc">Unsubscribe</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/notifications</span><span class="desc">My in-app notifications</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/notifications/:id/read</span><span class="desc">Mark as read</span></div>
+      <div class="route"><span class="method patch">PATCH</span><span class="path">/api/notifications/read-all</span><span class="desc">Mark all as read</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/admin/subscribers</span><span class="desc">All newsletter subscribers</span></div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="section">
+    <div class="section-header">
+      <i class="ti ti-search" style="font-size:18px" aria-hidden="true"></i>
+      <span class="section-title">Search</span>
+      <span class="badge badge-customer">customer</span>
+    </div>
+    <div class="route-list">
+      <div class="route"><span class="method get">GET</span><span class="path">/api/search?q=</span><span class="desc">Full-text product search</span></div>
+      <div class="route"><span class="method get">GET</span><span class="path">/api/search/suggestions?q=</span><span class="desc">Autocomplete suggestions</span></div>
+    </div>
+  </div>
+
+</div>
