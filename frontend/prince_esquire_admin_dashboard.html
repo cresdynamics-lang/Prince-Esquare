@@ -1,0 +1,864 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.shell{display:flex;height:820px;background:var(--color-background-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;border:0.5px solid var(--color-border-tertiary)}
+
+/* sidebar */
+.sidebar{width:220px;min-width:220px;background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-logo{padding:20px 16px 16px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.logo-mark{display:flex;align-items:center;gap:8px}
+.logo-icon{width:32px;height:32px;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:500}
+.logo-text{font-size:14px;font-weight:500;color:var(--color-text-primary)}
+.logo-sub{font-size:11px;color:var(--color-text-secondary)}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.nav-section-label{font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:0.06em;text-transform:uppercase;padding:10px 8px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--border-radius-md);cursor:pointer;font-size:13px;color:var(--color-text-secondary);transition:all 0.15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.nav-item.active{background:#1a1a1a;color:#fff}
+.nav-item.active i{color:#fff}
+.nav-item i{font-size:16px;color:var(--color-text-tertiary);flex-shrink:0}
+.nav-item.active i{color:#fff}
+.nav-badge{margin-left:auto;background:var(--color-background-danger);color:var(--color-text-danger);font-size:10px;font-weight:500;padding:1px 6px;border-radius:20px}
+.sidebar-footer{padding:12px 8px;border-top:0.5px solid var(--color-border-tertiary)}
+
+/* main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:56px;background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:8px}
+.page-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.breadcrumb{font-size:12px;color:var(--color-text-secondary)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-icon{width:32px;height:32px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-secondary);font-size:16px}
+.avatar{width:32px;height:32px;border-radius:50%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#fff;cursor:pointer}
+
+/* content area */
+.content{flex:1;overflow-y:auto;padding:24px}
+
+/* stat cards */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:16px}
+.stat-label{font-size:12px;color:var(--color-text-secondary);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.stat-value{font-size:22px;font-weight:500;color:var(--color-text-primary)}
+.stat-change{font-size:11px;margin-top:4px}
+.stat-change.up{color:var(--color-text-success)}
+.stat-change.down{color:var(--color-text-danger)}
+
+/* section header */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-size:14px;font-weight:500;color:var(--color-text-primary)}
+.btn-sm{font-size:12px;padding:5px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;display:flex;align-items:center;gap:5px}
+
+/* table */
+.table-wrap{background:var(--color-background-primary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);overflow:hidden;margin-bottom:24px}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);background:var(--color-background-secondary);border-bottom:0.5px solid var(--color-border-tertiary);letter-spacing:0.03em;text-transform:uppercase}
+.data-table td{padding:11px 14px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--color-background-secondary)}
+.badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-success{background:var(--color-background-success);color:var(--color-text-success)}
+.badge-warning{background:var(--color-background-warning);color:var(--color-text-warning)}
+.badge-danger{background:var(--color-background-danger);color:var(--color-text-danger)}
+.badge-info{background:var(--color-background-info);color:var(--color-text-info)}
+.badge-neutral{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.cell-user{display:flex;align-items:center;gap:10px}
+.cell-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0}
+.action-btn{width:28px;height:28px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--color-text-secondary);font-size:14px;margin-left:4px}
+
+/* two-col layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.panel{background:var(--color-background-primary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);overflow:hidden}
+.panel-header{padding:14px 16px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between}
+.panel-body{padding:12px 0}
+.list-item{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;font-size:13px}
+.list-item:hover{background:var(--color-background-secondary)}
+.list-left{display:flex;align-items:center;gap:10px}
+.list-rank{font-size:11px;font-weight:500;color:var(--color-text-tertiary);width:16px;text-align:center}
+.progress-bar-bg{width:80px;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;border-radius:2px;background:#1a1a1a}
+
+/* search bar */
+.search-bar{display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:6px 10px;margin-bottom:16px;font-size:13px;color:var(--color-text-secondary)}
+.search-bar input{background:none;border:none;outline:none;font-size:13px;color:var(--color-text-primary);flex:1;font-family:var(--font-sans)}
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-chip{font-size:12px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer}
+.filter-chip.active-chip{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+
+/* mini chart bars */
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:40px;padding:0 16px 12px}
+.mini-bar{flex:1;background:#1a1a1a;border-radius:2px 2px 0 0;opacity:0.15;min-height:4px}
+.mini-bar.hi{opacity:0.9}
+.mini-bar.mid{opacity:0.55}
+</style>
+
+<h2 class="sr-only">Prince Esquire admin dashboard with sidebar navigation. Click any sidebar item to switch views.</h2>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">PE</div>
+        <div>
+          <div class="logo-text">Prince Esquire</div>
+          <div class="logo-sub">Admin Panel</div>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <button class="nav-item active" onclick="showSection('dashboard',this)" aria-current="page">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+      </button>
+      <div class="nav-section-label">Store</div>
+      <button class="nav-item" onclick="showSection('orders',this)">
+        <i class="ti ti-package" aria-hidden="true"></i> Orders
+        <span class="nav-badge">12</span>
+      </button>
+      <button class="nav-item" onclick="showSection('products',this)">
+        <i class="ti ti-shoe" aria-hidden="true"></i> Products
+      </button>
+      <button class="nav-item" onclick="showSection('categories',this)">
+        <i class="ti ti-tag" aria-hidden="true"></i> Categories
+      </button>
+      <button class="nav-item" onclick="showSection('brands',this)">
+        <i class="ti ti-rosette" aria-hidden="true"></i> Brands
+      </button>
+      <div class="nav-section-label">People</div>
+      <button class="nav-item" onclick="showSection('customers',this)">
+        <i class="ti ti-users" aria-hidden="true"></i> Customers
+      </button>
+      <button class="nav-item" onclick="showSection('admins',this)">
+        <i class="ti ti-shield-check" aria-hidden="true"></i> Admins
+      </button>
+      <div class="nav-section-label">Marketing</div>
+      <button class="nav-item" onclick="showSection('coupons',this)">
+        <i class="ti ti-discount-2" aria-hidden="true"></i> Coupons
+      </button>
+      <button class="nav-item" onclick="showSection('banners',this)">
+        <i class="ti ti-photo" aria-hidden="true"></i> Banners
+      </button>
+      <button class="nav-item" onclick="showSection('newsletter',this)">
+        <i class="ti ti-mail" aria-hidden="true"></i> Newsletter
+      </button>
+      <div class="nav-section-label">Finance</div>
+      <button class="nav-item" onclick="showSection('payments',this)">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Payments
+      </button>
+      <button class="nav-item" onclick="showSection('reviews',this)">
+        <i class="ti ti-star" aria-hidden="true"></i> Reviews
+        <span class="nav-badge">5</span>
+      </button>
+      <div class="nav-section-label">System</div>
+      <button class="nav-item" onclick="showSection('settings',this)">
+        <i class="ti ti-settings" aria-hidden="true"></i> Settings
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" onclick="showSection('logout',this)">
+        <i class="ti ti-logout" aria-hidden="true"></i> Logout
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="breadcrumb" id="breadcrumb">Admin /</span>
+        <span class="page-title" id="page-title">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-icon" aria-label="Notifications"><i class="ti ti-bell" aria-hidden="true"></i></div>
+        <div class="topbar-icon" aria-label="Search"><i class="ti ti-search" aria-hidden="true"></i></div>
+        <div class="avatar" aria-label="Admin profile">AD</div>
+      </div>
+    </div>
+
+    <div class="content" id="content-area">
+      <!-- content injected by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+const sections = {
+  dashboard: {
+    title: 'Dashboard',
+    render: () => `
+      <div class="stat-grid">
+        ${[
+          {label:'Total Revenue',icon:'ti-currency-dollar',val:'KSh 4,821,300',change:'+18% this month',up:true},
+          {label:'Total Orders',icon:'ti-package',val:'1,243',change:'+9% this month',up:true},
+          {label:'Customers',icon:'ti-users',val:'847',change:'+23 new today',up:true},
+          {label:'Pending Orders',icon:'ti-clock',val:'12',change:'Needs attention',up:false}
+        ].map(s=>`
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ${s.icon}" aria-hidden="true" style="font-size:14px"></i>${s.label}</div>
+            <div class="stat-value">${s.val}</div>
+            <div class="stat-change ${s.up?'up':'down'}">${s.up?'↑':'↓'} ${s.change}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header"><span class="section-title">Recent orders</span><button class="btn-sm" onclick="showSection('orders',null)"><i class="ti ti-arrow-right" aria-hidden="true"></i> View all</button></div>
+          <div class="panel-body">
+            ${[
+              {num:'#PE-0412',cust:'James Mwangi',amount:'KSh 18,500',status:'pending'},
+              {num:'#PE-0411',cust:'Aisha Ochieng',amount:'KSh 9,750',status:'confirmed'},
+              {num:'#PE-0410',cust:'Kevin Njoroge',amount:'KSh 34,200',status:'shipped'},
+              {num:'#PE-0409',cust:'Fatuma Hassan',amount:'KSh 12,000',status:'delivered'},
+              {num:'#PE-0408',cust:'Brian Kamau',amount:'KSh 7,900',status:'cancelled'},
+            ].map(o=>`
+              <div class="list-item">
+                <div class="list-left">
+                  <div class="list-rank">#</div>
+                  <div>
+                    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${o.num}</div>
+                    <div style="font-size:11px;color:var(--color-text-secondary)">${o.cust}</div>
+                  </div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:13px;font-weight:500">${o.amount}</div>
+                  <span class="badge badge-${o.status==='delivered'?'success':o.status==='pending'?'warning':o.status==='cancelled'?'danger':o.status==='shipped'?'info':'neutral'}">${o.status}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="section-title">Top products</span><button class="btn-sm" onclick="showSection('products',null)"><i class="ti ti-arrow-right" aria-hidden="true"></i> View all</button></div>
+          <div class="panel-body">
+            ${[
+              {name:'Air Force 1 x North Face',sales:142,pct:90},
+              {name:'Adidas Samba Classic Low-Top',sales:118,pct:75},
+              {name:'Jordan 1 Retro High OG',sales:97,pct:62},
+              {name:'New Balance 550',sales:83,pct:53},
+              {name:'Balenciaga Track Trainer',sales:61,pct:39},
+            ].map((p,i)=>`
+              <div class="list-item">
+                <div class="list-left">
+                  <div class="list-rank">${i+1}</div>
+                  <div style="font-size:13px;color:var(--color-text-primary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${p.pct}%"></div></div>
+                  <span style="font-size:12px;color:var(--color-text-secondary);width:28px;text-align:right">${p.sales}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="mini-chart">
+            ${[30,50,40,70,55,80,60,90,75,95,65,100].map((h,i)=>`<div class="mini-bar ${h>80?'hi':h>55?'mid':''}" style="height:${h}%"></div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="section-header"><span class="section-title">Low stock alerts</span></div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Low stock alerts">
+          <thead><tr><th>Product</th><th>Size</th><th>Brand</th><th>Stock</th><th>Status</th></tr></thead>
+          <tbody>
+            ${[
+              {name:'Nike Pegasus 40',size:'EU 42',brand:'Nike',stock:2},
+              {name:'Adidas Gazelle Suede',size:'EU 40',brand:'Adidas',stock:1},
+              {name:'Jordan 4 Retro',size:'EU 44',brand:'Jordan',stock:3},
+            ].map(r=>`
+              <tr>
+                <td style="font-weight:500">${r.name}</td>
+                <td>${r.size}</td>
+                <td>${r.brand}</td>
+                <td style="font-weight:500">${r.stock}</td>
+                <td><span class="badge badge-danger">Low stock</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  orders: {
+    title: 'Orders',
+    render: () => `
+      <div class="stat-grid">
+        ${[
+          {label:'Total Orders',icon:'ti-package',val:'1,243',change:'All time'},
+          {label:'Pending',icon:'ti-clock',val:'12',change:'Needs action',up:false},
+          {label:'Shipped',icon:'ti-truck',val:'38',change:'In transit'},
+          {label:'Delivered',icon:'ti-circle-check',val:'1,143',change:'Completed',up:true}
+        ].map(s=>`
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ${s.icon}" aria-hidden="true" style="font-size:14px"></i>${s.label}</div>
+            <div class="stat-value">${s.val}</div>
+            <div class="stat-change ${s.up===false?'down':'up'}">${s.change}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="filter-row">
+        ${['All','Pending','Confirmed','Processing','Shipped','Delivered','Cancelled','Refunded'].map((f,i)=>`<span class="filter-chip ${i===0?'active-chip':''}" onclick="filterChip(this)">${f}</span>`).join('')}
+      </div>
+      <div class="search-bar"><i class="ti ti-search" aria-hidden="true"></i><input placeholder="Search by order number or customer name…" aria-label="Search orders"></div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Orders list">
+          <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {num:'#PE-0412',cust:'James Mwangi',date:'13 May 2026',items:2,total:'KSh 18,500',pay:'M-Pesa',status:'pending'},
+              {num:'#PE-0411',cust:'Aisha Ochieng',date:'13 May 2026',items:1,total:'KSh 9,750',pay:'M-Pesa',status:'confirmed'},
+              {num:'#PE-0410',cust:'Kevin Njoroge',date:'12 May 2026',items:3,total:'KSh 34,200',pay:'Card',status:'shipped'},
+              {num:'#PE-0409',cust:'Fatuma Hassan',date:'12 May 2026',items:1,total:'KSh 12,000',pay:'M-Pesa',status:'delivered'},
+              {num:'#PE-0408',cust:'Brian Kamau',date:'11 May 2026',items:2,total:'KSh 7,900',pay:'COD',status:'cancelled'},
+              {num:'#PE-0407',cust:'Grace Wanjiru',date:'11 May 2026',items:4,total:'KSh 52,000',pay:'Card',status:'delivered'},
+              {num:'#PE-0406',cust:'David Omondi',date:'10 May 2026',items:1,total:'KSh 6,500',pay:'M-Pesa',status:'processing'},
+            ].map(o=>`
+              <tr>
+                <td style="font-weight:500;color:var(--color-text-info)">${o.num}</td>
+                <td>${o.cust}</td>
+                <td style="color:var(--color-text-secondary)">${o.date}</td>
+                <td>${o.items}</td>
+                <td style="font-weight:500">${o.total}</td>
+                <td><span class="badge badge-neutral">${o.pay}</span></td>
+                <td><span class="badge badge-${o.status==='delivered'?'success':o.status==='pending'?'warning':o.status==='cancelled'?'danger':o.status==='shipped'?'info':'neutral'}">${o.status}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="View order"><i class="ti ti-eye" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Edit order"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  customers: {
+    title: 'Customers',
+    render: () => `
+      <div class="stat-grid">
+        ${[
+          {label:'Total Customers',icon:'ti-users',val:'847',change:'+23 this week',up:true},
+          {label:'Active',icon:'ti-user-check',val:'810',change:'95.6% of all',up:true},
+          {label:'Banned',icon:'ti-user-off',val:'7',change:'0.8% of all',up:false},
+          {label:'New Today',icon:'ti-user-plus',val:'23',change:'vs 18 yesterday',up:true}
+        ].map(s=>`
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ${s.icon}" aria-hidden="true" style="font-size:14px"></i>${s.label}</div>
+            <div class="stat-value">${s.val}</div>
+            <div class="stat-change ${s.up?'up':'down'}">${s.up?'↑':'↓'} ${s.change}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="section-header">
+        <span class="section-title">All customers</span>
+        <button class="btn-sm"><i class="ti ti-download" aria-hidden="true"></i> Export CSV</button>
+      </div>
+      <div class="search-bar"><i class="ti ti-search" aria-hidden="true"></i><input placeholder="Search by name, email or phone…" aria-label="Search customers"></div>
+      <div class="filter-row">
+        ${['All','Active','Verified','Unverified','Banned'].map((f,i)=>`<span class="filter-chip ${i===0?'active-chip':''}" onclick="filterChip(this)">${f}</span>`).join('')}
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Customers list">
+          <thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Orders</th><th>Spent</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {name:'James Mwangi',init:'JM',col:'#E6F1FB',tcol:'#0C447C',email:'j.mwangi@gmail.com',phone:'+254 712 345 678',orders:14,spent:'KSh 182,000',joined:'Jan 2025',status:'active',verified:true},
+              {name:'Aisha Ochieng',init:'AO',col:'#FAEEDA',tcol:'#633806',email:'aisha.o@outlook.com',phone:'+254 723 456 789',orders:7,spent:'KSh 64,500',joined:'Mar 2025',status:'active',verified:true},
+              {name:'Kevin Njoroge',init:'KN',col:'#EAF3DE',tcol:'#27500A',email:'kevin.n@gmail.com',phone:'+254 734 567 890',orders:3,spent:'KSh 28,200',joined:'Apr 2025',status:'active',verified:false},
+              {name:'Fatuma Hassan',init:'FH',col:'#EEEDFE',tcol:'#3C3489',email:'fatuma.h@yahoo.com',phone:'+254 745 678 901',orders:22,spent:'KSh 310,000',joined:'Aug 2024',status:'active',verified:true},
+              {name:'Brian Kamau',init:'BK',col:'#FAECE7',tcol:'#712B13',email:'b.kamau@gmail.com',phone:'+254 756 789 012',orders:1,spent:'KSh 7,900',joined:'May 2026',status:'active',verified:false},
+              {name:'Grace Wanjiru',init:'GW',col:'#E1F5EE',tcol:'#085041',email:'grace.w@gmail.com',phone:'+254 767 890 123',orders:9,spent:'KSh 97,400',joined:'Nov 2024',status:'active',verified:true},
+              {name:'David Omondi',init:'DO',col:'#F1EFE8',tcol:'#444441',email:'d.omondi@gmail.com',phone:'+254 778 901 234',orders:0,spent:'KSh 0',joined:'May 2026',status:'banned',verified:false},
+            ].map(c=>`
+              <tr>
+                <td>
+                  <div class="cell-user">
+                    <div class="cell-avatar" style="background:${c.col};color:${c.tcol}">${c.init}</div>
+                    <div>
+                      <div style="font-weight:500;font-size:13px">${c.name}</div>
+                      ${c.verified?`<div style="font-size:11px;color:var(--color-text-success)"><i class="ti ti-circle-check" style="font-size:11px" aria-hidden="true"></i> Verified</div>`:`<div style="font-size:11px;color:var(--color-text-secondary)">Unverified</div>`}
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${c.email}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${c.phone}</td>
+                <td style="text-align:center;font-weight:500">${c.orders}</td>
+                <td style="font-weight:500">${c.spent}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${c.joined}</td>
+                <td><span class="badge badge-${c.status==='active'?'success':'danger'}">${c.status}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="View customer"><i class="ti ti-eye" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Edit customer"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="${c.status==='active'?'Ban':'Unban'} customer"><i class="ti ti-${c.status==='active'?'user-off':'user-check'}" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  products: {
+    title: 'Products',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">All products (284)</span>
+        <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Add product</button>
+      </div>
+      <div class="search-bar"><i class="ti ti-search" aria-hidden="true"></i><input placeholder="Search by product name, SKU or brand…" aria-label="Search products"></div>
+      <div class="filter-row">
+        ${['All','Shoes','Clothing','Accessories','Featured','New Arrivals','Low Stock'].map((f,i)=>`<span class="filter-chip ${i===0?'active-chip':''}" onclick="filterChip(this)">${f}</span>`).join('')}
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Products list">
+          <thead><tr><th>Product</th><th>SKU</th><th>Brand</th><th>Type</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {name:'Air Force 1 × North Face Sneakers',sku:'NK-AF1-NF-001',brand:'Nike',type:'Shoes',price:'KSh 24,750',stock:18,status:'active',featured:true},
+              {name:'Adidas Samba Classic Low-Top',sku:'AD-SMB-CL-002',brand:'Adidas',type:'Shoes',price:'KSh 14,750',stock:31,status:'active',featured:false},
+              {name:'Jordan 1 Retro High OG',sku:'JD-1-RHO-003',brand:'Jordan',type:'Shoes',price:'KSh 32,000',stock:7,status:'active',featured:true},
+              {name:'AirFlex Max Cushion Sneakers',sku:'NK-AMX-004',brand:'Nike',type:'Shoes',price:'KSh 6,450',stock:2,status:'active',featured:false},
+              {name:'Berluti Crocodile Loafers',sku:'BE-CRO-005',brand:'Berluti',type:'Shoes',price:'KSh 68,500',stock:4,status:'active',featured:true},
+              {name:'Balenciaga Track Trainer',sku:'BA-TRK-006',brand:'Balenciaga',type:'Shoes',price:'KSh 98,000',stock:0,status:'inactive',featured:false},
+              {name:'Stone Island Cargo Jacket',sku:'SI-CGJ-007',brand:'Stone Island',type:'Clothing',price:'KSh 45,000',stock:9,status:'active',featured:false},
+            ].map(p=>`
+              <tr>
+                <td>
+                  <div style="font-weight:500;font-size:13px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+                  ${p.featured?`<span style="font-size:10px;color:var(--color-text-warning)"><i class="ti ti-star" style="font-size:10px" aria-hidden="true"></i> Featured</span>`:''}
+                </td>
+                <td style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono)">${p.sku}</td>
+                <td>${p.brand}</td>
+                <td><span class="badge badge-neutral">${p.type}</span></td>
+                <td style="font-weight:500">${p.price}</td>
+                <td><span style="font-weight:500;color:${p.stock===0?'var(--color-text-danger)':p.stock<5?'var(--color-text-warning)':'var(--color-text-primary)'}">${p.stock===0?'Out of stock':p.stock}</span></td>
+                <td><span class="badge badge-${p.status==='active'?'success':'neutral'}">${p.status}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="View product"><i class="ti ti-eye" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Edit product"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete product"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  categories: {
+    title: 'Categories',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">All categories (12)</span>
+        <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Add category</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Categories list">
+          <thead><tr><th>Name</th><th>Slug</th><th>Gender</th><th>Parent</th><th>Products</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {name:'Sneakers',slug:'sneakers',gender:'Unisex',parent:'—',count:142,active:true},
+              {name:'Clothing',slug:'clothing',gender:'Unisex',parent:'—',count:88,active:true},
+              {name:'Accessories',slug:'accessories',gender:'Unisex',parent:'—',count:34,active:true},
+              {name:"Men's Shoes",slug:'mens-shoes',gender:'Men',parent:'Sneakers',count:76,active:true},
+              {name:"Women's Shoes",slug:'womens-shoes',gender:'Women',parent:'Sneakers',count:66,active:true},
+              {name:'Hoodies',slug:'hoodies',gender:'Unisex',parent:'Clothing',count:21,active:true},
+              {name:'Jackets',slug:'jackets',gender:'Unisex',parent:'Clothing',count:18,active:false},
+            ].map(c=>`
+              <tr>
+                <td style="font-weight:500">${c.name}</td>
+                <td style="font-family:var(--font-mono);font-size:12px;color:var(--color-text-secondary)">${c.slug}</td>
+                <td>${c.gender}</td>
+                <td style="color:var(--color-text-secondary)">${c.parent}</td>
+                <td style="text-align:center">${c.count}</td>
+                <td><span class="badge badge-${c.active?'success':'neutral'}">${c.active?'active':'inactive'}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="Edit category"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete category"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  brands: {
+    title: 'Brands',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">All brands (10)</span>
+        <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Add brand</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Brands list">
+          <thead><tr><th>Brand</th><th>Slug</th><th>Products</th><th>Featured</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {name:'Nike',slug:'nike',count:68,featured:true,active:true},
+              {name:'Adidas',slug:'adidas',count:54,featured:true,active:true},
+              {name:'Jordan',slug:'jordan',count:42,featured:true,active:true},
+              {name:'New Balance',slug:'new-balance',count:31,featured:true,active:true},
+              {name:'Balenciaga',slug:'balenciaga',count:18,featured:true,active:true},
+              {name:'Puma',slug:'puma',count:22,featured:false,active:true},
+              {name:'Vans',slug:'vans',count:15,featured:false,active:true},
+              {name:'Stone Island',slug:'stone-island',count:11,featured:false,active:false},
+            ].map(b=>`
+              <tr>
+                <td style="font-weight:500">${b.name}</td>
+                <td style="font-family:var(--font-mono);font-size:12px;color:var(--color-text-secondary)">${b.slug}</td>
+                <td style="text-align:center">${b.count}</td>
+                <td>${b.featured?`<span class="badge badge-warning"><i class="ti ti-star" style="font-size:10px" aria-hidden="true"></i> Yes</span>`:`<span style="color:var(--color-text-tertiary);font-size:12px">No</span>`}</td>
+                <td><span class="badge badge-${b.active?'success':'neutral'}">${b.active?'active':'inactive'}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="Edit brand"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete brand"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  coupons: {
+    title: 'Coupons',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">All coupons (8)</span>
+        <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Create coupon</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Coupons list">
+          <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Uses</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {code:'WELCOME20',type:'Percentage',val:'20%',min:'KSh 5,000',uses:'34/100',exp:'31 Dec 2026',active:true},
+              {code:'FREESHIP',type:'Fixed',val:'KSh 500',min:'KSh 3,000',uses:'201/—',exp:'Never',active:true},
+              {code:'SUMMER15',type:'Percentage',val:'15%',min:'KSh 8,000',uses:'89/200',exp:'30 Jun 2026',active:true},
+              {code:'VIP50',type:'Percentage',val:'50%',min:'KSh 20,000',uses:'12/20',exp:'31 May 2026',active:true},
+              {code:'OLDCODE10',type:'Percentage',val:'10%',min:'—',uses:'500/500',exp:'1 Jan 2026',active:false},
+            ].map(c=>`
+              <tr>
+                <td style="font-family:var(--font-mono);font-weight:500;font-size:13px">${c.code}</td>
+                <td><span class="badge badge-neutral">${c.type}</span></td>
+                <td style="font-weight:500">${c.val}</td>
+                <td style="color:var(--color-text-secondary)">${c.min}</td>
+                <td style="color:var(--color-text-secondary)">${c.uses}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${c.exp}</td>
+                <td><span class="badge badge-${c.active?'success':'neutral'}">${c.active?'active':'expired'}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="Edit coupon"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete coupon"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  banners: {
+    title: 'Banners',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">All banners (5)</span>
+        <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Add banner</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Banners list">
+          <thead><tr><th>Title</th><th>Position</th><th>Sort</th><th>Starts</th><th>Ends</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {title:'Discover Excellence — Hero',pos:'Hero',sort:1,starts:'Always',ends:'Never',active:true},
+              {title:'Summer Sale Promo Strip',pos:'Promo',sort:1,starts:'1 Jun 2026',ends:'30 Jun 2026',active:false},
+              {title:'New Arrivals Sidebar',pos:'Sidebar',sort:1,starts:'Always',ends:'Never',active:true},
+              {title:'Welcome Popup — 20% Off',pos:'Popup',sort:1,starts:'Always',ends:'31 Dec 2026',active:true},
+            ].map(b=>`
+              <tr>
+                <td style="font-weight:500">${b.title}</td>
+                <td><span class="badge badge-info">${b.pos}</span></td>
+                <td style="text-align:center">${b.sort}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${b.starts}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${b.ends}</td>
+                <td><span class="badge badge-${b.active?'success':'neutral'}">${b.active?'active':'inactive'}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="Edit banner"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete banner"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  newsletter: {
+    title: 'Newsletter',
+    render: () => `
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        ${[
+          {label:'Total Subscribers',icon:'ti-mail',val:'2,841',change:'All time'},
+          {label:'Active',icon:'ti-circle-check',val:'2,710',change:'95.4% active',up:true},
+          {label:'Unsubscribed',icon:'ti-mail-off',val:'131',change:'4.6% churned',up:false}
+        ].map(s=>`
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ${s.icon}" aria-hidden="true" style="font-size:14px"></i>${s.label}</div>
+            <div class="stat-value">${s.val}</div>
+            <div class="stat-change ${s.up===false?'down':'up'}">${s.change}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="section-header">
+        <span class="section-title">Subscribers</span>
+        <button class="btn-sm"><i class="ti ti-download" aria-hidden="true"></i> Export</button>
+      </div>
+      <div class="search-bar"><i class="ti ti-search" aria-hidden="true"></i><input placeholder="Search by email…" aria-label="Search subscribers"></div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Newsletter subscribers">
+          <thead><tr><th>Email</th><th>Subscribed</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {email:'j.mwangi@gmail.com',date:'10 Jan 2025',active:true},
+              {email:'aisha.o@outlook.com',date:'22 Mar 2025',active:true},
+              {email:'kevin.n@gmail.com',date:'5 Apr 2025',active:true},
+              {email:'fatuma.h@yahoo.com',date:'1 Sep 2024',active:true},
+              {email:'grace.w@gmail.com',date:'14 Nov 2024',active:false},
+              {email:'david.o@gmail.com',date:'2 May 2026',active:true},
+            ].map(s=>`
+              <tr>
+                <td style="font-size:13px">${s.email}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${s.date}</td>
+                <td><span class="badge badge-${s.active?'success':'neutral'}">${s.active?'subscribed':'unsubscribed'}</span></td>
+                <td><button class="action-btn" aria-label="Remove subscriber"><i class="ti ti-trash" aria-hidden="true"></i></button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  payments: {
+    title: 'Payments',
+    render: () => `
+      <div class="stat-grid">
+        ${[
+          {label:'Total Revenue',icon:'ti-currency-dollar',val:'KSh 4.82M',change:'All time',up:true},
+          {label:'This Month',icon:'ti-calendar',val:'KSh 421,300',change:'+18% vs last month',up:true},
+          {label:'M-Pesa',icon:'ti-device-mobile',val:'78%',change:'of all payments'},
+          {label:'Failed Payments',icon:'ti-alert-circle',val:'14',change:'This month',up:false}
+        ].map(s=>`
+          <div class="stat-card">
+            <div class="stat-label"><i class="ti ${s.icon}" aria-hidden="true" style="font-size:14px"></i>${s.label}</div>
+            <div class="stat-value">${s.val}</div>
+            <div class="stat-change ${s.up===false?'down':'up'}">${s.change}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="section-header"><span class="section-title">Payment transactions</span></div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Payments list">
+          <thead><tr><th>Reference</th><th>Order</th><th>Customer</th><th>Method</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody>
+            ${[
+              {ref:'MP240513001',order:'#PE-0412',cust:'James Mwangi',method:'M-Pesa',amount:'KSh 18,500',date:'13 May 2026',status:'success'},
+              {ref:'MP240513002',order:'#PE-0411',cust:'Aisha Ochieng',method:'M-Pesa',amount:'KSh 9,750',date:'13 May 2026',status:'success'},
+              {ref:'CD240512001',order:'#PE-0410',cust:'Kevin Njoroge',method:'Card',amount:'KSh 34,200',date:'12 May 2026',status:'success'},
+              {ref:'MP240512002',order:'#PE-0409',cust:'Fatuma Hassan',method:'M-Pesa',amount:'KSh 12,000',date:'12 May 2026',status:'refunded'},
+              {ref:'MP240511003',order:'#PE-0408',cust:'Brian Kamau',method:'M-Pesa',amount:'KSh 7,900',date:'11 May 2026',status:'failed'},
+            ].map(p=>`
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px">${p.ref}</td>
+                <td style="color:var(--color-text-info)">${p.order}</td>
+                <td>${p.cust}</td>
+                <td><span class="badge badge-neutral">${p.method}</span></td>
+                <td style="font-weight:500">${p.amount}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${p.date}</td>
+                <td><span class="badge badge-${p.status==='success'?'success':p.status==='refunded'?'warning':'danger'}">${p.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  reviews: {
+    title: 'Reviews',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">Pending approval (5)</span>
+      </div>
+      <div class="filter-row">
+        ${['All','Pending','Approved','Rejected'].map((f,i)=>`<span class="filter-chip ${i===0?'active-chip':''}" onclick="filterChip(this)">${f}</span>`).join('')}
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Reviews list">
+          <thead><tr><th>Customer</th><th>Product</th><th>Rating</th><th>Review</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {cust:'James Mwangi',product:'Air Force 1 × North Face',rating:5,text:'Absolutely love these. Quality is top notch.',date:'12 May 2026',status:'pending'},
+              {cust:'Aisha Ochieng',product:'Adidas Samba Classic',rating:4,text:'Great sneakers, delivery was fast!',date:'11 May 2026',status:'approved'},
+              {cust:'Grace Wanjiru',product:'Jordan 1 Retro High OG',rating:5,text:'Worth every shilling. Highly recommend.',date:'10 May 2026',status:'pending'},
+              {cust:'Brian Kamau',product:'AirFlex Max Cushion',rating:2,text:'Sizing runs small, had to return.',date:'10 May 2026',status:'pending'},
+            ].map(r=>`
+              <tr>
+                <td style="font-weight:500">${r.cust}</td>
+                <td style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.product}</td>
+                <td>${'★'.repeat(r.rating)}<span style="color:var(--color-text-tertiary)">${'★'.repeat(5-r.rating)}</span></td>
+                <td style="font-size:12px;color:var(--color-text-secondary);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.text}</td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${r.date}</td>
+                <td><span class="badge badge-${r.status==='approved'?'success':'warning'}">${r.status}</span></td>
+                <td>
+                  <button class="action-btn" aria-label="Approve review"><i class="ti ti-check" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete review"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  admins: {
+    title: 'Admins',
+    render: () => `
+      <div class="section-header">
+        <span class="section-title">Admin accounts (3)</span>
+        <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Add admin</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" aria-label="Admins list">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${[
+              {name:'Super Admin',init:'SA',col:'#1a1a1a',tc:'#fff',email:'admin@princeesquire.com',role:'superadmin',login:'13 May 2026, 09:14',active:true},
+              {name:'Store Manager',init:'SM',col:'#E6F1FB',tc:'#0C447C',email:'manager@princeesquire.com',role:'admin',login:'12 May 2026, 15:30',active:true},
+              {name:'Content Editor',init:'CE',col:'#EAF3DE',tc:'#27500A',email:'editor@princeesquire.com',role:'editor',login:'10 May 2026, 11:05',active:true},
+            ].map(a=>`
+              <tr>
+                <td>
+                  <div class="cell-user">
+                    <div class="cell-avatar" style="background:${a.col};color:${a.tc}">${a.init}</div>
+                    <span style="font-weight:500">${a.name}</span>
+                  </div>
+                </td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${a.email}</td>
+                <td><span class="badge badge-${a.role==='superadmin'?'danger':a.role==='admin'?'info':'neutral'}">${a.role}</span></td>
+                <td style="color:var(--color-text-secondary);font-size:12px">${a.login}</td>
+                <td><span class="badge badge-success">active</span></td>
+                <td>
+                  <button class="action-btn" aria-label="Edit admin"><i class="ti ti-edit" aria-hidden="true"></i></button>
+                  <button class="action-btn" aria-label="Delete admin"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  },
+
+  settings: {
+    title: 'Settings',
+    render: () => `
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header"><span class="section-title">Store information</span></div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            ${[
+              {label:'Store name',val:'Prince Esquire'},
+              {label:'Store email',val:'hello@princeesquire.com'},
+              {label:'Phone',val:'+254 700 000 000'},
+              {label:'Currency',val:'KES (KSh)'},
+              {label:'Country',val:'Kenya'},
+            ].map(f=>`
+              <div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">${f.label}</div>
+                <div style="font-size:13px;font-weight:500;background:var(--color-background-secondary);padding:8px 10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)">${f.val}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="section-title">Integrations</span></div>
+          <div class="panel-body">
+            ${[
+              {name:'M-Pesa (Daraja)',icon:'ti-device-mobile',status:'connected'},
+              {name:'Cloudinary (Images)',icon:'ti-cloud',status:'connected'},
+              {name:'SMTP Email',icon:'ti-mail',status:'connected'},
+              {name:'Google Analytics',icon:'ti-chart-bar',status:'not connected'},
+              {name:'Facebook Pixel',icon:'ti-brand-facebook',status:'not connected'},
+            ].map(i=>`
+              <div class="list-item">
+                <div class="list-left">
+                  <i class="ti ${i.icon}" aria-hidden="true" style="font-size:18px;color:var(--color-text-secondary)"></i>
+                  <span style="font-size:13px">${i.name}</span>
+                </div>
+                <span class="badge badge-${i.status==='connected'?'success':'neutral'}">${i.status}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="section-title">Shipping zones</span>
+          <button class="btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Add zone</button>
+        </div>
+        <div class="panel-body">
+          ${[
+            {zone:'Nairobi CBD & Westlands',fee:'KSh 200',time:'Same day'},
+            {zone:'Nairobi Suburbs',fee:'KSh 300',time:'Next day'},
+            {zone:'Kiambu, Machakos, Kajiado',fee:'KSh 400',time:'1–2 days'},
+            {zone:'Rest of Kenya',fee:'KSh 600',time:'2–4 days'},
+          ].map(z=>`
+            <div class="list-item">
+              <div class="list-left">
+                <i class="ti ti-map-pin" aria-hidden="true" style="font-size:16px;color:var(--color-text-secondary)"></i>
+                <div>
+                  <div style="font-size:13px;font-weight:500">${z.zone}</div>
+                  <div style="font-size:11px;color:var(--color-text-secondary)">${z.time}</div>
+                </div>
+              </div>
+              <span style="font-size:13px;font-weight:500">${z.fee}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+  }
+};
+
+function showSection(key, btn) {
+  if(!sections[key]) return;
+  document.getElementById('content-area').innerHTML = sections[key].render();
+  document.getElementById('page-title').textContent = sections[key].title;
+  document.getElementById('breadcrumb').textContent = 'Admin /';
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.classList.remove('active');
+    el.removeAttribute('aria-current');
+  });
+  if(btn){btn.classList.add('active');btn.setAttribute('aria-current','page');}
+  else{
+    document.querySelectorAll('.nav-item').forEach(el=>{
+      if(el.textContent.trim().startsWith(sections[key].title)||el.getAttribute('onclick')===`showSection('${key}',this)`){
+        el.classList.add('active');el.setAttribute('aria-current','page');
+      }
+    });
+  }
+}
+
+function filterChip(el){
+  el.closest('.filter-row').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active-chip'));
+  el.classList.add('active-chip');
+}
+
+showSection('dashboard', document.querySelector('.nav-item.active'));
+</script>
