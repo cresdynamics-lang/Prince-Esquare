@@ -499,32 +499,222 @@ const OrdersView = () => {
 
 const ProductsView = () => {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentProduct, setCurrentProduct] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    price: '',
+    discount_price: '',
+    category_id: '',
+    brand_id: '',
+    stock_quantity: 0,
+    is_featured: false,
+    is_active: true,
+    thumbnail: '',
+    images: [],
+    variants: [],
+    thumbnailFile: null,
+    thumbnailPreview: '',
+    galleryFiles: [],
+    galleryPreviews: []
+  });
+
+  const handleInputChange = (e, field) => {
+    let value = e.target.value;
+    if (typeof value === 'string' && field !== 'thumbnail' && field !== 'slug' && !field.includes('image')) {
+      value = value.toUpperCase();
+    }
+    setFormData({ ...formData, [field]: value });
+  };
+
+  const handleThumbnailChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({
+        ...formData,
+        thumbnailFile: file,
+        thumbnailPreview: URL.createObjectURL(file)
+      });
+    }
+  };
+
+  const handleGalleryChange = (e) => {
+    const files = Array.from(e.target.files);
+    const previews = files.map(file => URL.createObjectURL(file));
+    setFormData({
+      ...formData,
+      galleryFiles: [...formData.galleryFiles, ...files],
+      galleryPreviews: [...formData.galleryPreviews, ...previews]
+    });
+  };
+
+  const removeGalleryFile = (index) => {
+    const newFiles = [...formData.galleryFiles];
+    const newPreviews = [...formData.galleryPreviews];
+    URL.revokeObjectURL(newPreviews[index]);
+    newFiles.splice(index, 1);
+    newPreviews.splice(index, 1);
+    setFormData({
+      ...formData,
+      galleryFiles: newFiles,
+      galleryPreviews: newPreviews
+    });
+  };
+
+  const handleAddVariant = () => {
+    setFormData({ 
+      ...formData, 
+      variants: [...formData.variants, { color: '', size: '', stock: 0, price_override: '' }] 
+    });
+  };
+
+  const handleVariantChange = (index, field, value) => {
+    const newVariants = [...formData.variants];
+    let finalValue = value;
+    if (typeof finalValue === 'string' && (field === 'color' || field === 'size')) {
+      finalValue = finalValue.toUpperCase();
+    }
+    newVariants[index][field] = finalValue;
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const handleRemoveVariant = (index) => {
+    setFormData({ ...formData, variants: formData.variants.filter((_, i) => i !== index) });
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [prodRes, catRes, brandRes] = await Promise.all([
+        adminProductAPI.getAll(),
+        adminCategoryAPI.getAll(),
+        adminBrandAPI.getAll()
+      ]);
+      setProducts(prodRes.data.data);
+      setCategories(catRes.data.data);
+      setBrands(brandRes.data.data);
+    } catch (error) {
+      console.error('Error fetching product data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await adminProductAPI.getAll();
-        setProducts(res.data.data);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
+    fetchData();
   }, []);
 
+  const handleOpenModal = (product = null) => {
+    if (product) {
+      setCurrentProduct(product);
+      setFormData({
+        name: product.name || '',
+        slug: product.slug || '',
+        description: product.description || '',
+        price: product.price || '',
+        discount_price: product.discount_price || '',
+        category_id: product.category_id || '',
+        brand_id: product.brand_id || '',
+        stock_quantity: product.stock_quantity || 0,
+        is_featured: product.is_featured || false,
+        is_active: product.is_active ?? true,
+        thumbnail: product.thumbnail || '',
+        images: Array.isArray(product.images) ? product.images : [],
+        variants: Array.isArray(product.variants) ? product.variants : [],
+        thumbnailFile: null,
+        thumbnailPreview: product.thumbnail || '',
+        galleryFiles: [],
+        galleryPreviews: Array.isArray(product.images) ? product.images : []
+      });
+    } else {
+      setCurrentProduct(null);
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        price: '',
+        discount_price: '',
+        category_id: '',
+        brand_id: '',
+        stock_quantity: 0,
+        is_featured: false,
+        is_active: true,
+        thumbnail: '',
+        images: [],
+        variants: [],
+        thumbnailFile: null,
+        thumbnailPreview: '',
+        galleryFiles: [],
+        galleryPreviews: []
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      try {
+        await adminProductAPI.remove(id);
+        fetchData();
+      } catch (error) {
+        alert('Error deleting product');
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const data = new FormData();
+      Object.keys(formData).forEach(key => {
+        if (key === 'variants') {
+          data.append(key, JSON.stringify(formData[key]));
+        } else if (key === 'galleryFiles') {
+          formData[key].forEach(file => data.append('images', file));
+        } else if (key === 'thumbnailFile' && formData[key]) {
+          data.append('thumbnail', formData[key]);
+        } else if (['thumbnailPreview', 'galleryPreviews', 'thumbnail', 'images'].includes(key)) {
+           // Skip internal state previews and old URL fields if they are strings
+        } else {
+          data.append(key, formData[key]);
+        }
+      });
+
+      if (currentProduct) {
+        await adminProductAPI.update(currentProduct.id, data);
+      } else {
+        await adminProductAPI.create(data);
+      }
+      setIsModalOpen(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      alert('Error saving product');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Inventory Management ({products.length})</h3>
-        <button className="flex items-center gap-2 px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20">
+        <h3 className="text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">Inventory Management ({products.length})</h3>
+        <button 
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20"
+        >
           <Plus size={20} /> Add Product
         </button>
       </div>
 
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm text-gold-100">
         {loading ? (
           <div className="py-24 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
@@ -554,15 +744,15 @@ const ProductsView = () => {
                         )}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gold-100">{p.name}</div>
+                        <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
                         <div className="text-[10px] font-mono text-gold-500/40 uppercase mt-1">{p.slug}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gold-500/60">{p.category_name || 'Uncategorized'}</td>
+                  <td className="px-6 py-4 text-[10px] font-bold text-gold-500/60 uppercase">{p.category_name || 'Uncategorized'}</td>
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.price).toLocaleString()}</td>
                   <td className="px-6 py-4">
-                    <div className={`text-xs font-bold ${p.stock_quantity === 0 ? 'text-red-400' : p.stock_quantity < 10 ? 'text-gold-500' : 'text-green-400'}`}>
+                    <div className={`text-[10px] font-black uppercase ${p.stock_quantity === 0 ? 'text-red-400' : p.stock_quantity < 10 ? 'text-gold-500' : 'text-green-400'}`}>
                       {p.stock_quantity === 0 ? 'Out of Stock' : `${p.stock_quantity} units`}
                     </div>
                   </td>
@@ -573,8 +763,18 @@ const ProductsView = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"><Edit size={16} /></button>
-                      <button className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"><Trash2 size={16} /></button>
+                      <button 
+                        onClick={() => handleOpenModal(p)}
+                        className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(p.id)}
+                        className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -582,11 +782,302 @@ const ProductsView = () => {
             </tbody>
           </table>
         ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
+          <div className="py-24 text-center text-gold-500/40 text-sm uppercase tracking-widest">
             No products found in inventory.
           </div>
         )}
       </div>
+
+      {/* Product Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-navy-900 border border-gold-500/20 rounded-3xl p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl custom-scrollbar"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">
+                {currentProduct ? 'Edit Product' : 'Add New Product'}
+              </h4>
+              <button onClick={() => setIsModalOpen(false)} className="text-gold-500/40 hover:text-gold-500">
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-10">
+              {/* Basic Info */}
+              <div className="space-y-6">
+                <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">General Information</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Product Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
+                      }}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.slug}
+                      onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Price (KSh)</label>
+                    <input 
+                      type="number" 
+                      required
+                      value={formData.price}
+                      onChange={(e) => setFormData({...formData, price: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Discount Price</label>
+                    <input 
+                      type="number" 
+                      value={formData.discount_price}
+                      onChange={(e) => setFormData({...formData, discount_price: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Total Stock</label>
+                    <input 
+                      type="number" 
+                      required
+                      value={formData.stock_quantity}
+                      onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Category</label>
+                    <select 
+                      required
+                      value={formData.category_id}
+                      onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Brand</label>
+                    <select 
+                      value={formData.brand_id}
+                      onChange={(e) => setFormData({...formData, brand_id: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                    >
+                      <option value="">Select Brand</option>
+                      {brands.map(brand => (
+                        <option key={brand.id} value={brand.id}>{brand.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                  <textarea 
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* Media Section */}
+              <div className="space-y-6">
+                <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">Product Media</h5>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Main Thumbnail</label>
+                    <div className="flex items-center gap-6 p-6 bg-navy-950 border-2 border-dashed border-gold-500/10 rounded-2xl group hover:border-gold-500/30 transition-all">
+                      <div className="w-24 h-24 rounded-xl border border-gold-500/20 overflow-hidden bg-navy-900 flex items-center justify-center relative">
+                        {formData.thumbnailPreview ? (
+                          <img src={formData.thumbnailPreview} className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="text-gold-500/20" size={32} />
+                        )}
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleThumbnailChange}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-[10px] font-black text-gold-100 uppercase tracking-widest">Select Thumbnail</p>
+                        <p className="text-[9px] text-gold-500/40 uppercase tracking-wider">Drag and drop or click to upload</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Additional Gallery Images</label>
+                      <div className="relative">
+                        <button type="button" className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
+                          <Plus size={14} /> Attach Photos
+                        </button>
+                        <input 
+                          type="file" 
+                          multiple 
+                          accept="image/*"
+                          onChange={handleGalleryChange}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {formData.galleryPreviews.map((preview, idx) => (
+                        <div key={idx} className="aspect-square rounded-xl border border-gold-500/10 overflow-hidden relative group">
+                          <img src={preview} className="w-full h-full object-cover" />
+                          <button 
+                            type="button" 
+                            onClick={() => removeGalleryFile(idx)} 
+                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Variants Section */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
+                  <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Product Variants (COLOUR, SIZE, ETC.)</h5>
+                  <button type="button" onClick={handleAddVariant} className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
+                    <Plus size={14} /> Add Variant Option
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {formData.variants.length > 0 ? formData.variants.map((variant, idx) => (
+                    <div key={idx} className="bg-navy-950/50 border border-gold-500/10 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-5 gap-4 items-end relative group">
+                      <div className="space-y-2">
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Colour</label>
+                        <input 
+                          type="text" 
+                          placeholder="E.G. MIDNIGHT BLUE"
+                          value={variant.color}
+                          onChange={(e) => handleVariantChange(idx, 'color', e.target.value)}
+                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size</label>
+                        <input 
+                          type="text" 
+                          placeholder="E.G. XL / 42"
+                          value={variant.size}
+                          onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
+                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Stock</label>
+                        <input 
+                          type="number" 
+                          value={variant.stock}
+                          onChange={(e) => handleVariantChange(idx, 'stock', e.target.value)}
+                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Override</label>
+                        <input 
+                          type="number" 
+                          placeholder="IF DIFFERENT"
+                          value={variant.price_override}
+                          onChange={(e) => handleVariantChange(idx, 'price_override', e.target.value)}
+                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
+                        />
+                      </div>
+                      <div className="pb-1 text-right">
+                        <button type="button" onClick={() => handleRemoveVariant(idx)} className="p-2 text-red-400/40 hover:text-red-400 transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="py-8 text-center border-2 border-dashed border-gold-500/5 rounded-2xl text-[10px] text-gold-500/20 uppercase font-black tracking-widest">
+                      No variants added. Click above to add sizes or colours.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status & Submit */}
+              <div className="pt-10 border-t border-gold-500/10 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex gap-8">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.is_featured}
+                      onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
+                      className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                    />
+                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.is_active}
+                      onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                      className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                    />
+                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Active / Published</span>
+                  </label>
+                </div>
+
+                <div className="flex gap-4 w-full md:w-auto">
+                  <button 
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-8 py-4 bg-navy-800 text-gold-500/60 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-navy-700 hover:text-gold-500 transition-all border border-gold-500/10"
+                  >
+                    Discard
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={submitting}
+                    className="px-12 py-4 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all disabled:opacity-50 shadow-xl shadow-gold-600/20"
+                  >
+                    {submitting ? 'AUTHENTICATING...' : 'COMMIT PRODUCT'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
@@ -595,26 +1086,93 @@ const ProductsView = () => {
 const CategoriesView = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentCategory, setCurrentCategory] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    is_featured: false,
+    is_active: true
+  });
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    try {
+      const res = await adminCategoryAPI.getAll();
+      setCategories(res.data.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await adminCategoryAPI.getAll();
-        setCategories(res.data.data);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchCategories();
   }, []);
 
+  const handleOpenModal = (category = null) => {
+    if (category) {
+      setCurrentCategory(category);
+      setFormData({
+        name: category.name || '',
+        slug: category.slug || '',
+        description: category.description || '',
+        is_featured: category.is_featured || false,
+        is_active: category.is_active ?? true
+      });
+    } else {
+      setCurrentCategory(null);
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        is_featured: false,
+        is_active: true
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this category?')) {
+      try {
+        await adminCategoryAPI.remove(id);
+        fetchCategories();
+      } catch (error) {
+        alert('Error deleting category');
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (currentCategory) {
+        await adminCategoryAPI.update(currentCategory.id, formData);
+      } else {
+        await adminCategoryAPI.create(formData);
+      }
+      setIsModalOpen(false);
+      fetchCategories();
+    } catch (error) {
+      alert('Error saving category');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
        <div className="flex items-center justify-between mb-8">
         <h3 className="text-xl font-serif font-bold text-gold-100">Categories ({categories.length})</h3>
-        <button className="flex items-center gap-2 px-6 py-3 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl font-bold hover:bg-navy-800 transition-all">
+        <button 
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 px-6 py-3 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl font-bold hover:bg-navy-800 transition-all"
+        >
           <Plus size={20} /> New Category
         </button>
       </div>
@@ -630,8 +1188,7 @@ const CategoriesView = () => {
               <tr>
                 <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Slug</th>
-                <th className="px-6 py-4">Parent ID</th>
-                <th className="px-6 py-4">Products</th>
+                <th className="px-6 py-4">Featured</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -644,8 +1201,7 @@ const CategoriesView = () => {
                     {c.name}
                   </td>
                   <td className="px-6 py-4 font-mono text-gold-500/60 text-xs">{c.slug}</td>
-                  <td className="px-6 py-4 text-gold-500/40">{c.parent_id || '—'}</td>
-                  <td className="px-6 py-4 font-bold text-gold-200">{c.product_count || 0}</td>
+                  <td className="px-6 py-4 text-gold-200">{c.is_featured ? 'Yes' : 'No'}</td>
                   <td className="px-6 py-4">
                     <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
                       c.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'
@@ -654,7 +1210,20 @@ const CategoriesView = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-gold-500/60 hover:text-gold-500 transition-all"><Edit size={16} /></button>
+                    <div className="flex justify-end gap-2">
+                      <button 
+                        onClick={() => handleOpenModal(c)}
+                        className="p-2 text-gold-500/60 hover:text-gold-500 transition-all"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(c.id)}
+                        className="p-2 text-red-400/60 hover:text-red-400 transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -666,6 +1235,90 @@ const CategoriesView = () => {
           </div>
         )}
       </div>
+
+      {/* Category Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-navy-900 border border-gold-500/20 rounded-3xl p-8 w-full max-w-lg shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h4 className="text-2xl font-serif font-bold text-gold-100">
+                {currentCategory ? 'Edit Category' : 'Create New Category'}
+              </h4>
+              <button onClick={() => setIsModalOpen(false)} className="text-gold-500/40 hover:text-gold-500"><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
+                      }}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.slug}
+                      onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                  <textarea 
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                  />
+                </div>
+
+              <div className="flex gap-8">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.is_featured}
+                    onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
+                    className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gold-100">Featured Category</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                    className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gold-100">Active</span>
+                </label>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={submitting}
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+              >
+                {submitting ? 'AUTHENTICATING...' : 'COMMIT CATEGORY'}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

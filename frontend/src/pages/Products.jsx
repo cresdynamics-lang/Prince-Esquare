@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { products } from '../data/products';
 import { ShoppingBag, Search, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const Products = () => {
-  const [filter, setFilter] = useState('All');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const categoryParam = searchParams.get('category');
   const [searchQuery, setSearchQuery] = useState('');
   
   const categories = ['All', ...new Set(products.map(p => p.category))];
+  const filter = categories.includes(categoryParam) ? categoryParam : 'All';
   const featuredProducts = products.filter(p => p.featured);
+
+  const updateFilter = (category) => {
+    setSearchParams(category === 'All' ? {} : { category });
+  };
 
   const filteredProducts = products.filter(product => {
     const matchesFilter = filter === 'All' || product.category === filter;
@@ -75,7 +81,7 @@ const Products = () => {
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setFilter(cat)}
+                  onClick={() => updateFilter(cat)}
                   className={`px-8 py-3 text-[10px] font-bold uppercase tracking-widest transition-all ${
                     filter === cat 
                       ? 'bg-gold-600 text-navy-950' 
@@ -147,7 +153,7 @@ const Products = () => {
             <div className="py-32 text-center">
               <p className="text-gold-600/30 text-[10px] uppercase tracking-widest font-bold">No products found.</p>
               <button 
-                onClick={() => {setFilter('All'); setSearchQuery('');}}
+                onClick={() => {updateFilter('All'); setSearchQuery('');}}
                 className="mt-6 text-[10px] font-bold uppercase tracking-widest text-gold-500 border-b border-gold-500/30 pb-1"
               >
                 Reset Search
