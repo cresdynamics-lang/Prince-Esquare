@@ -16,13 +16,13 @@ exports.getProducts = async (req, res, next) => {
         let paramCount = 1;
 
         if (category) {
-            query += `AND (c.slug = $${paramCount} OR c.id::text = $${paramCount}) `;
+            query += `AND (LOWER(c.slug) = LOWER($${paramCount}::text) OR c.id::text = $${paramCount}) `;
             params.push(category);
             paramCount++;
         }
 
         if (brand) {
-            query += `AND (b.slug = $${paramCount} OR b.id::text = $${paramCount}) `;
+            query += `AND (LOWER(b.slug) = LOWER($${paramCount}::text) OR b.id::text = $${paramCount}) `;
             params.push(brand);
             paramCount++;
         }

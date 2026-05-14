@@ -22,25 +22,25 @@ const Navbar = () => {
   }, []);
 
   const menuItems = [
-    { 
-      name: 'Footwear', 
-      sub: ['Clarks Oxford', 'Santoni Loafers', 'Monk-Straps', 'Penny Loafers'], 
-      category: 'Shoes' 
+    {
+      name: 'Footwear',
+      sub: ['Clarks Oxford', 'Santoni Loafers', 'Monk-Straps', 'Penny Loafers'],
+      category: 'shoes',
     },
-    { 
-      name: 'Leisure', 
-      sub: ['Prada Tracksuits', 'Zegna Collection', 'Stefano Ricci'], 
-      category: 'Tracksuits' 
+    {
+      name: 'Leisure',
+      sub: ['Prada Tracksuits', 'Zegna Collection', 'Stefano Ricci'],
+      category: 'tracksuits',
     },
-    { 
-      name: 'Formal Wear', 
-      sub: ['Presidential Shirts', 'Executive Shirts', 'Tapered Pants', 'Dockers'], 
-      category: 'Shirts' 
+    {
+      name: 'Formal Wear',
+      sub: ['Presidential Shirts', 'Executive Shirts', 'Tapered Pants', 'Dockers'],
+      category: 'shirts',
     },
-    { 
-      name: 'Outerwear', 
-      sub: ['Puffer Vests', 'Jackets'], 
-      category: 'Outerwear' 
+    {
+      name: 'Outerwear',
+      sub: ['Puffer Vests', 'Jackets'],
+      category: 'outerwear',
     },
   ];
 

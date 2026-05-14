@@ -21,6 +21,30 @@ export const authAPI = {
   getProfile:()     => API.get('/profile'),
 };
 
+export const productAPI = {
+  list: (params) => API.get('/products', { params }),
+  featured: () => API.get('/products/featured'),
+  getBySlug: (slug) => API.get(`/products/${encodeURIComponent(slug)}`),
+  related: (productId) => API.get(`/products/${productId}/related`),
+};
+
+export const cartAPI = {
+  get: () => API.get('/cart'),
+  addItem: (body) => API.post('/cart/items', body),
+  updateItem: (itemId, body) => API.patch(`/cart/items/${itemId}`, body),
+  removeItem: (itemId) => API.delete(`/cart/items/${itemId}`),
+  clear: () => API.delete('/cart/clear'),
+};
+
+export const orderAPI = {
+  create: (body) => API.post('/orders', body),
+  getOne: (id) => API.get(`/orders/${id}`),
+};
+
+export const paymentAPI = {
+  stkPush: (body) => API.post('/payments/stk-push', body),
+};
+
 export const adminAuthAPI = {
   login:  (data) => API.post('/admin/auth/login', data),
   logout: ()     => API.post('/admin/auth/logout'),

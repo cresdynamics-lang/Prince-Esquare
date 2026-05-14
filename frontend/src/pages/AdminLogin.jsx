@@ -77,7 +77,7 @@ const AdminLogin = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-navy-950/50 border border-gold-500/10 py-4 pl-12 pr-6 text-white text-sm rounded-xl focus:border-gold-500 outline-none transition-all placeholder:text-navy-700"
-                  placeholder="admin@princeesquire.com"
+                  placeholder="manage@prince-esquire.co.ke"
                 />
               </div>
             </div>
