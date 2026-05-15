@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { authAPI } from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
@@ -15,8 +15,10 @@ const SignUp = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const redirect = searchParams.get('redirect');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +31,12 @@ const SignUp = () => {
         login(response.data.data.user, response.data.data.token);
         await useCartStore.getState().mergeGuestCartToServer();
         await useCartStore.getState().loadCart();
-        navigate('/');
+        const target = redirect
+          ? redirect.startsWith('/')
+            ? redirect
+            : `/${redirect}`
+          : '/profile';
+        navigate(target);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');

@@ -19,6 +19,9 @@ export const authAPI = {
   register:  (data) => API.post('/auth/register', data),
   login:     (data) => API.post('/auth/login', data),
   getProfile:()     => API.get('/profile'),
+  updateProfile: (data) => API.put('/profile', data),
+  updatePassword:(data) => API.patch('/profile/password', data),
+  getAddresses:  () => API.get('/profile/addresses'),
 };
 
 export const productAPI = {
@@ -38,6 +41,7 @@ export const cartAPI = {
 
 export const orderAPI = {
   create: (body) => API.post('/orders', body),
+  getMyOrders: () => API.get('/orders/my-orders'),
   getOne: (id) => API.get(`/orders/${id}`),
 };
 

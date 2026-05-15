@@ -28,6 +28,7 @@ const ProductDetail = () => {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [addedToCart, setAddedToCart] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +84,8 @@ const ProductDetail = () => {
   const handleAddToCart = async () => {
     if (!product) return;
     await addToCart(buildPayload());
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 3000);
   };
 
   const handleBuyNow = async () => {
@@ -221,23 +224,44 @@ const ProductDetail = () => {
                     </button>
                   </div>
 
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => handleAddToCart()}
-                    className="flex-1 bg-navy-950 border border-gold-600 text-gold-500 py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-600 hover:text-navy-950 transition-all flex items-center justify-center space-x-3"
+                    className={`flex-1 py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center space-x-3 ${
+                      addedToCart 
+                      ? 'bg-green-600 text-white border-green-600' 
+                      : 'bg-navy-950 border border-gold-600 text-gold-500 hover:bg-gold-600 hover:text-navy-950'
+                    }`}
                   >
                     <ShoppingBag size={14} />
-                    <span>Add to Bag</span>
-                  </button>
+                    <span>{addedToCart ? 'Added to Bag' : 'Add to Bag'}</span>
+                  </motion.button>
                 </div>
 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   type="button"
                   onClick={() => handleBuyNow()}
-                  className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all"
+                  className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10"
                 >
                   Buy it now
-                </button>
+                </motion.button>
+                
+                <AnimatePresence>
+                  {addedToCart && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="text-[10px] text-green-500 font-bold uppercase tracking-widest text-center pt-4"
+                    >
+                      Excellent choice. Item added to your curation.
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="space-y-8 pt-10 border-t border-gold-600/10">

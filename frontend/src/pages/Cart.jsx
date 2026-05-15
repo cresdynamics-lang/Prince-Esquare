@@ -2,11 +2,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../store/useCartStore';
 import { Trash2, ShoppingBag, ArrowRight, Minus, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const Cart = () => {
   const { items, removeFromCart, updateQuantity, getTotal } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
   const lineKey = (item) =>
@@ -129,16 +131,20 @@ const Cart = () => {
                 </div>
 
                 <div className="space-y-4 pt-6">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="button"
                     disabled={items.length === 0}
-                    onClick={() => navigate('/checkout')}
-                    className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group"
+                    onClick={() => navigate(isAuthenticated ? '/checkout' : '/login?redirect=checkout')}
+                    className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group shadow-xl shadow-gold-600/10"
                   >
-                    <span>Begin Checkout</span>
+                    <span>{isAuthenticated ? 'Begin Checkout' : 'Sign In to Checkout'}</span>
                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
-                  <p className="text-[9px] text-gold-600/30 text-center uppercase tracking-[0.3em] font-bold">Secure Global Delivery</p>
+                  </motion.button>
+                  <p className="text-[9px] text-gold-600/30 text-center uppercase tracking-[0.3em] font-bold">
+                    {isAuthenticated ? 'Secure Global Delivery' : 'Authentication Required for Safety'}
+                  </p>
                 </div>
               </div>
             </div>

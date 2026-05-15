@@ -5,9 +5,14 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { productAPI } from '../services/api';
+import { useCartStore } from '../store/useCartStore';
+import { useNavigate } from 'react-router-dom';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const addToCart = useCartStore((state) => state.addToCart);
+  
   const CATEGORY_DATA = [
     { name: 'All', sub: [] },
     { name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
@@ -31,6 +36,30 @@ const Products = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const handleQuickAdd = async (product) => {
+    // If product has variants or needs size, redirect to detail
+    // Otherwise add to cart immediately with default
+    const hasVariants = product.variants && product.variants.length > 0;
+    const needsSize = ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts'].includes((product.category_name || '').toLowerCase());
+    
+    if (hasVariants || needsSize) {
+      navigate(`/product/${product.slug}`);
+    } else {
+      await addToCart({
+        productId: product.id,
+        variantId: null,
+        quantity: 1,
+        sizeLabel: '',
+        name: product.name,
+        price: parseFloat(product.price),
+        image: product.thumbnail,
+        slug: product.slug,
+        brandName: product.brand_name,
+      });
+      alert(`Added ${product.name} to your collection.`);
+    }
+  };
 
   const setFilter = (cat, sub = 'All') => {
     const params = {};
@@ -226,9 +255,18 @@ const Products = () => {
                           <span className="text-sm font-light text-gold-500 italic">
                             KSh {parseFloat(product.price).toLocaleString()}
                           </span>
-                          <div className="w-10 h-10 border border-gold-600/20 flex items-center justify-center group-hover:bg-gold-600 group-hover:text-navy-950 transition-all">
+                          <motion.button
+                            whileHover={{ scale: 1.1, backgroundColor: '#d4af37', color: '#000814' }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleQuickAdd(product);
+                            }}
+                            className="w-10 h-10 border border-gold-600/20 flex items-center justify-center transition-all bg-navy-950 text-gold-600 shadow-lg shadow-gold-600/5"
+                          >
                             <ShoppingBag size={14} />
-                          </div>
+                          </motion.button>
                         </div>
                       </div>
                     </Link>
