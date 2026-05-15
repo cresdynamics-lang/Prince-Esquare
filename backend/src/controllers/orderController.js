@@ -7,6 +7,7 @@ exports.createOrder = async (req, res, next) => {
     try {
         const userId = req.user.id;
         const { shipping_address, billing_address, payment_method, coupon_id } = req.body;
+        const couponId = coupon_id || null;
 
         // 1. Get cart items
         const cartItems = await db.query(
@@ -34,7 +35,7 @@ exports.createOrder = async (req, res, next) => {
         const total = subtotal + tax + shipping;
 
         // 3. Start transaction
-        const client = await db.connect();
+        const client = await db.pool.connect();
         try {
             await client.query('BEGIN');
 
@@ -42,7 +43,7 @@ exports.createOrder = async (req, res, next) => {
             const orderResult = await client.query(
                 'INSERT INTO orders (user_id, total_amount, tax_amount, shipping_amount, payment_method, shipping_address, billing_address, coupon_id) ' +
                 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-                [userId, total, tax, shipping, payment_method, JSON.stringify(shipping_address), JSON.stringify(billing_address), coupon_id]
+                [userId, total, tax, shipping, payment_method, JSON.stringify(shipping_address), JSON.stringify(billing_address || shipping_address), couponId]
             );
             const order = orderResult.rows[0];
 
@@ -50,8 +51,8 @@ exports.createOrder = async (req, res, next) => {
             for (const item of cartItems.rows) {
                 const price = parseFloat(item.price) + parseFloat(item.price_modifier || 0);
                 await client.query(
-                    'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price) VALUES ($1, $2, $3, $4, $5)',
-                    [order.id, item.product_id, item.variant_id, item.quantity, price]
+                    'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, size_label) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [order.id, item.product_id, item.variant_id, item.quantity, price, item.size_label || null]
                 );
             }
 
@@ -95,7 +96,9 @@ exports.getOrderDetail = async (req, res, next) => {
 
         const order = orderResult.rows[0];
         const itemsResult = await db.query(
-            'SELECT oi.*, p.name, p.thumbnail FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = $1',
+            'SELECT oi.*, p.name, p.thumbnail, v.name as variant_name, v.value as variant_value ' +
+            'FROM order_items oi JOIN products p ON oi.product_id = p.id ' +
+            'LEFT JOIN product_variants v ON oi.variant_id = v.id WHERE oi.order_id = $1',
             [id]
         );
         order.items = itemsResult.rows;

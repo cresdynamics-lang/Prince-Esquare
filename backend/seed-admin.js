@@ -108,20 +108,26 @@ async function createAdmin() {
             return;
         }
 
-        await db.query(
-            `INSERT INTO users (name, email, password, role, is_verified)
-             VALUES ($1, $2, $3, 'admin', TRUE)`,
-            [name, email, hashedPassword]
-        );
-
-        console.log(`Admin user created for ${email}.`);
-    } finally {
-        rl.close();
-        await db.pool.end();
+        const exists = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (exists.rows.length > 0) {
+            await db.query(
+                'UPDATE users SET password = $1, role = $2, name = $3 WHERE email = $4',
+                [hashedPassword, 'admin', name, email]
+            );
+            console.log('Admin user updated:', email);
+        } else {
+            await db.query(
+                'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)',
+                [name, email, hashedPassword, 'admin']
+            );
+            console.log('Admin user created:', email);
+        }
+        console.log('Password:', password);
+        process.exit(0);
+    } catch (error) {
+        console.error('Error seeding admin:', error);
+        process.exit(1);
     }
 }
 
-createAdmin().catch((error) => {
-    console.error('Failed to create admin credentials:', error.message);
-    process.exit(1);
-});
+seedAdmin();

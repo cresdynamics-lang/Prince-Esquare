@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/useAuthStore';
+import { useCartStore } from '../store/useCartStore';
 import { authAPI } from '../services/api';
 import { Mail, Lock, ArrowRight, UserPlus } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -27,7 +28,14 @@ const Login = () => {
       const response = await authAPI.login({ email, password });
       if (response.data.success) {
         login(response.data.data.user, response.data.data.token);
-        navigate(redirect ? `/${redirect}` : '/');
+        await useCartStore.getState().mergeGuestCartToServer();
+        await useCartStore.getState().loadCart();
+        const target = redirect
+          ? redirect.startsWith('/')
+            ? redirect
+            : `/${redirect}`
+          : '/';
+        navigate(target);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid email or password');

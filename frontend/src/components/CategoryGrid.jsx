@@ -9,29 +9,29 @@ const CategoryGrid = () => {
       subtitle: 'Premium Italian Craftsmanship',
       image: '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
       span: 'col-span-1 row-span-2',
-      category: 'Shoes'
+      category: 'shoes',
     },
     {
       title: 'Luxury Tracksuits',
       subtitle: 'Prada & Zegna Collections',
       image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
       span: 'col-span-1 row-span-1',
-      category: 'Tracksuits'
+      category: 'tracksuits',
     },
     {
       title: 'Executive Shirts',
       subtitle: 'The Presidential Series',
       image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
       span: 'col-span-1 row-span-1',
-      category: 'Shirts'
+      category: 'shirts',
     },
     {
       title: 'Tailored Essentials',
       subtitle: 'Dockers & Smart Trousers',
       image: '/WhatsApp Image 2026-05-12 at 8.07.20 PM.jpeg',
       span: 'col-span-2 row-span-1',
-      category: 'Trousers'
-    }
+      category: 'trousers',
+    },
   ];
 
   return (

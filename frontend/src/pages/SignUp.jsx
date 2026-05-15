@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { authAPI } from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
+import { useCartStore } from '../store/useCartStore';
 import { Mail, Lock, User, ArrowRight, LogIn } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -26,6 +27,8 @@ const SignUp = () => {
       const response = await authAPI.register({ name, email, password });
       if (response.data.success) {
         login(response.data.data.user, response.data.data.token);
+        await useCartStore.getState().mergeGuestCartToServer();
+        await useCartStore.getState().loadCart();
         navigate('/');
       }
     } catch (err) {
