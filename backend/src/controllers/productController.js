@@ -5,24 +5,41 @@ const db = require('../config/db');
 // @route   GET /api/products
 exports.getProducts = async (req, res, next) => {
     try {
-        const { category, brand, minPrice, maxPrice, sort, page = 1, limit = 10 } = req.query;
+        const { category, sub, brand, minPrice, maxPrice, sort, page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
 
-        let query = 'SELECT p.*, c.name as category_name, b.name as brand_name FROM products p ';
-        query += 'LEFT JOIN categories c ON p.category_id = c.id ';
-        query += 'LEFT JOIN brands b ON p.brand_id = b.id WHERE p.is_active = true ';
+        let query = `
+            SELECT p.*, c.name as category_name, p_cat.name as parent_category_name, b.name as brand_name 
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+            LEFT JOIN brands b ON p.brand_id = b.id 
+            WHERE p.is_active = true 
+        `;
         
         const params = [];
         let paramCount = 1;
 
-        if (category) {
-            query += `AND (LOWER(c.slug) = LOWER($${paramCount}::text) OR c.id::text = $${paramCount}) `;
-            params.push(category);
-            paramCount++;
+        if (category && category !== 'All') {
+            if (sub && sub !== 'All') {
+                // Filter by specific sub-category AND its parent
+                query += ` AND (LOWER(c.name) = LOWER($${paramCount}) OR LOWER(c.slug) = LOWER($${paramCount})) `;
+                query += ` AND (LOWER(p_cat.name) = LOWER($${paramCount + 1}) OR LOWER(p_cat.slug) = LOWER($${paramCount + 1})) `;
+                params.push(sub, category);
+                paramCount += 2;
+            } else {
+                // Filter by parent category OR any product directly in this category
+                query += ` AND (
+                    LOWER(c.name) = LOWER($${paramCount}) OR LOWER(c.slug) = LOWER($${paramCount})
+                    OR LOWER(p_cat.name) = LOWER($${paramCount}) OR LOWER(p_cat.slug) = LOWER($${paramCount})
+                ) `;
+                params.push(category);
+                paramCount++;
+            }
         }
 
         if (brand) {
-            query += `AND (LOWER(b.slug) = LOWER($${paramCount}::text) OR b.id::text = $${paramCount}) `;
+            query += ` AND (LOWER(b.slug) = LOWER($${paramCount}::text) OR b.id::text = $${paramCount} OR LOWER(b.name) = LOWER($${paramCount})) `;
             params.push(brand);
             paramCount++;
         }

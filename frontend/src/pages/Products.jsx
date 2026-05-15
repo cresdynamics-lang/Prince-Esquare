@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useState } from 'react';
-=======
 import { useState, useEffect } from 'react';
->>>>>>> ec8acc1feea52c2a4e0fe3f7a142e93e768c5f5e
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Search, ArrowRight } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -12,33 +8,35 @@ import { productAPI } from '../services/api';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-<<<<<<< HEAD
-  const categoryParam = searchParams.get('category');
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const categories = ['All', ...new Set(products.map(p => p.category))];
-  const filter = categories.includes(categoryParam) ? categoryParam : 'All';
-  const featuredProducts = products.filter(p => p.featured);
+  const CATEGORY_DATA = [
+    { name: 'All', sub: [] },
+    { name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
+    { name: 'Shoes', sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'] },
+    { name: 'Shirts', sub: ['Formal shirts', 'Casual', 'Presidential'] },
+    { name: 'Suits', sub: ['Two piece', 'Three piece'] },
+    { name: 'Blazers', sub: [] },
+    { name: 'Track Suits', sub: [] },
+    { name: 'Jackets', sub: ['Jackets', 'Half jackets'] },
+    { name: 'Trousers', sub: ['khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'] },
+    { name: 'Linen', sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'] },
+    { name: 'Caps & Hats', sub: [] },
+    { name: 'Belts & Ties', sub: [] },
+    { name: 'Sweaters', sub: [] },
+    { name: 'T-shirts', sub: ['Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'] },
+  ];
 
-  const updateFilter = (category) => {
-    setSearchParams(category === 'All' ? {} : { category });
-  };
-
-  const filteredProducts = products.filter(product => {
-    const matchesFilter = filter === 'All' || product.category === filter;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.brand?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-=======
-  const filter = searchParams.get('category') || 'All';
+  const currentCategory = searchParams.get('category') || 'All';
+  const currentSub = searchParams.get('sub') || 'All';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const setFilter = (cat) => {
-    if (cat === 'All') setSearchParams({});
-    else setSearchParams({ category: cat });
+  const setFilter = (cat, sub = 'All') => {
+    const params = {};
+    if (cat !== 'All') params.category = cat;
+    if (sub !== 'All') params.sub = sub;
+    setSearchParams(params);
   };
 
   useEffect(() => {
@@ -47,7 +45,8 @@ const Products = () => {
       setLoading(true);
       try {
         const params = { limit: 100, page: 1 };
-        if (filter !== 'All') params.category = filter;
+        if (currentCategory !== 'All') params.category = currentCategory;
+        if (currentSub !== 'All') params.sub = currentSub;
         const res = await productAPI.list(params);
         if (cancelled) return;
         const list = res.data?.data?.products || [];
@@ -61,9 +60,8 @@ const Products = () => {
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [currentCategory, currentSub]);
 
-  const categories = ['All', 'shoes', 'tracksuits', 'trousers', 'shirts', 'outerwear'];
   const featuredProducts = products.filter((p) => p.is_featured);
 
   const filteredProducts = products.filter((product) => {
@@ -71,7 +69,6 @@ const Products = () => {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (product.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
->>>>>>> ec8acc1feea52c2a4e0fe3f7a142e93e768c5f5e
   });
 
   return (
@@ -120,25 +117,61 @@ const Products = () => {
       <main className="py-20">
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-8 md:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
-            <div className="flex flex-wrap gap-4">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-<<<<<<< HEAD
-                  onClick={() => updateFilter(cat)}
-=======
-                  type="button"
-                  onClick={() => setFilter(cat)}
->>>>>>> ec8acc1feea52c2a4e0fe3f7a142e93e768c5f5e
-                  className={`px-8 py-3 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    filter === cat
-                      ? 'bg-gold-600 text-navy-950'
-                      : 'bg-navy-950 text-gold-600/50 border border-gold-600/10 hover:text-gold-500 hover:border-gold-500'
-                  }`}
-                >
-                  {cat === 'All' ? 'All' : cat}
-                </button>
-              ))}
+            <div className="w-full space-y-8">
+              <div className="flex flex-wrap gap-3">
+                {CATEGORY_DATA.map((cat) => (
+                  <button
+                    key={cat.name}
+                    type="button"
+                    onClick={() => setFilter(cat.name)}
+                    className={`px-6 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all border ${
+                      currentCategory === cat.name
+                        ? 'bg-gold-600 text-navy-950 border-gold-600'
+                        : 'bg-transparent text-gold-600/50 border-gold-600/10 hover:border-gold-600/30 hover:text-gold-500'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+
+              <AnimatePresence>
+                {currentCategory !== 'All' &&
+                  CATEGORY_DATA.find((c) => c.name === currentCategory)?.sub.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="flex flex-wrap gap-2 pt-4 border-t border-gold-600/5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setFilter(currentCategory, 'All')}
+                        className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
+                          currentSub === 'All'
+                            ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
+                            : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
+                        }`}
+                      >
+                        All {currentCategory}
+                      </button>
+                      {CATEGORY_DATA.find((c) => c.name === currentCategory).sub.map((sub) => (
+                        <button
+                          key={sub}
+                          type="button"
+                          onClick={() => setFilter(currentCategory, sub)}
+                          className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
+                            currentSub === sub
+                              ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
+                              : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+              </AnimatePresence>
             </div>
 
             <div className="relative w-full md:w-80 group">
@@ -208,17 +241,12 @@ const Products = () => {
           {!loading && filteredProducts.length === 0 && (
             <div className="py-32 text-center">
               <p className="text-gold-600/30 text-[10px] uppercase tracking-widest font-bold">No products found.</p>
-<<<<<<< HEAD
-              <button 
-                onClick={() => {updateFilter('All'); setSearchQuery('');}}
-=======
               <button
                 type="button"
                 onClick={() => {
                   setFilter('All');
                   setSearchQuery('');
                 }}
->>>>>>> ec8acc1feea52c2a4e0fe3f7a142e93e768c5f5e
                 className="mt-6 text-[10px] font-bold uppercase tracking-widest text-gold-500 border-b border-gold-500/30 pb-1"
               >
                 Reset Search
