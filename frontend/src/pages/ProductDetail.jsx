@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
+import { getPremiumImage } from '../utils/productImages';
 
 function sizesForCategoryName(name) {
   const n = (name || '').toLowerCase();
@@ -76,7 +77,7 @@ const ProductDetail = () => {
     sizeLabel: selectedSize,
     name: product.name,
     price: unitPrice,
-    image: product.thumbnail,
+    image: getPremiumImage(product),
     slug: product.slug,
     brandName: product.brand_name,
   });
@@ -124,8 +125,8 @@ const ProductDetail = () => {
               <div className="relative aspect-square md:aspect-[4/5] bg-navy-900 overflow-hidden rounded-sm border border-gold-600/10">
                 <AnimatePresence mode="wait">
                   <motion.img
-                    key={product.thumbnail}
-                    src={product.thumbnail}
+                    key={getPremiumImage(product)}
+                    src={getPremiumImage(product)}
                     alt={product.name}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -278,7 +279,7 @@ const ProductDetail = () => {
                   <Link to={`/product/${p.slug}`} key={p.id} className="group block">
                     <div className="aspect-square bg-navy-900 overflow-hidden mb-6 border border-gold-600/10">
                       <img
-                        src={p.thumbnail}
+                        src={getPremiumImage(p)}
                         alt={p.name}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />

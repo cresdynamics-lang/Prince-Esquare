@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import { productAPI } from '../services/api';
 import { useCartStore } from '../store/useCartStore';
 import { useNavigate } from 'react-router-dom';
+import { getPremiumImage } from '../utils/productImages';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -22,7 +23,7 @@ const Products = () => {
     { name: 'Blazers', sub: [] },
     { name: 'Track Suits', sub: [] },
     { name: 'Jackets', sub: ['Jackets', 'Half jackets'] },
-    { name: 'Trousers', sub: ['khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'] },
+    { name: 'Trousers', sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'] },
     { name: 'Linen', sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'] },
     { name: 'Caps & Hats', sub: [] },
     { name: 'Belts & Ties', sub: [] },
@@ -124,13 +125,13 @@ const Products = () => {
             {featuredProducts.map((p) => (
               <motion.div key={p.id} className="min-w-[300px] md:min-w-[450px] snap-start" whileHover={{ y: -10 }}>
                 <Link to={`/product/${p.slug}`} className="block group">
-                  <div className="aspect-[4/5] bg-navy-950 overflow-hidden rounded-sm mb-6 border border-gold-600/10 group-hover:border-gold-600 transition-colors">
-                    <img
-                      src={p.thumbnail}
-                      alt={p.name}
-                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                    />
-                  </div>
+                    <div className="aspect-[4/5] bg-navy-950 overflow-hidden rounded-sm mb-6 border border-gold-600/10 group-hover:border-gold-600 transition-colors">
+                      <img
+                        src={getPremiumImage(p)}
+                        alt={p.name}
+                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                      />
+                    </div>
                   <div className="space-y-2">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-gold-600/50">{p.brand_name}</span>
                     <h3 className="text-2xl font-serif text-white group-hover:text-gold-500 transition-colors">{p.name}</h3>
@@ -235,7 +236,7 @@ const Products = () => {
                     <Link to={`/product/${product.slug}`} className="block">
                       <div className="relative aspect-square bg-navy-950 overflow-hidden mb-6 border border-gold-600/10 group-hover:border-gold-600 transition-colors">
                         <img
-                          src={product.thumbnail}
+                          src={getPremiumImage(product)}
                           alt={product.name}
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />

@@ -23,29 +23,46 @@ const Navbar = () => {
 
   const menuItems = [
     {
-      name: 'Footwear',
-      sub: ['Clarks Oxford', 'Santoni Loafers', 'Monk-Straps', 'Penny Loafers'],
+      name: 'Polo T-shirts',
+      category: 'polo-t-shirts',
+      sub: ['Knitted Polos', 'Polos'],
+    },
+    {
+      name: 'Shoes',
       category: 'shoes',
+      sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'],
     },
     {
-      name: 'Leisure',
-      sub: ['Prada Tracksuits', 'Zegna Collection', 'Stefano Ricci'],
-      category: 'tracksuits',
-    },
-    {
-      name: 'Formal Wear',
-      sub: ['Presidential Shirts', 'Executive Shirts', 'Tapered Pants', 'Dockers'],
+      name: 'Shirts',
       category: 'shirts',
+      sub: ['Formal shirts', 'Casual', 'Presidential'],
     },
     {
-      name: 'Outerwear',
-      sub: ['Puffer Vests', 'Jackets'],
-      category: 'outerwear',
+      name: 'Suits',
+      category: 'suits',
+      sub: ['Two piece', 'Three piece'],
+    },
+    {
+      name: 'Trousers',
+      category: 'trousers',
+      sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'],
+    },
+    {
+      name: 'Linen',
+      category: 'linen',
+      sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'],
+    },
+    {
+      name: 'More',
+      category: 'more',
+      sub: ['Blazers', 'Track Suits', 'Jackets', 'Half jackets', 'Caps & Hats', 'Belts & Ties', 'Sweaters', 'Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'],
     },
   ];
 
-  const handleCategoryClick = (category) => {
-    navigate(`/products?category=${category}`);
+  const handleCategoryClick = (category, sub = null) => {
+    let url = `/products?category=${category}`;
+    if (sub) url += `&sub=${encodeURIComponent(sub)}`;
+    navigate(url);
     setIsOpen(false);
   };
 
@@ -85,7 +102,7 @@ const Navbar = () => {
                       {item.sub.map((sub) => (
                         <button 
                           key={sub} 
-                          onClick={() => handleCategoryClick(item.category)}
+                          onClick={() => handleCategoryClick(item.category, sub)}
                           className="block w-full text-left text-[9px] font-bold uppercase tracking-[0.2em] text-navy-200 hover:text-gold-400 transition-colors"
                         >
                           {sub}
@@ -174,7 +191,7 @@ const Navbar = () => {
                       {item.sub.map((sub) => (
                         <button 
                           key={sub} 
-                          onClick={() => handleCategoryClick(item.category)}
+                          onClick={() => handleCategoryClick(item.category, sub)}
                           className="text-left text-[10px] font-bold uppercase tracking-widest text-navy-300 hover:text-gold-400"
                         >
                           {sub}
