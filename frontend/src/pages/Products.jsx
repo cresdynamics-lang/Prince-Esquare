@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Search, ArrowRight } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { productAPI } from '../services/api';
 import { useCartStore } from '../store/useCartStore';
-import { useNavigate } from 'react-router-dom';
 import { getPremiumImage } from '../utils/productImages';
+import { getDummyProducts } from '../utils/dummyData';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,52 +14,30 @@ const Products = () => {
   const addToCart = useCartStore((state) => state.addToCart);
   
   const CATEGORY_DATA = [
-    { name: 'All', sub: [] },
-    { name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
-    { name: 'Shoes', sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'] },
-    { name: 'Shirts', sub: ['Formal shirts', 'Casual', 'Presidential'] },
-    { name: 'Suits', sub: ['Two piece', 'Three piece'] },
-    { name: 'Blazers', sub: [] },
-    { name: 'Track Suits', sub: [] },
-    { name: 'Jackets', sub: ['Jackets', 'Half jackets'] },
-    { name: 'Trousers', sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'] },
-    { name: 'Linen', sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'] },
-    { name: 'Caps & Hats', sub: [] },
-    { name: 'Belts & Ties', sub: [] },
-    { name: 'Sweaters', sub: [] },
-    { name: 'T-shirts', sub: ['Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'] },
+    { id: 'All', name: 'All', sub: [] },
+    { id: 'polo-t-shirts', name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
+    { id: 'shoes', name: 'Shoes', sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'] },
+    { id: 'shirts', name: 'Shirts', sub: ['Formal shirts', 'Casual', 'Presidential'] },
+    { id: 'suits', name: 'Suits', sub: ['Two piece', 'Three piece'] },
+    { id: 'trousers', name: 'Trousers', sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'] },
+    { id: 'linen', name: 'Linen', sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'] },
+    { id: 'more', name: 'More', sub: ['Blazers', 'Track Suits', 'Jackets', 'Half jackets', 'Caps & Hats', 'Belts & Ties', 'Sweaters', 'Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'] },
   ];
 
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const currentCategory = searchParams.get('category') || 'All';
   const currentSub = searchParams.get('sub') || 'All';
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const handleQuickAdd = async (product) => {
-    // If product has variants or needs size, redirect to detail
-    // Otherwise add to cart immediately with default
-    const hasVariants = product.variants && product.variants.length > 0;
-    const needsSize = ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts'].includes((product.category_name || '').toLowerCase());
-    
-    if (hasVariants || needsSize) {
-      navigate(`/product/${product.slug}`);
-    } else {
-      await addToCart({
-        productId: product.id,
-        variantId: null,
-        quantity: 1,
-        sizeLabel: '',
-        name: product.name,
-        price: parseFloat(product.price),
-        image: product.thumbnail,
-        slug: product.slug,
-        brandName: product.brand_name,
-      });
-      alert(`Added ${product.name} to your collection.`);
-    }
-  };
+  useEffect(() => {
+    setLoading(true);
+    const data = getDummyProducts(currentCategory, currentSub);
+    setProducts(data);
+    setLoading(false);
+    window.scrollTo(0, 0);
+  }, [currentCategory, currentSub]);
 
   const setFilter = (cat, sub = 'All') => {
     const params = {};
@@ -69,28 +46,26 @@ const Products = () => {
     setSearchParams(params);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const params = { limit: 100, page: 1 };
-        if (currentCategory !== 'All') params.category = currentCategory;
-        if (currentSub !== 'All') params.sub = currentSub;
-        const res = await productAPI.list(params);
-        if (cancelled) return;
-        const list = res.data?.data?.products || [];
-        setProducts(list);
-      } catch {
-        if (!cancelled) setProducts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentCategory, currentSub]);
+  const handleQuickAdd = async (product) => {
+    const needsSize = ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts'].includes((product.category_name || '').toLowerCase());
+    
+    if (needsSize) {
+      navigate(`/product/${product.slug}`);
+    } else {
+      addToCart({
+        productId: product.id,
+        variantId: null,
+        quantity: 1,
+        sizeLabel: '',
+        name: product.name,
+        price: parseFloat(product.price),
+        image: getPremiumImage(product),
+        slug: product.slug,
+        brandName: product.brand_name,
+      });
+      alert(`Added ${product.name} to your collection.`);
+    }
+  };
 
   const featuredProducts = products.filter((p) => p.is_featured);
 
@@ -151,11 +126,11 @@ const Products = () => {
               <div className="flex flex-wrap gap-3">
                 {CATEGORY_DATA.map((cat) => (
                   <button
-                    key={cat.name}
+                    key={cat.id}
                     type="button"
-                    onClick={() => setFilter(cat.name)}
+                    onClick={() => setFilter(cat.id)}
                     className={`px-6 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all border ${
-                      currentCategory === cat.name
+                      currentCategory === cat.id
                         ? 'bg-gold-600 text-navy-950 border-gold-600'
                         : 'bg-transparent text-gold-600/50 border-gold-600/10 hover:border-gold-600/30 hover:text-gold-500'
                     }`}
@@ -167,7 +142,7 @@ const Products = () => {
 
               <AnimatePresence>
                 {currentCategory !== 'All' &&
-                  CATEGORY_DATA.find((c) => c.name === currentCategory)?.sub.length > 0 && (
+                  CATEGORY_DATA.find((c) => c.id === currentCategory)?.sub.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -183,9 +158,9 @@ const Products = () => {
                             : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
                         }`}
                       >
-                        All {currentCategory}
+                        All {CATEGORY_DATA.find(c => c.id === currentCategory)?.name}
                       </button>
-                      {CATEGORY_DATA.find((c) => c.name === currentCategory).sub.map((sub) => (
+                      {CATEGORY_DATA.find((c) => c.id === currentCategory).sub.map((sub) => (
                         <button
                           key={sub}
                           type="button"
@@ -245,30 +220,24 @@ const Products = () => {
                             Featured
                           </div>
                         )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gold-600/40">{product.brand_name}</p>
-                        <h3 className="text-lg font-serif text-white group-hover:text-gold-500 transition-colors leading-tight min-h-[50px]">
-                          {product.name}
-                        </h3>
-                        <div className="flex justify-between items-center pt-2">
-                          <span className="text-sm font-light text-gold-500 italic">
-                            KSh {parseFloat(product.price).toLocaleString()}
-                          </span>
-                          <motion.button
-                            whileHover={{ scale: 1.1, backgroundColor: '#d4af37', color: '#000814' }}
-                            whileTap={{ scale: 0.9 }}
+                        <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
                             onClick={(e) => {
                               e.preventDefault();
-                              e.stopPropagation();
                               handleQuickAdd(product);
                             }}
-                            className="w-10 h-10 border border-gold-600/20 flex items-center justify-center transition-all bg-navy-950 text-gold-600 shadow-lg shadow-gold-600/5"
+                            className="bg-white text-navy-950 px-6 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500"
                           >
-                            <ShoppingBag size={14} />
-                          </motion.button>
+                            Quick Add
+                          </button>
                         </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gold-600/50">{product.brand_name}</span>
+                        </div>
+                        <h3 className="text-lg font-serif text-white group-hover:text-gold-500 transition-colors">{product.name}</h3>
+                        <p className="text-gold-500 font-light italic">KSh {parseFloat(product.price).toLocaleString()}</p>
                       </div>
                     </Link>
                   </motion.div>
@@ -278,17 +247,13 @@ const Products = () => {
           )}
 
           {!loading && filteredProducts.length === 0 && (
-            <div className="py-32 text-center">
-              <p className="text-gold-600/30 text-[10px] uppercase tracking-widest font-bold">No products found.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setFilter('All');
-                  setSearchQuery('');
-                }}
-                className="mt-6 text-[10px] font-bold uppercase tracking-widest text-gold-500 border-b border-gold-500/30 pb-1"
+            <div className="text-center py-24 space-y-4">
+              <p className="text-gold-600/50 text-[10px] uppercase tracking-widest">No pieces found in this curation.</p>
+              <button 
+                onClick={() => setFilter('All')}
+                className="text-white text-[10px] font-bold uppercase tracking-widest border-b border-white/20 pb-1 hover:border-white transition-all"
               >
-                Reset Search
+                Clear Filters
               </button>
             </div>
           )}

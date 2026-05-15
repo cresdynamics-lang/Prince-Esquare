@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
 import { getPremiumImage } from '../utils/productImages';
+import { DUMMY_PRODUCTS } from '../utils/dummyData';
 
 function sizesForCategoryName(name) {
   const n = (name || '').toLowerCase();
@@ -32,38 +33,34 @@ const ProductDetail = () => {
   const [addedToCart, setAddedToCart] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoadError('');
-      setProduct(null);
-      try {
-        const res = await productAPI.getBySlug(slug);
-        if (cancelled) return;
-        if (!res.data?.success) {
-          setLoadError('Product not found.');
-          return;
-        }
-        const p = res.data.data;
-        setProduct(p);
-        const vars = p.variants || [];
-        setSelectedVariant(vars[0] || null);
-        const sizes = sizesForCategoryName(p.category_name);
-        setSelectedSize(sizes[0] || '');
-        try {
-          const rel = await productAPI.related(p.id);
-          if (!cancelled && rel.data?.success && Array.isArray(rel.data.data)) {
-            setRelated(rel.data.data.slice(0, 4));
-          }
-        } catch {
-          setRelated([]);
-        }
-      } catch {
-        if (!cancelled) setLoadError('Product not found.');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setLoadError('');
+    setProduct(null);
+    
+    // Use dummy data as requested by user
+    const found = DUMMY_PRODUCTS.find(p => p.slug === slug);
+    
+    if (found) {
+      const p = {
+        ...found,
+        thumbnail: getPremiumImage(found),
+        description: found.description || `Exquisite ${found.name} from our latest collection. Crafted with precision and the finest materials.`,
+        variants: [
+          { id: 1, value: 'Original Edit', price_modifier: 0 }
+        ]
+      };
+      setProduct(p);
+      setSelectedVariant(p.variants[0]);
+      const sizes = sizesForCategoryName(p.category_name);
+      setSelectedSize(sizes[0] || '');
+      
+      // Related products from same category
+      const rel = DUMMY_PRODUCTS.filter(item => item.category_name === p.category_name && item.id !== p.id)
+        .slice(0, 4)
+        .map(item => ({ ...item, thumbnail: getPremiumImage(item) }));
+      setRelated(rel);
+    } else {
+      setLoadError('Product not found.');
+    }
   }, [slug]);
 
   const unitPrice = product
