@@ -48,7 +48,9 @@ exports.status = async (req, res, next) => {
 
 exports.history = async (req, res, next) => {
     try {
-        formatResponse(res, 200, true, 'Payment history fetched', []);
+        const userId = req.user.id;
+        const result = await db.query('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+        formatResponse(res, 200, true, 'Payment history fetched', result.rows);
     } catch (error) {
         next(error);
     }
@@ -56,7 +58,25 @@ exports.history = async (req, res, next) => {
 
 exports.refund = async (req, res, next) => {
     try {
+        const { id } = req.body;
+        // Logic for refunding...
+        await db.query("UPDATE payments SET status = 'refunded' WHERE id = $1", [id]);
         formatResponse(res, 200, true, 'Refund processed');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.adminGetPayments = async (req, res, next) => {
+    try {
+        const result = await db.query(`
+            SELECT p.*, u.name as customer_name, o.id as order_ref
+            FROM payments p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN orders o ON p.order_id = o.id
+            ORDER BY p.created_at DESC
+        `);
+        formatResponse(res, 200, true, 'All payments fetched', result.rows);
     } catch (error) {
         next(error);
     }

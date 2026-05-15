@@ -221,20 +221,23 @@ const DashboardView = () => {
   const [stats, setStats] = useState(null);
   const [topProducts, setTopProducts] = useState([]);
   const [lowStock, setLowStock] = useState([]);
+  const [salesData, setSalesData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [statsRes, topRes, lowStockRes] = await Promise.all([
+        const [statsRes, topRes, lowStockRes, chartRes] = await Promise.all([
           adminAnalyticsAPI.getStats(),
           adminAnalyticsAPI.getTopProducts(),
-          adminAnalyticsAPI.getLowStock()
+          adminAnalyticsAPI.getLowStock(),
+          adminAnalyticsAPI.getSalesChart()
         ]);
         
         setStats(statsRes.data.data);
         setTopProducts(topRes.data.data);
         setLowStock(lowStockRes.data.data);
+        setSalesData(chartRes.data.data);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -294,20 +297,23 @@ const DashboardView = () => {
             <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Current Year</div>
           </div>
           <div className="p-8 h-64 flex items-end justify-between gap-2">
-             {[40, 65, 45, 80, 55, 90, 75, 60, 85, 70, 95, 80].map((h, i) => (
+             {salesData.length > 0 ? salesData.map((d, i) => (
                <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                 <div className="relative w-full">
+                 <div className="relative w-full flex justify-center">
                     <motion.div 
                       initial={{ height: 0 }}
-                      animate={{ height: `${h}%` }}
-                      className="w-full bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-lg opacity-40 group-hover:opacity-100 transition-all duration-500"
+                      animate={{ height: `${(d.total / Math.max(...salesData.map(s => s.total || 1))) * 100}%` }}
+                      className="w-8 bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-lg group-hover:from-gold-500 group-hover:to-gold-300 transition-all shadow-lg shadow-gold-600/10"
                     />
+                    <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gold-600 text-navy-950 text-[10px] font-bold px-2 py-1 rounded pointer-events-none">
+                      KSh {parseInt(d.total).toLocaleString()}
+                    </div>
                  </div>
-                 <span className="text-[9px] font-bold text-gold-500/30 uppercase tracking-tighter">
-                   {['J','F','M','A','M','J','J','A','S','O','N','D'][i]}
-                 </span>
+                 <span className="text-[10px] font-bold text-gold-500/30 uppercase tracking-widest">{d.month}</span>
                </div>
-             ))}
+             )) : (
+               <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs uppercase tracking-widest">No sales data yet</div>
+             )}
           </div>
         </div>
 
@@ -1063,14 +1069,14 @@ const ProductsView = () => {
                     onClick={() => setIsModalOpen(false)}
                     className="px-8 py-4 bg-navy-800 text-gold-500/60 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-navy-700 hover:text-gold-500 transition-all border border-gold-500/10"
                   >
-                    Discard
+                    Cancel
                   </button>
                   <button 
                     type="submit" 
                     disabled={submitting}
                     className="px-12 py-4 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all disabled:opacity-50 shadow-xl shadow-gold-600/20"
                   >
-                    {submitting ? 'AUTHENTICATING...' : 'COMMIT PRODUCT'}
+                    {submitting ? 'COMMITTING...' : 'SAVE PRODUCT'}
                   </button>
                 </div>
               </div>
@@ -1409,6 +1415,16 @@ const CustomersView = () => {
     c.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleToggleStatus = async (id, currentStatus) => {
+    try {
+      await adminCustomerAPI.updateStatus(id, !currentStatus);
+      setCustomers(customers.map(c => c.id === id ? { ...c, is_active: !currentStatus } : c));
+    } catch (error) {
+      console.error('Error updating customer status:', error);
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
@@ -1461,7 +1477,7 @@ const CustomersView = () => {
                       <div>
                         <div className="text-sm font-bold text-gold-100 flex items-center gap-2">
                           {c.name}
-                          {c.is_verified && <CheckCircle size={14} className="text-blue-400" />}
+                          {c.is_verified && <CheckCircle2 size={14} className="text-blue-400" />}
                         </div>
                         <div className="text-[10px] text-gold-500/40 uppercase tracking-widest mt-0.5">ID: {c.id.substring(0, 8)}</div>
                       </div>
@@ -1484,8 +1500,14 @@ const CustomersView = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      <button 
+                        onClick={() => handleToggleStatus(c.id, c.is_active)}
+                        className={`p-2 rounded-lg transition-all ${c.is_active ? 'text-red-400/40 hover:text-red-400 hover:bg-red-400/5' : 'text-green-400/40 hover:text-green-400 hover:bg-green-400/5'}`}
+                        title={c.is_active ? 'Suspend Account' : 'Activate Account'}
+                      >
+                        {c.is_active ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                      </button>
                       <button className="p-2 text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="View History"><Eye size={16} /></button>
-                      <button className="p-2 text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"><MoreVertical size={18} /></button>
                     </div>
                   </td>
                 </tr>
@@ -1504,6 +1526,23 @@ const CustomersView = () => {
 
 
 const AdminsView = () => {
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const res = await adminCustomerAPI.getAll({ role: 'admin' });
+        setAdmins(res.data.data.filter(u => u.role === 'admin'));
+      } catch (error) {
+        console.error('Error fetching admins:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAdmins();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
@@ -1512,29 +1551,32 @@ const AdminsView = () => {
           <UserPlus size={20} /> Add Staff
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[
-          { name: 'Super Admin', email: 'admin@princeesquire.com', role: 'Superadmin', last: '13 May, 09:14', color: 'border-red-400' },
-          { name: 'Store Manager', email: 'manager@princeesquire.com', role: 'Admin', last: '12 May, 15:30', color: 'border-gold-500' },
-          { name: 'Content Editor', email: 'editor@princeesquire.com', role: 'Editor', last: '10 May, 11:05', color: 'border-blue-400' },
-        ].map((admin, i) => (
-          <div key={i} className={`bg-navy-900/40 border-l-4 ${admin.color} p-6 rounded-r-2xl border-y border-r border-gold-500/10 backdrop-blur-sm group`}>
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <div className="text-sm font-bold text-gold-100">{admin.name}</div>
-                <div className="text-xs text-gold-500/40">{admin.email}</div>
+      
+      {loading ? (
+        <div className="py-24 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {admins.length > 0 ? admins.map((admin, i) => (
+            <div key={i} className={`bg-navy-900/40 border-l-4 border-gold-500 p-6 rounded-r-2xl border-y border-r border-gold-500/10 backdrop-blur-sm group`}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="text-sm font-bold text-gold-100">{admin.name}</div>
+                  <div className="text-xs text-gold-500/40">{admin.email}</div>
+                </div>
+                <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10`}>{admin.role}</span>
               </div>
-              <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10`}>{admin.role}</span>
-            </div>
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-[10px] text-gold-500/40 uppercase tracking-widest flex items-center gap-2">
-                <Clock size={12} /> Last Login: {admin.last}
+              <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
+                <span className="text-gold-500/30 uppercase">ID: {admin.id.substring(0, 8)}</span>
+                <span className="text-gold-500/30 uppercase">Active</span>
               </div>
-              <button className="text-gold-500/40 hover:text-gold-500 transition-colors"><MoreVertical size={18} /></button>
             </div>
-          </div>
-        ))}
-      </div>
+          )) : (
+            <div className="col-span-full py-12 text-center text-gold-500/40 text-sm">No admin accounts found.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1780,42 +1822,50 @@ const NewsletterView = () => {
 
 
 const PaymentsView = () => {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const res = await adminPaymentAPI.getAll();
+        setPayments(res.data.data);
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPayments();
+  }, []);
+
+  const totalMpesa = payments
+    .filter(p => p.method === 'M-Pesa' && p.status === 'Success')
+    .reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
+
+  const successRate = payments.length > 0 
+    ? (payments.filter(p => p.status === 'Success').length / payments.length) * 100 
+    : 0;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="bg-navy-900/40 border border-gold-500/10 p-8 rounded-3xl relative overflow-hidden group">
           <div className="relative z-10">
-            <div className="text-xs font-bold text-gold-500/40 uppercase tracking-widest mb-2">M-Pesa Collections</div>
-            <div className="text-3xl font-serif font-bold text-gold-100 mb-6">KSh 3,745,200</div>
+            <div className="text-xs font-bold text-gold-500/40 uppercase tracking-widest mb-2">Total Collections</div>
+            <div className="text-3xl font-serif font-bold text-gold-100 mb-6">KSh {totalMpesa.toLocaleString()}</div>
             <div className="flex gap-4">
               <div className="flex flex-col">
                 <span className="text-[10px] text-gold-500/30 uppercase">Transactions</span>
-                <span className="text-lg font-bold text-gold-200">842</span>
+                <span className="text-lg font-bold text-gold-200">{payments.length}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] text-gold-500/30 uppercase">Success Rate</span>
-                <span className="text-lg font-bold text-green-400">98.4%</span>
+                <span className="text-lg font-bold text-green-400">{successRate.toFixed(1)}%</span>
               </div>
             </div>
           </div>
           <Laptop size={120} className="absolute -bottom-4 -right-4 text-gold-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
-        </div>
-        <div className="bg-navy-900/40 border border-gold-500/10 p-8 rounded-3xl relative overflow-hidden group">
-          <div className="relative z-10">
-            <div className="text-xs font-bold text-gold-500/40 uppercase tracking-widest mb-2">Card Payments</div>
-            <div className="text-3xl font-serif font-bold text-gold-100 mb-6">KSh 1,076,100</div>
-            <div className="flex gap-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Transactions</span>
-                <span className="text-lg font-bold text-gold-200">142</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Success Rate</span>
-                <span className="text-lg font-bold text-green-400">94.2%</span>
-              </div>
-            </div>
-          </div>
-          <CardIcon size={120} className="absolute -bottom-4 -right-4 text-gold-500/5 -rotate-12 group-hover:rotate-0 transition-transform duration-700" />
         </div>
       </div>
       
@@ -1823,44 +1873,49 @@ const PaymentsView = () => {
         <div className="px-6 py-5 border-b border-gold-500/10 bg-navy-800/30">
           <h3 className="font-serif font-bold text-lg text-gold-100">Transaction History</h3>
         </div>
-        <table className="w-full text-left">
-          <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-            <tr>
-              <th className="px-6 py-4">Reference</th>
-              <th className="px-6 py-4">Order</th>
-              <th className="px-6 py-4">Method</th>
-              <th className="px-6 py-4">Amount</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gold-500/5">
-            {[
-              { ref: 'MP240513001', order: '#PE-0412', method: 'M-Pesa', amount: 'KSh 18,500', status: 'Success' },
-              { ref: 'MP240513002', order: '#PE-0411', method: 'M-Pesa', amount: 'KSh 9,750', status: 'Success' },
-              { ref: 'MP240512002', order: '#PE-0409', method: 'M-Pesa', amount: 'KSh 12,000', status: 'Refunded' },
-              { ref: 'CD240512001', order: '#PE-0410', method: 'Card', amount: 'KSh 34,200', status: 'Failed' },
-            ].map((p, i) => (
-              <tr key={i} className="hover:bg-navy-800/30 transition-colors">
-                <td className="px-6 py-4 font-mono text-xs text-gold-500">{p.ref}</td>
-                <td className="px-6 py-4 text-sm font-bold text-gold-100">{p.order}</td>
-                <td className="px-6 py-4 text-xs text-gold-500/60 uppercase">{p.method}</td>
-                <td className="px-6 py-4 font-bold text-gold-100">{p.amount}</td>
-                <td className="px-6 py-4">
-                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
-                    p.status === 'Success' ? 'border-green-400 text-green-400 bg-green-400/5' : 
-                    p.status === 'Refunded' ? 'border-gold-500 text-gold-500 bg-gold-500/5' : 'border-red-400 text-red-400 bg-red-400/5'
-                  }`}>
-                    {p.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-gold-500/40 hover:text-gold-500 transition-colors"><Eye size={16} /></button>
-                </td>
+        {loading ? (
+          <div className="py-24 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+          </div>
+        ) : payments.length > 0 ? (
+          <table className="w-full text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+              <tr>
+                <th className="px-6 py-4">Reference</th>
+                <th className="px-6 py-4">Order</th>
+                <th className="px-6 py-4">Method</th>
+                <th className="px-6 py-4">Amount</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Details</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gold-500/5">
+              {payments.map((p, i) => (
+                <tr key={i} className="hover:bg-navy-800/30 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs text-gold-500">{p.transaction_id}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-gold-100">#{p.order_ref?.substring(0, 8).toUpperCase()}</td>
+                  <td className="px-6 py-4 text-xs text-gold-500/60 uppercase">{p.method}</td>
+                  <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.amount).toLocaleString()}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
+                      p.status === 'Success' ? 'border-green-400 text-green-400 bg-green-400/5' : 
+                      p.status === 'Refunded' ? 'border-gold-500 text-gold-500 bg-gold-500/5' : 'border-red-400 text-red-400 bg-red-400/5'
+                    }`}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="text-gold-500/40 hover:text-gold-500 transition-colors"><Eye size={16} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="py-24 text-center text-gold-500/40 text-sm">
+            No transaction history found.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1974,81 +2029,122 @@ const ReviewsView = () => {
   );
 };
 
-
 const SettingsView = () => {
+  const [settings, setSettings] = useState({
+    store_name: '',
+    support_email: '',
+    phone_number: '',
+    store_currency: ''
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await adminSettingsAPI.get();
+        setSettings(res.data.data);
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await adminSettingsAPI.update(settings);
+      alert('Settings updated successfully');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Error saving settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-8 pb-12">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Store Info */}
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8">
+          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
             <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
               <Settings size={20} className="text-gold-500" /> Store Information
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { label: 'Store Name', val: 'Prince Esquire' },
-                { label: 'Support Email', val: 'hello@princeesquire.com' },
-                { label: 'Phone Number', val: '+254 700 000 000' },
-                { label: 'Store Currency', val: 'KES (KSh)' },
-              ].map((f, i) => (
-                <div key={i} className="space-y-2">
-                  <label className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">{f.label}</label>
-                  <input type="text" defaultValue={f.val} className="w-full bg-navy-800/50 border border-gold-500/10 px-4 py-3 rounded-xl text-sm text-gold-100 focus:border-gold-500/40 transition-all outline-none" />
-                </div>
-              ))}
-            </div>
+            {loading ? (
+              <div className="py-12 text-center text-gold-500/40 uppercase tracking-widest text-xs">Retrieving configurations...</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[
+                  { label: 'Store Name', key: 'store_name' },
+                  { label: 'Support Email', key: 'support_email' },
+                  { label: 'Phone Number', key: 'phone_number' },
+                  { label: 'Store Currency', key: 'store_currency' },
+                ].map((f, i) => (
+                  <div key={i} className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">{f.label}</label>
+                    <input 
+                      type="text" 
+                      value={settings[f.key] || ''} 
+                      onChange={(e) => setSettings({...settings, [f.key]: e.target.value.toUpperCase()})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase" 
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Shipping Zones */}
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8">
-             <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
-              <Truck size={20} className="text-gold-500" /> Shipping & Logistics
+          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
+            <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
+              <Mail size={20} className="text-gold-500" /> Notification Preferences
             </h4>
             <div className="space-y-4">
-               {[
-                 { zone: 'Nairobi Metro', counties: 'Nairobi, Kiambu, Kajiado', rate: 'KSh 350', time: 'Same Day' },
-                 { zone: 'Central & Rift', counties: 'Nakuru, Nyeri, Meru', rate: 'KSh 650', time: '24 - 48 Hours' },
-               ].map((z, i) => (
-                 <div key={i} className="flex items-center justify-between p-4 bg-navy-800/30 border border-gold-500/5 rounded-xl">
-                   <div>
-                     <div className="text-sm font-bold text-gold-100">{z.zone}</div>
-                     <div className="text-[10px] text-gold-500/40 mt-1">{z.counties}</div>
-                   </div>
-                   <div className="text-right">
-                     <div className="text-sm font-bold text-gold-500">{z.rate}</div>
-                     <div className="text-[9px] uppercase font-bold text-gold-500/20">{z.time}</div>
-                   </div>
-                 </div>
-               ))}
+              {[
+                'Order Confirmation Emails',
+                'Low Stock Alerts',
+                'New Customer Registrations',
+                'Daily Sales Summaries'
+              ].map((pref, i) => (
+                <label key={i} className="flex items-center justify-between p-4 bg-navy-950/50 rounded-xl border border-gold-500/5 cursor-pointer group">
+                  <span className="text-xs font-bold text-gold-100 group-hover:text-gold-500 transition-colors uppercase">{pref}</span>
+                  <div className="w-12 h-6 bg-navy-800 rounded-full relative border border-gold-500/20">
+                    <div className="absolute top-1 right-1 w-4 h-4 bg-gold-600 rounded-full" />
+                  </div>
+                </label>
+              ))}
             </div>
           </div>
         </div>
 
         <div className="space-y-8">
-          {/* Integrations */}
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8">
-            <h4 className="font-serif font-bold text-lg text-gold-100 mb-6 flex items-center gap-3">
-              <Globe size={18} className="text-gold-500" /> System Integrations
-            </h4>
-            <div className="space-y-4">
-              {[
-                { name: 'M-Pesa Daraja API', status: 'Connected', color: 'text-green-400' },
-                { name: 'Cloudinary CDN', status: 'Connected', color: 'text-green-400' },
-                { name: 'SendGrid Email', status: 'Connected', color: 'text-green-400' },
-                { name: 'Google Analytics', status: 'Not Configured', color: 'text-gold-500/20' },
-              ].map((int, i) => (
-                <div key={i} className="flex items-center justify-between p-3 border-b border-gold-500/5 last:border-0">
-                  <span className="text-xs text-gold-200">{int.name}</span>
-                  <span className={`text-[9px] font-bold uppercase ${int.color}`}>{int.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+           <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
+             <h5 className="text-[10px] font-black text-gold-500/40 uppercase tracking-widest mb-6 border-b border-gold-500/10 pb-2">System Integrations</h5>
+             <div className="space-y-6">
+                {[
+                  { label: 'Daraja API', val: 'Connected', color: 'text-green-400' },
+                  { label: 'Cloudinary', val: 'Operational', color: 'text-green-400' },
+                  { label: 'PostgreSQL', val: 'Connected', color: 'text-green-400' },
+                  { label: 'SendGrid', val: 'Operational', color: 'text-green-400' },
+                ].map((h, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gold-100 uppercase">{h.label}</span>
+                    <span className={`text-[10px] font-black uppercase ${h.color}`}>{h.val}</span>
+                  </div>
+                ))}
+             </div>
+           </div>
 
-          <button className="w-full py-4 bg-gold-600 text-navy-950 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-gold-600/10 hover:bg-gold-500 hover:-translate-y-1 transition-all duration-300">
-            Save All Changes
-          </button>
+           <button 
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full py-5 bg-gold-600 text-navy-950 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all disabled:opacity-50"
+           >
+             {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
+           </button>
         </div>
       </div>
     </div>

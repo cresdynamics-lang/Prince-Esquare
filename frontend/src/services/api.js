@@ -94,10 +94,11 @@ export const adminBrandAPI = {
 
 // ── ADMIN – CUSTOMERS ────────────────────────────────────────────────
 export const adminCustomerAPI = {
-  getAll:        (params) => API.get('/admin/customers/admin/all', { params }),
-  getOne:        (id)     => API.get(`/admin/customers/admin/${id}`),
-  updateStatus:  (id, status) => API.patch(`/admin/customers/admin/${id}/status`, { status }),
+  getAll:        (params) => API.get('/admin/customers/all', { params }),
+  getOne:        (id)     => API.get(`/admin/customers/${id}`),
+  updateStatus:  (id, status) => API.patch(`/admin/customers/${id}/status`, { is_active: status }),
 };
+
 
 // ── ADMIN – COUPONS ───────────────────────────────────────────────────
 export const adminCouponAPI = {
@@ -125,6 +126,15 @@ export const adminReviewAPI = {
   getAll:   ()   => API.get('/admin/reviews'),
   approve:  (id) => API.patch(`/admin/reviews/${id}/approve`),
   remove:   (id) => API.delete(`/admin/reviews/${id}`),
+};
+
+export const adminPaymentAPI = {
+  getAll: () => API.get('/payments/admin/all'),
+};
+
+export const adminSettingsAPI = {
+  get:    ()     => API.get('/admin/settings'),
+  update: (data) => API.put('/admin/settings', data),
 };
 
 // ─────────────────────────────────────────────────────────────────────

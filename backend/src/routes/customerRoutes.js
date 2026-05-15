@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const adminCustomerController = require('../controllers/adminCustomerController');
-const { protect } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 
-router.get('/admin/all', protect, adminCustomerController.getCustomers);
-router.get('/admin/:id', protect, adminCustomerController.getCustomerDetail);
-router.patch('/admin/:id/status', protect, adminCustomerController.updateCustomerStatus);
+router.get('/all', protect, adminOnly, adminCustomerController.getCustomers);
+router.get('/:id', protect, adminOnly, adminCustomerController.getCustomerDetail);
+router.patch('/:id/status', protect, adminOnly, adminCustomerController.updateCustomerStatus);
 
 module.exports = router;
