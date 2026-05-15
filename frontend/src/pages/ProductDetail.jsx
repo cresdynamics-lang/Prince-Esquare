@@ -36,27 +36,44 @@ const ProductDetail = () => {
     setLoadError('');
     setProduct(null);
     
-    // Use dummy data as requested by user
     const found = DUMMY_PRODUCTS.find(p => p.slug === slug);
     
     if (found) {
+      // Find siblings that are variants (same brand and similar base name)
+      // e.g. "Clarks Gereld Tie in Black" and "Clarks Gereld Tie in Tan"
+      const baseName = found.name.split(' in ')[0];
+      const variants = DUMMY_PRODUCTS.filter(p => 
+        p.name.startsWith(baseName) && p.brand_name === found.brand_name
+      ).map(v => ({
+        id: v.id,
+        value: v.name.includes(' in ') ? v.name.split(' in ')[1] : v.name,
+        price_modifier: parseFloat(v.price) - parseFloat(found.price),
+        slug: v.slug,
+        thumbnail: v.thumbnail
+      }));
+
       const p = {
         ...found,
-        thumbnail: getPremiumImage(found),
+        thumbnail: found.thumbnail, // Already set in dummyData
         description: found.description || `Exquisite ${found.name} from our latest collection. Crafted with precision and the finest materials.`,
-        variants: [
-          { id: 1, value: 'Original Edit', price_modifier: 0 }
-        ]
+        variants: variants.length > 1 ? variants : []
       };
+      
       setProduct(p);
-      setSelectedVariant(p.variants[0]);
+      const initialVariant = variants.find(v => v.slug === slug) || { id: p.id, value: 'Original', price_modifier: 0, slug: p.slug, thumbnail: p.thumbnail };
+      setSelectedVariant(initialVariant);
+      
       const sizes = sizesForCategoryName(p.category_name);
       setSelectedSize(sizes[0] || '');
       
-      // Related products from same category
-      const rel = DUMMY_PRODUCTS.filter(item => item.category_name === p.category_name && item.id !== p.id)
+      // Related products from same category, excluding variants
+      const variantSlugs = variants.map(v => v.slug);
+      const rel = DUMMY_PRODUCTS.filter(item => 
+        item.category_name === p.category_name && 
+        !variantSlugs.includes(item.slug)
+      )
         .slice(0, 4)
-        .map(item => ({ ...item, thumbnail: getPremiumImage(item) }));
+        .map(item => ({ ...item, thumbnail: item.thumbnail }));
       setRelated(rel);
     } else {
       setLoadError('Product not found.');
@@ -74,7 +91,7 @@ const ProductDetail = () => {
     sizeLabel: selectedSize,
     name: product.name,
     price: unitPrice,
-    image: getPremiumImage(product),
+    image: selectedVariant?.thumbnail || product.thumbnail,
     slug: product.slug,
     brandName: product.brand_name,
   });
@@ -122,8 +139,8 @@ const ProductDetail = () => {
               <div className="relative aspect-square md:aspect-[4/5] bg-navy-900 overflow-hidden rounded-sm border border-gold-600/10">
                 <AnimatePresence mode="wait">
                   <motion.img
-                    key={getPremiumImage(product)}
-                    src={getPremiumImage(product)}
+                    key={selectedVariant?.thumbnail || product.thumbnail}
+                    src={selectedVariant?.thumbnail || product.thumbnail}
                     alt={product.name}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -132,11 +149,6 @@ const ProductDetail = () => {
                     className="w-full h-full object-cover"
                   />
                 </AnimatePresence>
-                {product.is_featured && (
-                  <div className="absolute top-6 left-6 bg-gold-600 text-navy-950 px-4 py-1 text-[10px] font-bold uppercase tracking-widest">
-                    Featured Edit
-                  </div>
-                )}
               </div>
             </div>
 

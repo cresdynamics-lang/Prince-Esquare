@@ -67,8 +67,6 @@ const Products = () => {
     }
   };
 
-  const featuredProducts = products.filter((p) => p.is_featured);
-
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,47 +78,20 @@ const Products = () => {
     <div className="bg-navy-950 min-h-screen font-serif">
       <Navbar />
 
-      <section className="pt-32 pb-24 bg-navy-950 overflow-hidden border-b border-gold-600/5">
+      <main className="pt-32 pb-20">
         <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between mb-12">
-            <div className="space-y-4">
-              <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold">Curated Selections</span>
-              <h1 className="text-5xl md:text-7xl font-serif text-white tracking-tight">The Featured Edit</h1>
-            </div>
-            <Link
-              to="/products"
-              className="hidden md:flex items-center space-x-3 text-[10px] font-bold uppercase tracking-widest text-gold-500 group mt-6 md:mt-0"
-            >
-              <span>View Full Collection</span>
-              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
+          <div className="mb-12">
+            <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold">Prince Esquire</span>
+            <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight mt-2">
+              {currentCategory === 'All' ? 'Our Collections' : CATEGORY_DATA.find(c => c.id === currentCategory)?.name}
+            </h1>
+            {currentSub !== 'All' && (
+              <p className="text-gold-600/60 text-[12px] uppercase tracking-widest mt-4">
+                Exploring: {currentSub}
+              </p>
+            )}
           </div>
 
-          <div className="flex overflow-x-auto pb-8 space-x-8 scrollbar-hide snap-x snap-mandatory">
-            {featuredProducts.map((p) => (
-              <motion.div key={p.id} className="min-w-[300px] md:min-w-[450px] snap-start" whileHover={{ y: -10 }}>
-                <Link to={`/product/${p.slug}`} className="block group">
-                    <div className="aspect-[4/5] bg-navy-950 overflow-hidden rounded-sm mb-6 border border-gold-600/10 group-hover:border-gold-600 transition-colors">
-                      <img
-                        src={getPremiumImage(p)}
-                        alt={p.name}
-                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                      />
-                    </div>
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gold-600/50">{p.brand_name}</span>
-                    <h3 className="text-2xl font-serif text-white group-hover:text-gold-500 transition-colors">{p.name}</h3>
-                    <p className="text-gold-500 font-light italic">KSh {parseFloat(p.price).toLocaleString()}</p>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <main className="py-20">
-        <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-8 md:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
             <div className="w-full space-y-8">
               <div className="flex flex-wrap gap-3">
@@ -215,11 +186,6 @@ const Products = () => {
                           alt={product.name}
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
-                        {product.is_featured && (
-                          <div className="absolute top-4 left-4 bg-gold-600 text-navy-950 px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
-                            Featured
-                          </div>
-                        )}
                         <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button 
                             onClick={(e) => {
