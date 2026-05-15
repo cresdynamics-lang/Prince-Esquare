@@ -122,7 +122,6 @@ async function createAdmin() {
             );
             console.log('Admin user created:', email);
         }
-        console.log('Password:', password);
         process.exit(0);
     } catch (error) {
         console.error('Error seeding admin:', error);
@@ -130,4 +129,4 @@ async function createAdmin() {
     }
 }
 
-seedAdmin();
+createAdmin();
