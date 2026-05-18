@@ -470,6 +470,7 @@ export const getDummyProducts = (category = 'All', sub = 'All') => {
 
   return filtered.map(p => ({
     ...p,
+    id: `dummy-${p.id}`,
     description: `Exquisite ${p.name} from our latest collection. Crafted with precision and the finest materials.`,
     is_active: true,
     is_featured: false, // User wants to remove featured edit, so we don't need this

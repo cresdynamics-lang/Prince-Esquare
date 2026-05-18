@@ -21,17 +21,43 @@ exports.getDashboardStats = async (req, res, next) => {
 
 exports.getSalesChart = async (req, res, next) => {
     try {
-        // Fetches monthly sales for the current year
-        const result = await db.query(`
-            SELECT 
-                TO_CHAR(created_at, 'Mon') as month, 
-                SUM(total_amount) as total 
-            FROM orders 
-            WHERE created_at >= DATE_TRUNC('year', CURRENT_DATE)
-            GROUP BY month, DATE_PART('month', created_at)
-            ORDER BY DATE_PART('month', created_at)
-        `);
-        formatResponse(res, 200, true, 'Sales chart data fetched', result.rows);
+        const { type = 'monthly' } = req.query;
+        let query = '';
+        
+        if (type === 'daily') {
+            query = `
+                SELECT 
+                    TO_CHAR(created_at, 'YYYY-MM-DD') as label, 
+                    SUM(total_amount) as total 
+                FROM orders 
+                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY label
+                ORDER BY label
+            `;
+        } else if (type === 'weekly') {
+            query = `
+                SELECT 
+                    TO_CHAR(DATE_TRUNC('week', created_at), 'YYYY-"W"IW') as label, 
+                    SUM(total_amount) as total 
+                FROM orders 
+                WHERE created_at >= CURRENT_DATE - INTERVAL '12 weeks'
+                GROUP BY label
+                ORDER BY label
+            `;
+        } else { // monthly
+            query = `
+                SELECT 
+                    TO_CHAR(created_at, 'Mon') as label, 
+                    SUM(total_amount) as total 
+                FROM orders 
+                WHERE created_at >= DATE_TRUNC('year', CURRENT_DATE)
+                GROUP BY label, DATE_PART('month', created_at)
+                ORDER BY DATE_PART('month', created_at)
+            `;
+        }
+
+        const result = await db.query(query);
+        formatResponse(res, 200, true, `${type} sales chart data fetched`, result.rows);
     } catch (error) {
         next(error);
     }

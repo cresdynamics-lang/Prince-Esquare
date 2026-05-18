@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
 import { getPremiumImage } from '../utils/productImages';
 import { getDummyProducts } from '../utils/dummyData';
+import { productAPI } from '../services/api';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,11 +33,32 @@ const Products = () => {
   const currentSub = searchParams.get('sub') || 'All';
 
   useEffect(() => {
-    setLoading(true);
-    const data = getDummyProducts(currentCategory, currentSub);
-    setProducts(data);
-    setLoading(false);
-    window.scrollTo(0, 0);
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const params = {};
+        if (currentCategory !== 'All') params.category = currentCategory;
+        if (currentSub !== 'All') params.sub = currentSub;
+        
+        // Fetch from backend
+        const response = await productAPI.list(params);
+        const fetchedProducts = response.data.data.products || response.data.data || [];
+        
+        // Get dummy products
+        const dummyData = getDummyProducts(currentCategory, currentSub);
+        
+        // Combine them
+        setProducts([...dummyData, ...fetchedProducts]);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        // Fallback to just dummy products if backend fails
+        setProducts(getDummyProducts(currentCategory, currentSub));
+      } finally {
+        setLoading(false);
+        window.scrollTo(0, 0);
+      }
+    };
+    fetchProducts();
   }, [currentCategory, currentSub]);
 
   const setFilter = (cat, sub = 'All') => {

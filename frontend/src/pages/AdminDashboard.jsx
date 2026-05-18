@@ -51,7 +51,7 @@ const AdminDashboard = () => {
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
-    { id: 'orders', label: 'Orders', icon: Package, section: 'Store', badge: '12' },
+    { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
     { id: 'categories', label: 'Categories', icon: Tag, section: 'Store' },
     { id: 'brands', label: 'Brands', icon: Award, section: 'Store' },
@@ -257,10 +257,10 @@ const DashboardView = () => {
   }
 
   const statCards = [
-    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard, up: true, change: '+12%' },
-    { label: 'Total Orders', value: stats?.orders || 0, icon: Package, up: true, change: '+5%' },
-    { label: 'Customers', value: stats?.customers || 0, icon: Users, up: true, change: '+8%' },
-    { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock, up: stats?.pendingOrders < 5, change: stats?.pendingOrders > 10 ? 'Action required' : 'Manageable' },
+    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard },
+    { label: 'Total Orders', value: stats?.orders || 0, icon: Package },
+    { label: 'Customers', value: stats?.customers || 0, icon: Users },
+    { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock },
   ];
 
   return (
@@ -273,7 +273,7 @@ const DashboardView = () => {
               <div className="p-3 bg-navy-800/50 rounded-xl group-hover:bg-gold-600 group-hover:text-navy-950 transition-all">
                 <stat.icon size={22} className="text-gold-500 group-hover:text-navy-950" />
               </div>
-              {stat.up ? (
+              {stat.change && (stat.up ? (
                 <span className="flex items-center text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">
                   <ArrowUpRight size={14} className="mr-1" /> {stat.change}
                 </span>
@@ -281,7 +281,7 @@ const DashboardView = () => {
                 <span className="flex items-center text-xs font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg">
                   <ArrowDownRight size={14} className="mr-1" /> {stat.change}
                 </span>
-              )}
+              ))}
             </div>
             <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest mb-1">{stat.label}</div>
             <div className="text-2xl font-serif font-bold text-gold-100">{stat.value}</div>
@@ -309,7 +309,7 @@ const DashboardView = () => {
                       KSh {parseInt(d.total).toLocaleString()}
                     </div>
                  </div>
-                 <span className="text-[10px] font-bold text-gold-500/30 uppercase tracking-widest">{d.month}</span>
+                 <span className="text-[10px] font-bold text-gold-500/30 uppercase tracking-widest">{d.label}</span>
                </div>
              )) : (
                <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs uppercase tracking-widest">No sales data yet</div>
@@ -1333,38 +1333,106 @@ const CategoriesView = () => {
 const BrandsView = () => {
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentBrand, setCurrentBrand] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    is_featured: false,
+    is_active: true
+  });
+
+  const fetchBrands = async () => {
+    setLoading(true);
+    try {
+      const res = await adminBrandAPI.getAll();
+      setBrands(res.data.data);
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        const res = await adminBrandAPI.getAll();
-        setBrands(res.data.data);
-      } catch (error) {
-        console.error('Error fetching brands:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchBrands();
   }, []);
 
+  const handleOpenModal = (brand = null) => {
+    if (brand) {
+      setCurrentBrand(brand);
+      setFormData({
+        name: brand.name || '',
+        slug: brand.slug || '',
+        description: brand.description || '',
+        is_featured: brand.is_featured || false,
+        is_active: brand.is_active ?? true
+      });
+    } else {
+      setCurrentBrand(null);
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        is_featured: false,
+        is_active: true
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this brand?')) {
+      try {
+        await adminBrandAPI.remove(id);
+        fetchBrands();
+      } catch (error) {
+        alert('Error deleting brand');
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (currentBrand) {
+        await adminBrandAPI.update(currentBrand.id, formData);
+      } else {
+        await adminBrandAPI.create(formData);
+      }
+      setIsModalOpen(false);
+      fetchBrands();
+    } catch (error) {
+      alert('Error saving brand');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
        <div className="flex items-center justify-between mb-8">
         <h3 className="text-xl font-serif font-bold text-gold-100">Brand Partners ({brands.length})</h3>
-        <button className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20">
-          Add Brand
+        <button 
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 px-6 py-3 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl font-bold hover:bg-navy-800 transition-all"
+        >
+          <Plus size={20} /> Add Brand
         </button>
       </div>
 
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
       {loading ? (
         <div className="py-24 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
         </div>
       ) : brands.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
           {brands.map((brand) => (
-            <div key={brand.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl flex items-center justify-between group backdrop-blur-sm">
+            <div key={brand.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl flex items-center justify-between group backdrop-blur-sm transition-all hover:bg-navy-800/50">
               <div>
                 <div className="text-lg font-bold text-gold-100 mb-1">{brand.name}</div>
                 <div className="text-xs text-gold-500/40 mb-3">{brand.product_count || 0} products live</div>
@@ -1375,15 +1443,105 @@ const BrandsView = () => {
                    </span>
                 </div>
               </div>
-              <button className="w-10 h-10 bg-navy-800 rounded-xl border border-gold-500/10 flex items-center justify-center text-gold-500/40 group-hover:border-gold-500/40 transition-all">
-                <Settings size={18} />
-              </button>
+              <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleOpenModal(brand)} className="w-10 h-10 bg-navy-800 rounded-xl border border-gold-500/10 flex items-center justify-center text-gold-500/60 hover:text-gold-500 hover:border-gold-500/40 transition-all">
+                  <Edit size={18} />
+                </button>
+                <button onClick={() => handleDelete(brand.id)} className="w-10 h-10 bg-red-400/10 rounded-xl border border-red-400/20 flex items-center justify-center text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition-all">
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="py-24 text-center text-gold-500/40 text-sm">
           No brand partners found.
+        </div>
+      )}
+      </div>
+
+      {/* Brand Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-navy-900 border border-gold-500/20 rounded-3xl p-8 w-full max-w-lg shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h4 className="text-2xl font-serif font-bold text-gold-100">
+                {currentBrand ? 'Edit Brand' : 'Create New Brand'}
+              </h4>
+              <button onClick={() => setIsModalOpen(false)} className="text-gold-500/40 hover:text-gold-500"><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
+                      }}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.slug}
+                      onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                  <textarea 
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                  />
+                </div>
+
+              <div className="flex gap-8">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.is_featured}
+                    onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
+                    className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gold-100">Featured Brand</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                    className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gold-100">Active</span>
+                </label>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={submitting}
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+              >
+                {submitting ? 'SAVING...' : 'SAVE BRAND'}
+              </button>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>
@@ -1528,27 +1686,83 @@ const CustomersView = () => {
 const AdminsView = () => {
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    permissions: ['products', 'orders']
+  });
+
+  const fetchAdmins = async () => {
+    setLoading(true);
+    try {
+      // Fetch both staff and admins
+      const [resStaff, resAdmin] = await Promise.all([
+        adminCustomerAPI.getAll({ role: 'staff' }),
+        adminCustomerAPI.getAll({ role: 'admin' })
+      ]);
+      const combined = [...resAdmin.data.data, ...resStaff.data.data];
+      setAdmins(combined);
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchAdmins = async () => {
-      try {
-        const res = await adminCustomerAPI.getAll({ role: 'admin' });
-        setAdmins(res.data.data.filter(u => u.role === 'admin'));
-      } catch (error) {
-        console.error('Error fetching admins:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchAdmins();
   }, []);
+
+  const handleOpenModal = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      permissions: ['products', 'orders']
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await adminCustomerAPI.createStaff(formData);
+      setIsModalOpen(false);
+      fetchAdmins();
+    } catch (error) {
+      console.error('Error creating staff:', error);
+      alert('Error creating staff member.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (id, currentStatus) => {
+    try {
+      await adminCustomerAPI.updateStatus(id, !currentStatus);
+      fetchAdmins();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-xl font-serif font-bold text-gold-100">Internal Access Controls</h3>
-        <button className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center gap-2">
-          <UserPlus size={20} /> Add Staff
+        <button 
+          onClick={handleOpenModal}
+          className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center gap-2 hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20"
+        >
+          <UserPlus size={20} /> ADD STAFF
         </button>
       </div>
       
@@ -1562,19 +1776,98 @@ const AdminsView = () => {
             <div key={i} className={`bg-navy-900/40 border-l-4 border-gold-500 p-6 rounded-r-2xl border-y border-r border-gold-500/10 backdrop-blur-sm group`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <div className="text-sm font-bold text-gold-100">{admin.name}</div>
+                  <div className="text-sm font-bold text-gold-100 flex items-center gap-2">
+                    {admin.name}
+                    {admin.is_active === false && <span className="w-2 h-2 rounded-full bg-red-500"></span>}
+                  </div>
                   <div className="text-xs text-gold-500/40">{admin.email}</div>
                 </div>
-                <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10`}>{admin.role}</span>
+                <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10 ${admin.role === 'admin' ? 'text-gold-400' : 'text-blue-400'}`}>
+                  {admin.role}
+                </span>
               </div>
               <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
                 <span className="text-gold-500/30 uppercase">ID: {admin.id.substring(0, 8)}</span>
-                <span className="text-gold-500/30 uppercase">Active</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleToggleStatus(admin.id, admin.is_active !== false)}
+                    className="p-1.5 rounded-lg text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 transition-all"
+                    title={admin.is_active !== false ? "Suspend Access" : "Restore Access"}
+                  >
+                    {admin.is_active !== false ? <UserMinus size={14} /> : <CheckCircle2 size={14} />}
+                  </button>
+                </div>
               </div>
             </div>
           )) : (
             <div className="col-span-full py-12 text-center text-gold-500/40 text-sm">No admin accounts found.</div>
           )}
+        </div>
+      )}
+
+      {/* Admin/Staff Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-navy-900 border border-gold-500/20 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+          >
+            <div className="flex justify-between items-center p-6 border-b border-gold-500/10 bg-navy-900/50">
+              <h3 className="font-serif font-bold text-gold-100 text-xl">ADD NEW STAFF</h3>
+              <button onClick={handleCloseModal} className="text-gold-500/40 hover:text-gold-500 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
+                    placeholder="E.g. James Arthur"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Email Address</label>
+                  <input 
+                    type="email" 
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
+                    placeholder="staff@prince-esquare.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Temporary Password</label>
+                  <input 
+                    type="password" 
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={submitting}
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+              >
+                {submitting ? 'CREATING...' : 'CREATE STAFF ACCOUNT'}
+              </button>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

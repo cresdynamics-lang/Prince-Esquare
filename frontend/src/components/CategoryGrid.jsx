@@ -1,38 +1,72 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { adminCategoryAPI } from '../services/api';
+
+const dummyCategories = [
+  {
+    title: 'The Shoe Atelier',
+    subtitle: 'Premium Italian Craftsmanship',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
+    span: 'col-span-1 row-span-2',
+    category: 'shoes',
+  },
+  {
+    title: 'Luxury Tracksuits',
+    subtitle: 'Prada & Zegna Collections',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
+    span: 'col-span-1 row-span-1',
+    category: 'tracksuits',
+  },
+  {
+    title: 'Executive Shirts',
+    subtitle: 'The Presidential Series',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
+    span: 'col-span-1 row-span-1',
+    category: 'shirts',
+  },
+  {
+    title: 'Tailored Essentials',
+    subtitle: 'Dockers & Smart Trousers',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.20 PM.jpeg',
+    span: 'col-span-2 row-span-1',
+    category: 'trousers',
+  },
+];
 
 const CategoryGrid = () => {
   const navigate = useNavigate();
-  const categories = [
-    {
-      title: 'The Shoe Atelier',
-      subtitle: 'Premium Italian Craftsmanship',
-      image: '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
-      span: 'col-span-1 row-span-2',
-      category: 'shoes',
-    },
-    {
-      title: 'Luxury Tracksuits',
-      subtitle: 'Prada & Zegna Collections',
-      image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
-      span: 'col-span-1 row-span-1',
-      category: 'tracksuits',
-    },
-    {
-      title: 'Executive Shirts',
-      subtitle: 'The Presidential Series',
-      image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
-      span: 'col-span-1 row-span-1',
-      category: 'shirts',
-    },
-    {
-      title: 'Tailored Essentials',
-      subtitle: 'Dockers & Smart Trousers',
-      image: '/WhatsApp Image 2026-05-12 at 8.07.20 PM.jpeg',
-      span: 'col-span-2 row-span-1',
-      category: 'trousers',
-    },
-  ];
+  const [categories, setCategories] = useState(dummyCategories);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await adminCategoryAPI.getAll();
+        const fetchedCats = res.data.data || [];
+        
+        // Map to our UI format
+        const formattedCats = fetchedCats.map((c, i) => ({
+          title: c.name,
+          subtitle: c.description || 'Premium Collection',
+          image: c.image || '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
+          span: 'col-span-1 row-span-1',
+          category: c.slug || c.name.toLowerCase(),
+        }));
+        
+        // Combine dummy and fetched categories
+        setCategories([...dummyCategories, ...formattedCats]);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+
+  if (loading || categories.length === 0) return null;
 
   return (
     <section className="py-32 bg-navy-950">

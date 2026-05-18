@@ -33,51 +33,81 @@ const ProductDetail = () => {
   const [addedToCart, setAddedToCart] = useState(false);
 
   useEffect(() => {
-    setLoadError('');
-    setProduct(null);
-    
-    const found = DUMMY_PRODUCTS.find(p => p.slug === slug);
-    
-    if (found) {
-      // Find siblings that are variants (same brand and similar base name)
-      // e.g. "Clarks Gereld Tie in Black" and "Clarks Gereld Tie in Tan"
-      const baseName = found.name.split(' in ')[0];
-      const variants = DUMMY_PRODUCTS.filter(p => 
-        p.name.startsWith(baseName) && p.brand_name === found.brand_name
-      ).map(v => ({
-        id: v.id,
-        value: v.name.includes(' in ') ? v.name.split(' in ')[1] : v.name,
-        price_modifier: parseFloat(v.price) - parseFloat(found.price),
-        slug: v.slug,
-        thumbnail: v.thumbnail
-      }));
+    const fetchProduct = async () => {
+      setLoadError('');
+      setProduct(null);
 
-      const p = {
-        ...found,
-        thumbnail: found.thumbnail, // Already set in dummyData
-        description: found.description || `Exquisite ${found.name} from our latest collection. Crafted with precision and the finest materials.`,
-        variants: variants.length > 1 ? variants : []
-      };
-      
-      setProduct(p);
-      const initialVariant = variants.find(v => v.slug === slug) || { id: p.id, value: 'Original', price_modifier: 0, slug: p.slug, thumbnail: p.thumbnail };
-      setSelectedVariant(initialVariant);
-      
-      const sizes = sizesForCategoryName(p.category_name);
-      setSelectedSize(sizes[0] || '');
-      
-      // Related products from same category, excluding variants
-      const variantSlugs = variants.map(v => v.slug);
-      const rel = DUMMY_PRODUCTS.filter(item => 
-        item.category_name === p.category_name && 
-        !variantSlugs.includes(item.slug)
-      )
-        .slice(0, 4)
-        .map(item => ({ ...item, thumbnail: item.thumbnail }));
-      setRelated(rel);
-    } else {
-      setLoadError('Product not found.');
-    }
+      // Try dummy first
+      let found = DUMMY_PRODUCTS.find(p => p.slug === slug);
+      let isDummy = !!found;
+
+      // If not dummy, try backend
+      if (!found) {
+        try {
+          const res = await productAPI.getBySlug(slug);
+          found = res.data.data;
+        } catch (error) {
+          setLoadError('Product not found.');
+          return;
+        }
+      }
+
+      if (found) {
+        let p, variants = [], rel = [];
+
+        if (isDummy) {
+          // Dummy specific logic
+          const baseName = found.name.split(' in ')[0];
+          variants = DUMMY_PRODUCTS.filter(p =>
+            p.name.startsWith(baseName) && p.brand_name === found.brand_name
+          ).map(v => ({
+            id: v.id,
+            value: v.name.includes(' in ') ? v.name.split(' in ')[1] : v.name,
+            price_modifier: parseFloat(v.price) - parseFloat(found.price),
+            slug: v.slug,
+            thumbnail: v.thumbnail
+          }));
+
+          p = {
+            ...found,
+            thumbnail: found.thumbnail,
+            description: found.description || `Exquisite ${found.name} from our latest collection. Crafted with precision and the finest materials.`,
+            variants: variants.length > 1 ? variants : []
+          };
+
+          const variantSlugs = variants.map(v => v.slug);
+          rel = DUMMY_PRODUCTS.filter(item =>
+            item.category_name === p.category_name &&
+            !variantSlugs.includes(item.slug)
+          ).slice(0, 4).map(item => ({ ...item, thumbnail: item.thumbnail }));
+        } else {
+          // Backend specific logic
+          p = {
+            ...found,
+            thumbnail: found.thumbnail || found.image_url,
+            description: found.description || `Exquisite ${found.name} from our latest collection.`,
+            variants: [] // Assumes backend doesn't return variants in this format for now
+          };
+          
+          try {
+            const relRes = await productAPI.related(found.id);
+            rel = relRes.data.data || [];
+          } catch (e) {
+            console.error("Could not fetch related products");
+          }
+        }
+
+        setProduct(p);
+        const initialVariant = variants.find(v => v.slug === slug) || { id: p.id, value: 'Original', price_modifier: 0, slug: p.slug, thumbnail: p.thumbnail };
+        setSelectedVariant(initialVariant);
+
+        const sizes = sizesForCategoryName(p.category_name);
+        setSelectedSize(sizes[0] || '');
+        setRelated(rel);
+      }
+    };
+
+    fetchProduct();
   }, [slug]);
 
   const unitPrice = product
@@ -85,15 +115,15 @@ const ProductDetail = () => {
     : 0;
 
   const buildPayload = () => ({
-    productId: product.id,
+    productId: product?.id,
     variantId: selectedVariant?.id || null,
     quantity,
     sizeLabel: selectedSize,
-    name: product.name,
+    name: product?.name,
     price: unitPrice,
-    image: selectedVariant?.thumbnail || product.thumbnail,
-    slug: product.slug,
-    brandName: product.brand_name,
+    image: selectedVariant?.thumbnail || product?.thumbnail,
+    slug: product?.slug,
+    brandName: product?.brand_name,
   });
 
   const handleAddToCart = async () => {
@@ -154,8 +184,8 @@ const ProductDetail = () => {
 
             <div className="lg:col-span-4 space-y-8">
               <div className="space-y-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-500">{product.brand_name}</p>
-                <h1 className="text-4xl md:text-5xl font-serif text-white leading-tight">{product.name}</h1>
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-500">{product?.brand_name}</p>
+                <h1 className="text-4xl md:text-5xl font-serif text-white leading-tight">{product?.name}</h1>
                 <p className="text-2xl font-light text-gold-400 italic">KSh {unitPrice.toLocaleString()}</p>
               </div>
 
@@ -168,17 +198,15 @@ const ProductDetail = () => {
                         key={variant.id}
                         type="button"
                         onClick={() => setSelectedVariant(variant)}
-                        className={`flex items-center justify-between px-6 py-4 border transition-all group ${
-                          selectedVariant?.id === variant.id
+                        className={`flex items-center justify-between px-6 py-4 border transition-all group ${selectedVariant?.id === variant.id
                             ? 'bg-gold-600 text-navy-950 border-gold-600'
                             : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'
-                        }`}
+                          }`}
                       >
                         <span className="text-[10px] font-bold uppercase tracking-widest">{variant.value}</span>
                         <div
-                          className={`w-3 h-3 rounded-full border ${
-                            selectedVariant?.id === variant.id ? 'bg-navy-950 border-white/20' : 'bg-gold-600/20 border-gold-600/40'
-                          }`}
+                          className={`w-3 h-3 rounded-full border ${selectedVariant?.id === variant.id ? 'bg-navy-950 border-white/20' : 'bg-gold-600/20 border-gold-600/40'
+                            }`}
                         />
                       </button>
                     ))}
@@ -197,16 +225,15 @@ const ProductDetail = () => {
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {sizesForCategoryName(product.category_name).map((size) => (
+                  {sizesForCategoryName(product?.category_name).map((size) => (
                     <button
                       key={size}
                       type="button"
                       onClick={() => setSelectedSize(size)}
-                      className={`w-12 h-12 flex items-center justify-center text-[10px] font-bold border transition-all ${
-                        selectedSize === size
+                      className={`w-12 h-12 flex items-center justify-center text-[10px] font-bold border transition-all ${selectedSize === size
                           ? 'bg-gold-600 text-navy-950 border-gold-600'
                           : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'
-                      }`}
+                        }`}
                     >
                       {size}
                     </button>
@@ -239,11 +266,10 @@ const ProductDetail = () => {
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => handleAddToCart()}
-                    className={`flex-1 py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center space-x-3 ${
-                      addedToCart 
-                      ? 'bg-green-600 text-white border-green-600' 
-                      : 'bg-navy-950 border border-gold-600 text-gold-500 hover:bg-gold-600 hover:text-navy-950'
-                    }`}
+                    className={`flex-1 py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center space-x-3 ${addedToCart
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-navy-950 border border-gold-600 text-gold-500 hover:bg-gold-600 hover:text-navy-950'
+                      }`}
                   >
                     <ShoppingBag size={14} />
                     <span>{addedToCart ? 'Added to Bag' : 'Add to Bag'}</span>
@@ -259,10 +285,10 @@ const ProductDetail = () => {
                 >
                   Buy it now
                 </motion.button>
-                
+
                 <AnimatePresence>
                   {addedToCart && (
-                    <motion.p 
+                    <motion.p
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
@@ -275,7 +301,7 @@ const ProductDetail = () => {
               </div>
 
               <div className="space-y-8 pt-10 border-t border-gold-600/10">
-                <p className="text-slate-400 text-sm leading-relaxed font-light">{product.description}</p>
+                <p className="text-slate-400 text-sm leading-relaxed font-light">{product?.description}</p>
               </div>
             </div>
           </div>

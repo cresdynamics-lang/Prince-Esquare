@@ -119,7 +119,16 @@ exports.getProductBySlug = async (req, res, next) => {
 
         // Fetch variants
         const variantsResult = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
-        product.variants = variantsResult.rows;
+        product.variants = variantsResult.rows.map(v => {
+            const [size, color] = v.value.split(' / ');
+            return {
+                id: v.id,
+                color: color || '',
+                size: size || '',
+                stock: v.stock_quantity,
+                price_override: v.price_modifier
+            };
+        });
 
         formatResponse(res, 200, true, 'Product details fetched', product);
     } catch (error) {
@@ -131,13 +140,26 @@ exports.getProductBySlug = async (req, res, next) => {
 // @route   POST /api/admin/products
 exports.createProduct = async (req, res, next) => {
     try {
-        const { name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images } = req.body;
+        const { name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images, variants } = req.body;
         
         const result = await db.query(
             'INSERT INTO products (name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images) ' +
             'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
             [name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, JSON.stringify(images || [])]
         );
+
+        const productId = result.rows[0].id;
+        
+        // Save variants
+        if (variants && Array.isArray(variants)) {
+            for (const v of variants) {
+                const value = `${v.size} / ${v.color}`;
+                await db.query(
+                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity) VALUES ($1, $2, $3, $4, $5)',
+                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0]
+                );
+            }
+        }
 
         formatResponse(res, 201, true, 'Product created successfully', result.rows[0]);
     } catch (error) {
@@ -150,7 +172,7 @@ exports.createProduct = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images } = req.body;
+        const { name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants } = req.body;
 
         const result = await db.query(
             'UPDATE products SET name = $1, slug = $2, description = $3, price = $4, discount_price = $5, category_id = $6, brand_id = $7, ' +
@@ -160,6 +182,33 @@ exports.updateProduct = async (req, res, next) => {
 
         if (result.rows.length === 0) {
             return formatResponse(res, 404, false, 'Product not found');
+        }
+
+        // Handle variants
+        if (variants && Array.isArray(variants)) {
+            // Delete removed variants
+            const incomingIds = variants.map(v => v.id).filter(Boolean);
+            if (incomingIds.length > 0) {
+                await db.query('DELETE FROM product_variants WHERE product_id = $1 AND id NOT IN (SELECT unnest($2::uuid[]))', [id, incomingIds]);
+            } else {
+                await db.query('DELETE FROM product_variants WHERE product_id = $1', [id]);
+            }
+
+            // Insert or update
+            for (const v of variants) {
+                const value = `${v.size} / ${v.color}`;
+                if (v.id) {
+                    await db.query(
+                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4 WHERE id = $5',
+                        ['Variant', value, v.price_override || 0, v.stock || 0, v.id]
+                    );
+                } else {
+                    await db.query(
+                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity) VALUES ($1, $2, $3, $4, $5)',
+                        [id, 'Variant', value, v.price_override || 0, v.stock || 0]
+                    );
+                }
+            }
         }
 
         formatResponse(res, 200, true, 'Product updated successfully', result.rows[0]);

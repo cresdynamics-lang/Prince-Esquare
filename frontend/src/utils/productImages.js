@@ -75,8 +75,9 @@ export const getPremiumImage = (product) => {
   if (!product) return LOCAL_IMAGES[0];
   
   // If product has a custom thumbnail that isn't a placeholder, use it
-  if (product.thumbnail && !product.thumbnail.includes('placeholder') && !product.thumbnail.includes('unsplash')) {
-    return product.thumbnail;
+  const customImage = product.thumbnail || product.image_url;
+  if (customImage && !customImage.includes('placeholder') && !customImage.includes('unsplash')) {
+    return customImage;
   }
 
   const name = product.name?.toLowerCase() || '';

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
 // Inject JWT from persisted Zustand store on every request
@@ -10,18 +10,19 @@ API.interceptors.request.use((config) => {
     const authStorage = JSON.parse(localStorage.getItem('prince-esquire-auth'));
     const token = authStorage?.state?.token;
     if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch (_) {}
+    // eslint-disable-next-line no-unused-vars
+  } catch (_) { /* empty */ }
   return config;
 });
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 export const authAPI = {
-  register:  (data) => API.post('/auth/register', data),
-  login:     (data) => API.post('/auth/login', data),
-  getProfile:()     => API.get('/profile'),
+  register: (data) => API.post('/auth/register', data),
+  login: (data) => API.post('/auth/login', data),
+  getProfile: () => API.get('/profile'),
   updateProfile: (data) => API.put('/profile', data),
-  updatePassword:(data) => API.patch('/profile/password', data),
-  getAddresses:  () => API.get('/profile/addresses'),
+  updatePassword: (data) => API.patch('/profile/password', data),
+  getAddresses: () => API.get('/profile/addresses'),
 };
 
 export const productAPI = {
@@ -50,74 +51,75 @@ export const paymentAPI = {
 };
 
 export const adminAuthAPI = {
-  login:  (data) => API.post('/admin/auth/login', data),
-  logout: ()     => API.post('/admin/auth/logout'),
+  login: (data) => API.post('/admin/auth/login', data),
+  logout: () => API.post('/admin/auth/logout'),
 };
 
 // ── ADMIN – DASHBOARD / ANALYTICS ────────────────────────────────────
 export const adminAnalyticsAPI = {
-  getStats:      () => API.get('/admin/dashboard/stats'),
+  getStats: () => API.get('/admin/dashboard/stats'),
   getSalesChart: () => API.get('/admin/dashboard/sales-chart'),
-  getTopProducts:() => API.get('/admin/dashboard/top-products'),
-  getLowStock:   () => API.get('/admin/dashboard/low-stock'),
-  getOrderReport:() => API.get('/admin/reports/orders'),
+  getTopProducts: () => API.get('/admin/dashboard/top-products'),
+  getLowStock: () => API.get('/admin/dashboard/low-stock'),
+  getOrderReport: () => API.get('/admin/reports/orders'),
 };
 
 // ── ADMIN – ORDERS ────────────────────────────────────────────────────
 export const adminOrderAPI = {
-  getAll:         (params) => API.get('/admin/orders', { params }),
-  getOne:         (id)     => API.get(`/admin/orders/${id}`),
-  updateStatus:   (id, status)  => API.patch(`/admin/orders/${id}/status`, { status }),
-  updatePayment:  (id, status)  => API.patch(`/admin/orders/${id}/payment`, { status }),
-  refund:         (id)     => API.post(`/admin/orders/${id}/refund`),
+  getAll: (params) => API.get('/admin/orders', { params }),
+  getOne: (id) => API.get(`/admin/orders/${id}`),
+  updateStatus: (id, status) => API.patch(`/admin/orders/${id}/status`, { status }),
+  updatePayment: (id, status) => API.patch(`/admin/orders/${id}/payment`, { status }),
+  refund: (id) => API.post(`/admin/orders/${id}/refund`),
 };
 
 // ── ADMIN – PRODUCTS ──────────────────────────────────────────────────
 export const adminProductAPI = {
-  getAll:   (params) => API.get('/admin/products', { params }),
-  create:   (data)   => API.post('/admin/products', data),
-  update:   (id, data) => API.put(`/admin/products/${id}`, data),
-  remove:   (id)     => API.delete(`/admin/products/${id}`),
+  getAll: (params) => API.get('/admin/products', { params }),
+  create: (data) => API.post('/admin/products', data),
+  update: (id, data) => API.put(`/admin/products/${id}`, data),
+  remove: (id) => API.delete(`/admin/products/${id}`),
 };
 
 // ── ADMIN – CATEGORIES (public GET, admin mutate) ─────────────────────
 export const adminCategoryAPI = {
-  getAll:  ()          => API.get('/categories'),               // public endpoint
-  create:  (data)      => API.post('/admin/categories', data),
-  update:  (id, data)  => API.put(`/admin/categories/${id}`, data),
-  remove:  (id)        => API.delete(`/admin/categories/${id}`),
+  getAll: () => API.get('/categories'),               // public endpoint
+  create: (data) => API.post('/admin/categories', data),
+  update: (id, data) => API.put(`/admin/categories/${id}`, data),
+  remove: (id) => API.delete(`/admin/categories/${id}`),
 };
 
 // ── ADMIN – BRANDS (public GET, admin mutate) ─────────────────────────
 export const adminBrandAPI = {
-  getAll:  ()          => API.get('/brands'),                   // public endpoint
-  create:  (data)      => API.post('/admin/brands', data),
-  update:  (id, data)  => API.put(`/admin/brands/${id}`, data),
-  remove:  (id)        => API.delete(`/admin/brands/${id}`),
+  getAll: () => API.get('/brands'),                   // public endpoint
+  create: (data) => API.post('/admin/brands', data),
+  update: (id, data) => API.put(`/admin/brands/${id}`, data),
+  remove: (id) => API.delete(`/admin/brands/${id}`),
 };
 
 // ── ADMIN – CUSTOMERS ────────────────────────────────────────────────
 export const adminCustomerAPI = {
-  getAll:        (params) => API.get('/admin/customers/all', { params }),
-  getOne:        (id)     => API.get(`/admin/customers/${id}`),
-  updateStatus:  (id, status) => API.patch(`/admin/customers/${id}/status`, { is_active: status }),
+  getAll: (params) => API.get('/admin/customers/all', { params }),
+  getOne: (id) => API.get(`/admin/customers/${id}`),
+  updateStatus: (id, status) => API.patch(`/admin/customers/${id}/status`, { is_active: status }),
+  createStaff: (data) => API.post('/admin/customers/staff', data),
 };
 
 
 // ── ADMIN – COUPONS ───────────────────────────────────────────────────
 export const adminCouponAPI = {
-  getAll:  ()          => API.get('/admin/coupons'),
-  create:  (data)      => API.post('/admin/coupons', data),
-  update:  (id, data)  => API.put(`/admin/coupons/${id}`, data),
-  remove:  (id)        => API.delete(`/admin/coupons/${id}`),
+  getAll: () => API.get('/admin/coupons'),
+  create: (data) => API.post('/admin/coupons', data),
+  update: (id, data) => API.put(`/admin/coupons/${id}`, data),
+  remove: (id) => API.delete(`/admin/coupons/${id}`),
 };
 
 // ── ADMIN – BANNERS ───────────────────────────────────────────────────
 export const adminBannerAPI = {
-  getAll:  ()          => API.get('/admin/banners'),
-  create:  (data)      => API.post('/admin/banners', data),
-  update:  (id, data)  => API.put(`/admin/banners/${id}`, data),
-  remove:  (id)        => API.delete(`/admin/banners/${id}`),
+  getAll: () => API.get('/admin/banners'),
+  create: (data) => API.post('/admin/banners', data),
+  update: (id, data) => API.put(`/admin/banners/${id}`, data),
+  remove: (id) => API.delete(`/admin/banners/${id}`),
 };
 
 // ── ADMIN – NEWSLETTER ────────────────────────────────────────────────
@@ -127,9 +129,9 @@ export const adminNewsletterAPI = {
 
 // ── ADMIN – REVIEWS ───────────────────────────────────────────────────
 export const adminReviewAPI = {
-  getAll:   ()   => API.get('/admin/reviews'),
-  approve:  (id) => API.patch(`/admin/reviews/${id}/approve`),
-  remove:   (id) => API.delete(`/admin/reviews/${id}`),
+  getAll: () => API.get('/admin/reviews'),
+  approve: (id) => API.patch(`/admin/reviews/${id}/approve`),
+  remove: (id) => API.delete(`/admin/reviews/${id}`),
 };
 
 export const adminPaymentAPI = {
@@ -137,7 +139,7 @@ export const adminPaymentAPI = {
 };
 
 export const adminSettingsAPI = {
-  get:    ()     => API.get('/admin/settings'),
+  get: () => API.get('/admin/settings'),
   update: (data) => API.put('/admin/settings', data),
 };
 

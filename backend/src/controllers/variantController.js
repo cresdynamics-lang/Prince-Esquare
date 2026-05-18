@@ -1,32 +1,55 @@
 const { formatResponse } = require('../utils/responseFormatter');
+const db = require('../config/db');
 
 exports.getVariants = async (req, res, next) => {
+    const { id } = req.params;
     try {
-        formatResponse(res, 200, true, 'Variants fetched', []);
+        const result = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [id]);
+        formatResponse(res, 200, true, 'Variants fetched', result.rows);
     } catch (error) {
         next(error);
     }
 };
 
 exports.addVariant = async (req, res, next) => {
+    const { id } = req.params;
+    const { name, value, price_modifier = 0, stock_quantity = 0 } = req.body;
     try {
-        formatResponse(res, 201, true, 'Variant added');
+        const result = await db.query(
+            'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [id, name, value, price_modifier, stock_quantity]
+        );
+        formatResponse(res, 201, true, 'Variant added successfully', result.rows[0]);
     } catch (error) {
         next(error);
     }
 };
 
 exports.updateVariant = async (req, res, next) => {
+    const { variantId } = req.params;
+    const { name, value, price_modifier, stock_quantity } = req.body;
     try {
-        formatResponse(res, 200, true, 'Variant updated');
+        const result = await db.query(
+            'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4 WHERE id = $5 RETURNING *',
+            [name, value, price_modifier, stock_quantity, variantId]
+        );
+        if (result.rows.length === 0) {
+            return formatResponse(res, 404, false, 'Variant not found');
+        }
+        formatResponse(res, 200, true, 'Variant updated successfully', result.rows[0]);
     } catch (error) {
         next(error);
     }
 };
 
 exports.deleteVariant = async (req, res, next) => {
+    const { variantId } = req.params;
     try {
-        formatResponse(res, 200, true, 'Variant deleted');
+        const result = await db.query('DELETE FROM product_variants WHERE id = $1 RETURNING id', [variantId]);
+        if (result.rows.length === 0) {
+            return formatResponse(res, 404, false, 'Variant not found');
+        }
+        formatResponse(res, 200, true, 'Variant deleted successfully');
     } catch (error) {
         next(error);
     }
