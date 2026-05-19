@@ -27,6 +27,22 @@ const slides = [
     desc: 'Lightweight linen sets and trousers for the gentleman who values comfort without compromising style.',
     cta: 'View Linen',
     link: '/products?category=linen'
+  },
+  {
+    image: '/WhatsApp Image 2026-05-12 at 8.07.38 PM.jpeg',
+    subtitle: 'Premium Tracksuits',
+    title: 'CASUAL LUXURY',
+    desc: 'Elevate your off-duty look with our signature velour and cotton tracksuits.',
+    cta: 'Shop Tracksuits',
+    link: '/products?category=tracksuits'
+  },
+  {
+    image: '/WhatsApp Image 2026-05-12 at 8.07.41 PM.jpeg',
+    subtitle: 'Modern Gentlemen',
+    title: 'SIGNATURE POLOS',
+    desc: 'The perfect blend of comfort and style for any casual occasion.',
+    cta: 'View Polos',
+    link: '/products?category=polo'
   }
 ];
 
@@ -43,30 +59,14 @@ const HeroSlider = () => {
   const nextSlide = () => setCurrent((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
   const prevSlide = () => setCurrent((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
 
+  if (!slides || slides.length === 0) return null;
+
   return (
     <section className="relative h-screen bg-navy-950 overflow-hidden">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={current}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1.5 }}
-          className="absolute inset-0"
-        >
-          <div 
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-[10000ms] scale-110"
-            style={{ 
-              backgroundImage: `url(${slides[current].image})`,
-              transform: 'scale(1.1) translateZ(0)'
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/40 to-transparent" />
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="container mx-auto px-6 h-full flex items-center relative z-10">
-        <div className="max-w-4xl space-y-8">
+      <div className="container mx-auto px-6 h-full flex flex-col lg:flex-row items-center relative z-10">
+        
+        {/* Left Side: Text Content */}
+        <div className="w-full lg:w-1/2 flex flex-col justify-center h-full space-y-8 z-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={current}
@@ -83,7 +83,7 @@ const HeroSlider = () => {
                 </p>
               </div>
               
-              <h1 className="text-6xl md:text-8xl font-serif text-white leading-tight uppercase tracking-tighter">
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif text-white leading-tight uppercase tracking-tighter">
                 {slides[current].title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -107,6 +107,27 @@ const HeroSlider = () => {
             </motion.div>
           </AnimatePresence>
         </div>
+
+        {/* Right Side: Image Carousel */}
+        <div className="w-full lg:w-1/2 h-[50vh] lg:h-full relative flex items-center justify-center lg:p-16 z-10 mt-12 lg:mt-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={current}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              transition={{ duration: 0.8 }}
+              className="absolute lg:relative w-[90%] lg:w-[80%] h-[90%] lg:h-[80%] rounded-3xl overflow-hidden shadow-2xl border border-gold-500/10 shadow-gold-500/5"
+            >
+              <img 
+                src={slides[current].image}
+                alt={slides[current].title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-navy-950/50 to-transparent" />
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Navigation Controls */}
@@ -124,20 +145,20 @@ const HeroSlider = () => {
         </div>
         <button 
           onClick={prevSlide}
-          className="w-12 h-12 border border-gold-500/30 flex items-center justify-center text-gold-500 hover:bg-gold-500 hover:text-navy-950 transition-all"
+          className="w-12 h-12 border border-gold-500/30 flex items-center justify-center text-gold-500 hover:bg-gold-500 hover:text-navy-950 transition-all backdrop-blur-md"
         >
           <ChevronLeft size={20} />
         </button>
         <button 
           onClick={nextSlide}
-          className="w-12 h-12 border border-gold-500/30 flex items-center justify-center text-gold-500 hover:bg-gold-500 hover:text-navy-950 transition-all"
+          className="w-12 h-12 border border-gold-500/30 flex items-center justify-center text-gold-500 hover:bg-gold-500 hover:text-navy-950 transition-all backdrop-blur-md"
         >
           <ChevronRight size={20} />
         </button>
       </div>
 
       {/* Vertical Side Text */}
-      <div className="absolute right-10 top-1/2 -translate-y-1/2 origin-center rotate-90 hidden lg:block">
+      <div className="absolute right-10 top-1/2 -translate-y-1/2 origin-center rotate-90 hidden lg:block z-20">
         <p className="text-gold-600/20 text-[10px] font-bold tracking-[1em] uppercase whitespace-nowrap">
           ESTABLISHED 2026 · NAIROBI · LUXURY
         </p>

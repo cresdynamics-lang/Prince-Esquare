@@ -4,12 +4,20 @@ const db = require('../config/db');
 exports.getDashboardStats = async (req, res, next) => {
     try {
         const revenueResult = await db.query('SELECT SUM(total_amount) as revenue FROM orders WHERE payment_status = $1', ['paid']);
+        const profitResult = await db.query(`
+            SELECT SUM(oi.quantity * (oi.price - COALESCE(p.cost_price, 0))) as profit
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            JOIN orders o ON oi.order_id = o.id
+            WHERE o.payment_status = $1
+        `, ['paid']);
         const ordersResult = await db.query('SELECT COUNT(*) as total FROM orders');
         const customersResult = await db.query("SELECT COUNT(*) as total FROM users WHERE role = 'customer'");
         const pendingOrdersResult = await db.query("SELECT COUNT(*) as total FROM orders WHERE status = 'pending'");
 
         formatResponse(res, 200, true, 'Dashboard stats fetched', {
             revenue: parseFloat(revenueResult.rows[0].revenue || 0),
+            profit: parseFloat(profitResult.rows[0].profit || 0),
             orders: parseInt(ordersResult.rows[0].total),
             customers: parseInt(customersResult.rows[0].total),
             pendingOrders: parseInt(pendingOrdersResult.rows[0].total)

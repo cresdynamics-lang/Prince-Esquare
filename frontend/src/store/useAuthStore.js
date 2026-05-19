@@ -12,7 +12,7 @@ export const useAuthStore = create(
         user: userData, 
         token, 
         isAuthenticated: true,
-        isAdmin: userData.role === 'admin' 
+        isAdmin: ['admin', 'staff'].includes(userData.role)
       }),
       logout: () => set({ 
         user: null, 

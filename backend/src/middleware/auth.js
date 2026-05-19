@@ -15,7 +15,7 @@ exports.protect = async (req, res, next) => {
 
     try {
         const decoded = verifyToken(token);
-        const result = await db.query('SELECT id, name, email, role FROM users WHERE id = $1', [decoded.id]);
+        const result = await db.query('SELECT id, name, email, role, permissions FROM users WHERE id = $1', [decoded.id]);
         
         if (result.rows.length === 0) {
             return formatResponse(res, 401, false, 'User no longer exists');
@@ -29,9 +29,9 @@ exports.protect = async (req, res, next) => {
 };
 
 exports.adminOnly = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && ['admin', 'staff'].includes(req.user.role)) {
         next();
     } else {
-        return formatResponse(res, 403, false, 'Access denied. Admin only.');
+        return formatResponse(res, 403, false, 'Access denied. Admin and Staff only.');
     }
 };

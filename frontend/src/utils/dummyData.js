@@ -75,42 +75,42 @@ export const DUMMY_PRODUCTS = [
   // Tracksuits (More)
   { 
     id: 8, 
-    name: 'Prada Tracksuit', 
+    name: 'Prada Classic Tracksuit in Navy', 
     category_name: 'more', 
     subcategory: 'Track Suits', 
     price: 15500, 
     brand_name: 'Prada', 
-    slug: 'prada-tracksuit-classic',
+    slug: 'prada-tracksuit-navy',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.16 PM.jpeg'
   },
   { 
     id: 9, 
-    name: 'Zegna Tracksuit', 
-    category_name: 'more', 
-    subcategory: 'Track Suits', 
-    price: 18500, 
-    brand_name: 'Ermenegildo Zegna', 
-    slug: 'zegna-tracksuit-luxury',
-    thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.17 PM (1).jpeg'
-  },
-  { 
-    id: 10, 
-    name: 'Prada Black Tracksuit', 
+    name: 'Prada Classic Tracksuit in Black', 
     category_name: 'more', 
     subcategory: 'Track Suits', 
     price: 16500, 
     brand_name: 'Prada', 
-    slug: 'prada-black-tracksuit',
+    slug: 'prada-tracksuit-black',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg'
   },
   { 
+    id: 10, 
+    name: 'Zegna Luxury Tracksuit in Grey', 
+    category_name: 'more', 
+    subcategory: 'Track Suits', 
+    price: 18500, 
+    brand_name: 'Ermenegildo Zegna', 
+    slug: 'zegna-tracksuit-grey',
+    thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.17 PM (1).jpeg'
+  },
+  { 
     id: 11, 
-    name: 'Stefano Ricci Dark Green Tracksuit', 
+    name: 'Zegna Luxury Tracksuit in Dark Green', 
     category_name: 'more', 
     subcategory: 'Track Suits', 
     price: 22500, 
-    brand_name: 'Stefano Ricci', 
-    slug: 'stefano-ricci-green-tracksuit',
+    brand_name: 'Ermenegildo Zegna', 
+    slug: 'zegna-tracksuit-dark-green',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg'
   },
 
@@ -211,42 +211,42 @@ export const DUMMY_PRODUCTS = [
   // Presidential Shirts
   { 
     id: 21, 
-    name: 'Presidential Green Patterned Shirt', 
+    name: 'Presidential Patterned Shirt in Green', 
     category_name: 'shirts', 
     subcategory: 'Presidential', 
     price: 7500, 
     brand_name: 'Presidential', 
-    slug: 'presidential-green-patterned-shirt',
+    slug: 'presidential-patterned-shirt-green',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.29 PM.jpeg'
   },
   { 
     id: 22, 
-    name: 'Presidential Checked Shirt', 
+    name: 'Presidential Patterned Shirt in White', 
     category_name: 'shirts', 
     subcategory: 'Presidential', 
     price: 7500, 
     brand_name: 'Presidential', 
-    slug: 'presidential-checked-shirt',
+    slug: 'presidential-patterned-shirt-white',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.30 PM (1).jpeg'
   },
   { 
     id: 23, 
-    name: 'Presidential Blue Paisley Shirt', 
+    name: 'Presidential Paisley Shirt in Blue', 
     category_name: 'shirts', 
     subcategory: 'Presidential', 
     price: 8500, 
     brand_name: 'Presidential', 
-    slug: 'presidential-blue-paisley-shirt',
+    slug: 'presidential-paisley-shirt-blue',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg'
   },
   { 
     id: 24, 
-    name: 'Presidential Grey Paisley Shirt', 
+    name: 'Presidential Paisley Shirt in Grey', 
     category_name: 'shirts', 
     subcategory: 'Presidential', 
     price: 8500, 
     brand_name: 'Presidential', 
-    slug: 'presidential-grey-paisley-shirt',
+    slug: 'presidential-paisley-shirt-grey',
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.31 PM.jpeg'
   },
 

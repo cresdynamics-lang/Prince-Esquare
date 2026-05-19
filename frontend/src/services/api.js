@@ -105,6 +105,11 @@ export const adminCustomerAPI = {
   createStaff: (data) => API.post('/admin/customers/staff', data),
 };
 
+// ── FRONTEND – BANNERS ───────────────────────────────────────────────────
+export const bannerAPI = {
+  getAll: () => API.get('/banners'),
+  getHomepageData: () => API.get('/homepage'),
+};
 
 // ── ADMIN – COUPONS ───────────────────────────────────────────────────
 export const adminCouponAPI = {

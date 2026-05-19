@@ -30,7 +30,7 @@ const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const logout = useAuthStore(state => state.logout);
-  const { isAuthenticated, isAdmin } = useAuthStore();
+  const { user, isAuthenticated, isAdmin } = useAuthStore();
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
@@ -49,7 +49,7 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
-  const sidebarItems = [
+  const allSidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
@@ -65,7 +65,33 @@ const AdminDashboard = () => {
     { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
   ];
 
+  const sidebarItems = allSidebarItems.filter(item => {
+    if (user?.role === 'admin') return true;
+    if (user?.role === 'staff') {
+      const perms = Array.isArray(user.permissions) ? user.permissions : [];
+      return perms.includes(item.id);
+    }
+    return false;
+  });
+
+  // Redirect to first available section if current activeSection is not permitted
+  useEffect(() => {
+    if (user?.role === 'staff' && sidebarItems.length > 0) {
+      if (!sidebarItems.find(i => i.id === activeSection)) {
+        setActiveSection(sidebarItems[0].id);
+      }
+    }
+  }, [user, sidebarItems, activeSection]);
+
   const renderContent = () => {
+    // Basic protection inside renderContent as well
+    if (user?.role === 'staff') {
+      const perms = Array.isArray(user.permissions) ? user.permissions : [];
+      if (!perms.includes(activeSection)) {
+        return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
+      }
+    }
+
     switch (activeSection) {
       case 'dashboard': return <DashboardView />;
       case 'orders': return <OrdersView />;
@@ -258,8 +284,8 @@ const DashboardView = () => {
 
   const statCards = [
     { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard },
+    { label: 'Total Profit', value: `KSh ${stats?.profit?.toLocaleString()}`, icon: Tag },
     { label: 'Total Orders', value: stats?.orders || 0, icon: Package },
-    { label: 'Customers', value: stats?.customers || 0, icon: Users },
     { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock },
   ];
 
@@ -517,6 +543,7 @@ const ProductsView = () => {
     description: '',
     price: '',
     discount_price: '',
+    cost_price: '',
     category_id: '',
     brand_id: '',
     stock_quantity: 0,
@@ -625,6 +652,7 @@ const ProductsView = () => {
         description: product.description || '',
         price: product.price || '',
         discount_price: product.discount_price || '',
+        cost_price: product.cost_price || '',
         category_id: product.category_id || '',
         brand_id: product.brand_id || '',
         stock_quantity: product.stock_quantity || 0,
@@ -646,6 +674,7 @@ const ProductsView = () => {
         description: '',
         price: '',
         discount_price: '',
+        cost_price: '',
         category_id: '',
         brand_id: '',
         stock_quantity: 0,
@@ -841,7 +870,7 @@ const ProductsView = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Price (KSh)</label>
                     <input 
@@ -858,6 +887,15 @@ const ProductsView = () => {
                       type="number" 
                       value={formData.discount_price}
                       onChange={(e) => setFormData({...formData, discount_price: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Cost Price</label>
+                    <input 
+                      type="number" 
+                      value={formData.cost_price}
+                      onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                     />
                   </div>
@@ -1856,6 +1894,29 @@ const AdminsView = () => {
                     className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
                     placeholder="••••••••"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access Permissions</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
+                    {['dashboard', 'orders', 'products', 'categories', 'brands', 'customers', 'admins', 'coupons', 'banners', 'newsletter', 'payments', 'reviews', 'settings'].map(perm => (
+                      <label key={perm} className="flex items-center gap-2 cursor-pointer group">
+                        <input 
+                          type="checkbox"
+                          checked={formData.permissions.includes(perm)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, permissions: [...formData.permissions, perm] });
+                            } else {
+                              setFormData({ ...formData, permissions: formData.permissions.filter(p => p !== perm) });
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-gold-500/20 bg-navy-900 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                        />
+                        <span className="text-[10px] uppercase font-bold text-gold-100 group-hover:text-gold-500 transition-colors">{perm}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
 

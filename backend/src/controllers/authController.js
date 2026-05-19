@@ -71,18 +71,18 @@ exports.adminLogin = async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
-        const result = await db.query('SELECT * FROM users WHERE email = $1 AND role = $2', [email, 'admin']);
-        const admin = result.rows[0];
+        const result = await db.query("SELECT * FROM users WHERE email = $1 AND role IN ('admin', 'staff')", [email]);
+        const user = result.rows[0];
 
-        if (!admin || !(await bcrypt.compare(password, admin.password))) {
-            return formatResponse(res, 401, false, 'Invalid admin credentials');
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return formatResponse(res, 401, false, 'Invalid credentials');
         }
 
-        const token = signToken(admin.id);
-        delete admin.password;
+        const token = signToken(user.id);
+        delete user.password;
 
         formatResponse(res, 200, true, 'Admin login successful', {
-            admin,
+            admin: user,
             token
         });
     } catch (error) {
