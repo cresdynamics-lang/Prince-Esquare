@@ -21,7 +21,9 @@ import {
   adminCouponAPI,
   adminBannerAPI,
   adminNewsletterAPI,
-  adminReviewAPI
+  adminReviewAPI,
+  adminPaymentAPI,
+  adminSettingsAPI
 } from '../services/api';
 import { useEffect } from 'react';
 
