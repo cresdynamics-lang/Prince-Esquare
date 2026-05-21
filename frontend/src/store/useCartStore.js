@@ -50,7 +50,9 @@ export const useCartStore = create(
           const res = await cartAPI.get();
           if (!res.data?.success) return;
           const rows = Array.isArray(res.data.data) ? res.data.data : [];
-          set({ items: rows.map(mapCartRow) });
+          const serverItems = rows.map(mapCartRow);
+          const dummyItems = get().items.filter(it => String(it.productId).length < 32);
+          set({ items: [...serverItems, ...dummyItems] });
         } catch (e) {
           console.error('loadCart', e);
         }
@@ -61,7 +63,8 @@ export const useCartStore = create(
         if (!isAuthenticated || !token) return;
         const items = get().items;
         for (const it of items) {
-          if (!it.productId || it.cartItemId) continue;
+          const isDummy = String(it.productId).length < 32;
+          if (!it.productId || it.cartItemId || isDummy) continue;
           try {
             await cartAPI.addItem({
               product_id: it.productId,
@@ -79,7 +82,9 @@ export const useCartStore = create(
       addToCart: async (payload) => {
         const { isAuthenticated, token } = useAuthStore.getState();
         const qty = Math.max(1, payload.quantity || 1);
-        if (isAuthenticated && token) {
+        const isDummy = String(payload.productId).length < 32;
+        
+        if (isAuthenticated && token && !isDummy) {
           await cartAPI.addItem({
             product_id: payload.productId,
             variant_id: payload.variantId,
@@ -89,6 +94,7 @@ export const useCartStore = create(
           await get().loadCart();
           return;
         }
+        
         const items = get().items;
         const idx = items.findIndex(
           (i) =>

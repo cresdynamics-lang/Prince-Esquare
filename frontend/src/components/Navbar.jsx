@@ -153,9 +153,15 @@ const Navbar = () => {
 
           <Link to="/cart" className="relative cursor-pointer group">
             <ShoppingBag size={18} className="group-hover:text-gold-200 transition-colors" />
-            <span className="absolute -top-2 -right-2 bg-gold-600 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+            <motion.span 
+              key={getItemCount()}
+              initial={{ scale: 1.5, opacity: 0.5 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 10 }}
+              className="absolute -top-2 -right-2 bg-gold-600 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold"
+            >
               {getItemCount()}
-            </span>
+            </motion.span>
           </Link>
         </div>
       </div>

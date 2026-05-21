@@ -1,12 +1,15 @@
+import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, Compass, MessageSquare, Mail, Phone, MapPin } from 'lucide-react';
+import { Globe, Compass, MessageSquare, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
 
 const Footer = () => {
+  const [whatsappOpen, setWhatsappOpen] = React.useState(false);
+
   return (
     <footer className="bg-navy-950 pt-24 pb-12 border-t border-gold-500/10 relative overflow-hidden">
       {/* Background elements */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-gold-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
-      
+
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-16 mb-20">
           {/* Brand Info */}
@@ -50,9 +53,9 @@ const Footer = () => {
           <div>
             <h3 className="text-gold-400 font-serif text-xl mb-8 tracking-widest">Support</h3>
             <ul className="space-y-4">
-              {['Contact Us', 'Bespoke Services', 'Shipping & Returns', 'Size Guide', 'Privacy Policy'].map((link) => (
+              {['Contact Us', 'Bespoke Services', 'Shipping & Returns', 'Size Guide', 'Privacy Policy', 'Admin'].map((link) => (
                 <li key={link}>
-                  <a href="#" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  <a href={link === 'Admin' ? '/admin' : '#'} className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
                     {link}
                   </a>
                 </li>
@@ -105,6 +108,40 @@ const Footer = () => {
           </p>
         </div>
       </div>
+      {/* WhatsApp Floating Chat */}
+      {whatsappOpen ? (
+        <div className="fixed bottom-6 right-6 w-64 h-80 bg-white rounded-lg shadow-xl border border-gold-500/20 flex flex-col">
+          <div className="flex justify-between items-center p-2 bg-gold-500 text-navy-950 rounded-t-lg">
+            <span>WhatsApp Chat</span>
+            <button onClick={() => setWhatsappOpen(false)} className="text-sm">✕</button>
+          </div>
+          <iframe src="https://wa.me/254712345678" className="flex-1 rounded-b-lg" title="WhatsApp Chat" />
+        </div>
+      ) : (
+        <button
+          onMouseEnter={() => {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(440, ctx.currentTime);
+            o.connect(g);
+            g.connect(ctx.destination);
+            g.gain.setValueAtTime(0.001, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+            o.start();
+            o.stop(ctx.currentTime + 0.1);
+          }}
+          onClick={() => setWhatsappOpen(true)}
+          className="group fixed bottom-6 right-6 bg-gold-500 rounded-full flex items-center overflow-hidden transition-all duration-300 w-12 h-12 hover:w-48"
+        >
+          <MessageSquare size={24} className="text-navy-950 p-2" />
+          <span className="text-navy-950 font-medium ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            WhatsApp
+          </span>
+          <ArrowRight size={20} className="text-navy-950 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        </button>
+      )}
     </footer>
   );
 };
