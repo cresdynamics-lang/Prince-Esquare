@@ -148,6 +148,12 @@ export const adminSettingsAPI = {
   update: (data) => API.put('/admin/settings', data),
 };
 
+export const adminUploadAPI = {
+  upload: (formData) => API.post('/admin/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
 // ─────────────────────────────────────────────────────────────────────
 // ⚠️  MISSING / NOT YET IMPLEMENTED ON BACKEND:
 //   - GET /api/admin/payments  → No admin-wide payments list endpoint.

@@ -47,7 +47,7 @@ exports.createBrand = async (req, res, next) => {
         const { name, slug, logo, description, is_featured } = req.body;
         const result = await db.query(
             'INSERT INTO brands (name, slug, logo, description, is_featured) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, slug, logo, description, is_featured]
+            [name, slug, logo || null, description, is_featured || false]
         );
         formatResponse(res, 201, true, 'Brand created successfully', result.rows[0]);
     } catch (error) {
@@ -63,7 +63,7 @@ exports.updateBrand = async (req, res, next) => {
         const { name, slug, logo, description, is_featured } = req.body;
         const result = await db.query(
             'UPDATE brands SET name = $1, slug = $2, logo = $3, description = $4, is_featured = $5 WHERE id = $6 RETURNING *',
-            [name, slug, logo, description, is_featured, id]
+            [name, slug, logo || null, description, is_featured || false, id]
         );
 
         if (result.rows.length === 0) {

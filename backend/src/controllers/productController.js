@@ -119,16 +119,16 @@ exports.getProductBySlug = async (req, res, next) => {
 
         // Fetch variants
         const variantsResult = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
-        product.variants = variantsResult.rows.map(v => {
-            const [size, color] = v.value.split(' / ');
-            return {
-                id: v.id,
-                color: color || '',
-                size: size || '',
-                stock: v.stock_quantity,
-                price_override: v.price_modifier
-            };
-        });
+        product.variants = variantsResult.rows.map(v => ({
+            id: v.id,
+            name: v.name,
+            value: v.value,
+            stock: v.stock_quantity,
+            price_modifier: v.price_modifier,
+            image_url: v.image_url,
+            color: v.color,
+            size: v.size
+        }));
 
         formatResponse(res, 200, true, 'Product details fetched', product);
     } catch (error) {
@@ -145,7 +145,7 @@ exports.createProduct = async (req, res, next) => {
         const result = await db.query(
             'INSERT INTO products (name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images) ' +
             'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-            [name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, JSON.stringify(images || [])]
+            [name, slug, description || null, price || 0, discount_price || null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, thumbnail || null, JSON.stringify(images || [])]
         );
 
         const productId = result.rows[0].id;
@@ -153,10 +153,10 @@ exports.createProduct = async (req, res, next) => {
         // Save variants
         if (variants && Array.isArray(variants)) {
             for (const v of variants) {
-                const value = `${v.size} / ${v.color}`;
+                const value = `${v.size || ''} / ${v.color || ''}`;
                 await db.query(
-                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity) VALUES ($1, $2, $3, $4, $5)',
-                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0]
+                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null]
                 );
             }
         }
@@ -177,7 +177,7 @@ exports.updateProduct = async (req, res, next) => {
         const result = await db.query(
             'UPDATE products SET name = $1, slug = $2, description = $3, price = $4, discount_price = $5, category_id = $6, brand_id = $7, ' +
             'stock_quantity = $8, is_featured = $9, is_active = $10, thumbnail = $11, images = $12 WHERE id = $13 RETURNING *',
-            [name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, JSON.stringify(images), id]
+            [name, slug, description || null, price || 0, discount_price || null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, is_active !== undefined ? is_active : true, thumbnail || null, JSON.stringify(images || []), id]
         );
 
         if (result.rows.length === 0) {
@@ -196,16 +196,16 @@ exports.updateProduct = async (req, res, next) => {
 
             // Insert or update
             for (const v of variants) {
-                const value = `${v.size} / ${v.color}`;
+                const value = `${v.size || ''} / ${v.color || ''}`;
                 if (v.id) {
                     await db.query(
-                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4 WHERE id = $5',
-                        ['Variant', value, v.price_override || 0, v.stock || 0, v.id]
+                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4, image_url = $5, color = $6, size = $7 WHERE id = $8',
+                        ['Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, v.id]
                     );
                 } else {
                     await db.query(
-                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity) VALUES ($1, $2, $3, $4, $5)',
-                        [id, 'Variant', value, v.price_override || 0, v.stock || 0]
+                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                        [id, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null]
                     );
                 }
             }

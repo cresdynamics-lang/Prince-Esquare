@@ -47,7 +47,7 @@ exports.createCategory = async (req, res, next) => {
         const { name, slug, description, image, parent_id, is_featured } = req.body;
         const result = await db.query(
             'INSERT INTO categories (name, slug, description, image, parent_id, is_featured) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [name, slug, description, image, parent_id, is_featured]
+            [name, slug, description, image || null, parent_id || null, is_featured || false]
         );
         formatResponse(res, 201, true, 'Category created successfully', result.rows[0]);
     } catch (error) {
@@ -63,7 +63,7 @@ exports.updateCategory = async (req, res, next) => {
         const { name, slug, description, image, parent_id, is_featured } = req.body;
         const result = await db.query(
             'UPDATE categories SET name = $1, slug = $2, description = $3, image = $4, parent_id = $5, is_featured = $6 WHERE id = $7 RETURNING *',
-            [name, slug, description, image, parent_id, is_featured, id]
+            [name, slug, description, image || null, parent_id || null, is_featured || false, id]
         );
 
         if (result.rows.length === 0) {

@@ -4,6 +4,7 @@ import { Menu, X, ShoppingBag, Search, User, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { adminCategoryAPI } from '../services/api';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);

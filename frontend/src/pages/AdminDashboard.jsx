@@ -23,7 +23,8 @@ import {
   adminNewsletterAPI,
   adminReviewAPI,
   adminPaymentAPI,
-  adminSettingsAPI
+  adminSettingsAPI,
+  adminUploadAPI
 } from '../services/api';
 import { useEffect } from 'react';
 
@@ -552,60 +553,172 @@ const ProductsView = () => {
     is_featured: false,
     is_active: true,
     thumbnail: '',
-    images: [],
+    images: [], // This will store the final URLs for saving
     variants: [],
     thumbnailFile: null,
     thumbnailPreview: '',
-    galleryFiles: [],
-    galleryPreviews: []
+    gallery: [] // Combined state: { id, preview, url, isUploading }
   });
 
   const handleInputChange = (e, field) => {
     let value = e.target.value;
-    if (typeof value === 'string' && field !== 'thumbnail' && field !== 'slug' && !field.includes('image')) {
+    const skipUppercase = ['thumbnail', 'slug', 'description', 'image', 'logo', 'url', 'email', 'phone'];
+    if (typeof value === 'string' && !skipUppercase.some(s => field.toLowerCase().includes(s))) {
       value = value.toUpperCase();
     }
     setFormData({ ...formData, [field]: value });
   };
 
-  const handleThumbnailChange = (e) => {
+  const removeGalleryFile = (index) => {
+    const nextGallery = [...formData.gallery];
+    const removedItem = nextGallery.splice(index, 1)[0];
+    
+    // Revoke blob if needed
+    if (removedItem.preview?.startsWith('blob:')) {
+        URL.revokeObjectURL(removedItem.preview);
+    }
+
+    // Also update images array which is used for saving
+    const nextImages = nextGallery.map(item => item.url).filter(Boolean);
+    
+    setFormData({ 
+        ...formData, 
+        gallery: nextGallery,
+        images: nextImages
+    });
+  };
+
+  const removeThumbnail = () => {
+    setFormData({ ...formData, thumbnail: '', thumbnailPreview: '' });
+  };
+
+  const [uploading, setUploading] = useState(false);
+
+  const handleThumbnailChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData({
-        ...formData,
-        thumbnailFile: file,
-        thumbnailPreview: URL.createObjectURL(file)
-      });
+      setUploading(true);
+      const localPreview = URL.createObjectURL(file);
+      setFormData(prev => ({
+        ...prev,
+        thumbnailPreview: localPreview,
+        thumbnail: localPreview
+      }));
+      
+      const uploadData = new FormData();
+      uploadData.append('images', file);
+      try {
+        const res = await adminUploadAPI.upload(uploadData);
+        if (res.data.success) {
+          const finalUrl = res.data.data[0];
+          setFormData(prev => ({ 
+            ...prev, 
+            thumbnail: finalUrl,
+            thumbnailPreview: finalUrl 
+          }));
+        }
+      } catch (error) {
+        console.error('Thumbnail upload failed:', error);
+        alert('Image upload failed. Please try again.');
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
-  const handleGalleryChange = (e) => {
+  const handleGalleryChange = async (e) => {
     const files = Array.from(e.target.files);
-    const previews = files.map(file => URL.createObjectURL(file));
-    setFormData({
-      ...formData,
-      galleryFiles: [...formData.galleryFiles, ...files],
-      galleryPreviews: [...formData.galleryPreviews, ...previews]
-    });
+    if (files.length === 0) return;
+    
+    setUploading(true);
+    
+    // Add placeholders with local previews
+    const newItems = files.map(file => ({
+        id: Math.random().toString(36).substring(7),
+        preview: URL.createObjectURL(file),
+        url: null,
+        isUploading: true
+    }));
+
+    setFormData(prev => ({
+      ...prev,
+      gallery: [...prev.gallery, ...newItems]
+    }));
+
+    const uploadData = new FormData();
+    files.forEach(file => uploadData.append('images', file));
+    try {
+      const res = await adminUploadAPI.upload(uploadData);
+      if (res.data.success) {
+        const uploadedUrls = res.data.data;
+        setFormData(prev => {
+            const nextGallery = [...prev.gallery];
+            // Match uploaded URLs to our new items (simple sequential match for now)
+            let urlIdx = 0;
+            const updatedGallery = nextGallery.map(item => {
+                if (item.isUploading && urlIdx < uploadedUrls.length) {
+                    return { ...item, url: uploadedUrls[urlIdx++], isUploading: false };
+                }
+                return item;
+            });
+            return { 
+                ...prev, 
+                gallery: updatedGallery,
+                images: updatedGallery.map(i => i.url).filter(Boolean)
+            };
+        });
+      }
+    } catch (error) {
+      console.error('Gallery upload failed:', error);
+      alert('One or more gallery images failed to upload.');
+      // Remove the failed ones
+      setFormData(prev => ({
+          ...prev,
+          gallery: prev.gallery.filter(i => !i.isUploading)
+      }));
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const removeGalleryFile = (index) => {
-    const newFiles = [...formData.galleryFiles];
-    const newPreviews = [...formData.galleryPreviews];
-    URL.revokeObjectURL(newPreviews[index]);
-    newFiles.splice(index, 1);
-    newPreviews.splice(index, 1);
-    setFormData({
-      ...formData,
-      galleryFiles: newFiles,
-      galleryPreviews: newPreviews
-    });
+  const handleVariantImageChange = async (index, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setUploading(true);
+      const localPreview = URL.createObjectURL(file);
+      
+      // Update locally first
+      setFormData(prev => {
+        const next = [...prev.variants];
+        next[index] = { ...next[index], image_url: localPreview };
+        return { ...prev, variants: next };
+      });
+
+      const uploadData = new FormData();
+      uploadData.append('images', file);
+      try {
+        const res = await adminUploadAPI.upload(uploadData);
+        if (res.data.success) {
+          const finalUrl = res.data.data[0];
+          setFormData(prev => {
+            const next = [...prev.variants];
+            next[index] = { ...next[index], image_url: finalUrl };
+            return { ...prev, variants: next };
+          });
+        }
+      } catch (error) {
+        console.error('Variant image upload failed:', error);
+        alert('Variant image upload failed.');
+      } finally {
+        setUploading(false);
+      }
+    }
   };
 
   const handleAddVariant = () => {
     setFormData({ 
       ...formData, 
-      variants: [...formData.variants, { color: '', size: '', stock: 0, price_override: '' }] 
+      variants: [...formData.variants, { color: '', size: '', stock: 0, price_override: '', image_url: '' }] 
     });
   };
 
@@ -663,10 +776,13 @@ const ProductsView = () => {
         thumbnail: product.thumbnail || '',
         images: Array.isArray(product.images) ? product.images : [],
         variants: Array.isArray(product.variants) ? product.variants : [],
-        thumbnailFile: null,
         thumbnailPreview: product.thumbnail || '',
-        galleryFiles: [],
-        galleryPreviews: Array.isArray(product.images) ? product.images : []
+        gallery: (Array.isArray(product.images) ? product.images : []).map(url => ({
+          id: Math.random().toString(36).substring(7),
+          preview: url,
+          url: url,
+          isUploading: false
+        }))
       });
     } else {
       setCurrentProduct(null);
@@ -685,10 +801,8 @@ const ProductsView = () => {
         thumbnail: '',
         images: [],
         variants: [],
-        thumbnailFile: null,
         thumbnailPreview: '',
-        galleryFiles: [],
-        galleryPreviews: []
+        gallery: []
       });
     }
     setIsModalOpen(true);
@@ -709,25 +823,20 @@ const ProductsView = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const data = new FormData();
-      Object.keys(formData).forEach(key => {
-        if (key === 'variants') {
-          data.append(key, JSON.stringify(formData[key]));
-        } else if (key === 'galleryFiles') {
-          formData[key].forEach(file => data.append('images', file));
-        } else if (key === 'thumbnailFile' && formData[key]) {
-          data.append('thumbnail', formData[key]);
-        } else if (['thumbnailPreview', 'galleryPreviews', 'thumbnail', 'images'].includes(key)) {
-           // Skip internal state previews and old URL fields if they are strings
-        } else {
-          data.append(key, formData[key]);
-        }
-      });
+      const payload = { ...formData };
+      
+      // Remove frontend-only state fields
+      delete payload.thumbnailPreview;
+      delete payload.galleryPreviews;
+      delete payload.gallery;
+      delete payload.thumbnailFile;
+      delete payload.galleryFiles;
+      delete payload.galleryPreviews; // in case it was still there
 
       if (currentProduct) {
-        await adminProductAPI.update(currentProduct.id, data);
+        await adminProductAPI.update(currentProduct.id, payload);
       } else {
-        await adminProductAPI.create(data);
+        await adminProductAPI.create(payload);
       }
       setIsModalOpen(false);
       fetchData();
@@ -959,23 +1068,46 @@ const ProductsView = () => {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Main Thumbnail</label>
-                    <div className="flex items-center gap-6 p-6 bg-navy-950 border-2 border-dashed border-gold-500/10 rounded-2xl group hover:border-gold-500/30 transition-all">
-                      <div className="w-24 h-24 rounded-xl border border-gold-500/20 overflow-hidden bg-navy-900 flex items-center justify-center relative">
+                    <div className="flex items-center gap-6 p-6 bg-navy-950 border-2 border-dashed border-gold-500/10 rounded-2xl group hover:border-gold-500/30 transition-all relative">
+                      {uploading && (
+                        <div className="absolute inset-0 bg-navy-950/60 backdrop-blur-[2px] z-20 flex items-center justify-center rounded-2xl">
+                          <div className="flex flex-col items-center gap-2">
+                             <div className="w-6 h-6 border-2 border-gold-500 border-t-transparent animate-spin rounded-full" />
+                             <span className="text-[8px] font-black uppercase text-gold-500 tracking-widest">Uploading to Cloudinary...</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="w-24 h-24 rounded-xl border border-gold-500/20 overflow-hidden bg-navy-900 flex items-center justify-center relative group">
                         {formData.thumbnailPreview ? (
-                          <img src={formData.thumbnailPreview} className="w-full h-full object-cover" />
+                          <>
+                            <img src={formData.thumbnailPreview} className="w-full h-full object-cover" />
+                            <button 
+                              type="button" 
+                              onClick={removeThumbnail}
+                              className="absolute inset-0 bg-red-500/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 size={20} />
+                            </button>
+                          </>
                         ) : (
-                          <ImageIcon className="text-gold-500/20" size={32} />
+                          <>
+                            <ImageIcon className="text-gold-500/20" size={32} />
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={handleThumbnailChange}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            />
+                          </>
                         )}
-                        <input 
-                          type="file" 
-                          accept="image/*"
-                          onChange={handleThumbnailChange}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <p className="text-[10px] font-black text-gold-100 uppercase tracking-widest">Select Thumbnail</p>
-                        <p className="text-[9px] text-gold-500/40 uppercase tracking-wider">Drag and drop or click to upload</p>
+                        <p className="text-[10px] font-black text-gold-100 uppercase tracking-widest">
+                          {formData.thumbnailPreview ? 'Current Thumbnail' : 'Select Thumbnail'}
+                        </p>
+                        <p className="text-[9px] text-gold-500/40 uppercase tracking-wider">
+                          {formData.thumbnailPreview ? 'Hover to remove and select a different one' : 'Drag and drop or click to upload'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -985,22 +1117,28 @@ const ProductsView = () => {
                       <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Additional Gallery Images</label>
                       <div className="relative">
                         <button type="button" className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
-                          <Plus size={14} /> Attach Photos
+                          <Plus size={14} /> {uploading ? 'Processing...' : 'Attach Photos'}
                         </button>
                         <input 
                           type="file" 
                           multiple 
                           accept="image/*"
                           onChange={handleGalleryChange}
+                          disabled={uploading}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {formData.galleryPreviews.map((preview, idx) => (
-                        <div key={idx} className="aspect-square rounded-xl border border-gold-500/10 overflow-hidden relative group">
-                          <img src={preview} className="w-full h-full object-cover" />
+                      {formData.gallery.map((item, idx) => (
+                        <div key={item.id || item.preview || idx} className="aspect-square rounded-xl border border-gold-500/10 overflow-hidden relative group">
+                          <img src={item.preview || item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-40 grayscale blur-[2px]' : ''}`} />
+                          {item.isUploading && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-5 h-5 border-2 border-gold-500 border-t-transparent animate-spin rounded-full" />
+                            </div>
+                          )}
                           <button 
                             type="button" 
                             onClick={() => removeGalleryFile(idx)} 
@@ -1026,22 +1164,43 @@ const ProductsView = () => {
                 
                 <div className="space-y-4">
                   {formData.variants.length > 0 ? formData.variants.map((variant, idx) => (
-                    <div key={idx} className="bg-navy-950/50 border border-gold-500/10 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-5 gap-4 items-end relative group">
+                    <div key={idx} className="bg-navy-950/50 border border-gold-500/10 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-6 gap-4 items-end relative group">
                       <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Colour</label>
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Image</label>
+                        <div className="w-12 h-12 rounded border border-gold-500/10 overflow-hidden bg-navy-900 flex items-center justify-center relative group-hover:border-gold-500/30 transition-all">
+                          {variant.image_url ? (
+                            <img src={variant.image_url} className={`w-full h-full object-cover ${variant.image_url.startsWith('blob:') ? 'opacity-50 grayscale' : ''}`} />
+                          ) : (
+                            <ImageIcon size={14} className="text-gold-500/20" />
+                          )}
+                          {variant.image_url?.startsWith('blob:') && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-3 h-3 border border-gold-500 border-t-transparent animate-spin rounded-full" />
+                            </div>
+                          )}
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={(e) => handleVariantImageChange(idx, e)}
+                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Colour (E.G. BLACK, NAVY)</label>
                         <input 
                           type="text" 
-                          placeholder="E.G. MIDNIGHT BLUE"
+                          placeholder="E.G. BLACK"
                           value={variant.color}
                           onChange={(e) => handleVariantChange(idx, 'color', e.target.value)}
                           className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size</label>
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size (E.G. 42, 46, XXL)</label>
                         <input 
                           type="text" 
-                          placeholder="E.G. XL / 42"
+                          placeholder="E.G. 42"
                           value={variant.size}
                           onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
                           className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
@@ -1057,10 +1216,10 @@ const ProductsView = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Override</label>
+                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Mod</label>
                         <input 
                           type="number" 
-                          placeholder="IF DIFFERENT"
+                          placeholder="± KSH"
                           value={variant.price_override}
                           onChange={(e) => handleVariantChange(idx, 'price_override', e.target.value)}
                           className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
@@ -1139,6 +1298,7 @@ const CategoriesView = () => {
     name: '',
     slug: '',
     description: '',
+    image: '',
     is_featured: false,
     is_active: true
   });
@@ -1159,6 +1319,22 @@ const CategoriesView = () => {
     fetchCategories();
   }, []);
 
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const uploadData = new FormData();
+      uploadData.append('images', file);
+      try {
+        const res = await adminUploadAPI.upload(uploadData);
+        if (res.data.success) {
+          setFormData({ ...formData, image: res.data.data[0] });
+        }
+      } catch (error) {
+        console.error('Category image upload failed:', error);
+      }
+    }
+  };
+
   const handleOpenModal = (category = null) => {
     if (category) {
       setCurrentCategory(category);
@@ -1166,6 +1342,7 @@ const CategoriesView = () => {
         name: category.name || '',
         slug: category.slug || '',
         description: category.description || '',
+        image: category.image || '',
         is_featured: category.is_featured || false,
         is_active: category.is_active ?? true
       });
@@ -1175,6 +1352,7 @@ const CategoriesView = () => {
         name: '',
         slug: '',
         description: '',
+        image: '',
         is_featured: false,
         is_active: true
       });
@@ -1325,6 +1503,17 @@ const CategoriesView = () => {
                 </div>
 
                 <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Image</label>
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center relative">
+                            {formData.image ? <img src={formData.image} className="w-full h-full object-cover" /> : <ImageIcon size={20} className="text-gold-500/20" />}
+                            <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                        <p className="text-[9px] text-gold-500/40 uppercase tracking-widest">Click to upload cover image</p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
                   <textarea 
                     value={formData.description}
@@ -1380,6 +1569,7 @@ const BrandsView = () => {
     name: '',
     slug: '',
     description: '',
+    logo: '',
     is_featured: false,
     is_active: true
   });
@@ -1400,6 +1590,22 @@ const BrandsView = () => {
     fetchBrands();
   }, []);
 
+  const handleLogoChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const uploadData = new FormData();
+      uploadData.append('images', file);
+      try {
+        const res = await adminUploadAPI.upload(uploadData);
+        if (res.data.success) {
+          setFormData({ ...formData, logo: res.data.data[0] });
+        }
+      } catch (error) {
+        console.error('Brand logo upload failed:', error);
+      }
+    }
+  };
+
   const handleOpenModal = (brand = null) => {
     if (brand) {
       setCurrentBrand(brand);
@@ -1407,6 +1613,7 @@ const BrandsView = () => {
         name: brand.name || '',
         slug: brand.slug || '',
         description: brand.description || '',
+        logo: brand.logo || '',
         is_featured: brand.is_featured || false,
         is_active: brand.is_active ?? true
       });
@@ -1416,6 +1623,7 @@ const BrandsView = () => {
         name: '',
         slug: '',
         description: '',
+        logo: '',
         is_featured: false,
         is_active: true
       });
@@ -1473,14 +1681,19 @@ const BrandsView = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
           {brands.map((brand) => (
             <div key={brand.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl flex items-center justify-between group backdrop-blur-sm transition-all hover:bg-navy-800/50">
-              <div>
-                <div className="text-lg font-bold text-gold-100 mb-1">{brand.name}</div>
-                <div className="text-xs text-gold-500/40 mb-3">{brand.product_count || 0} products live</div>
-                <div className="flex gap-2">
-                   {brand.is_featured && <span className="bg-gold-600/10 text-gold-500 text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border border-gold-500/10">Featured</span>}
-                   <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border ${brand.is_active ? 'border-green-400/20 text-green-400' : 'border-gold-500/5 text-gold-500/20'}`}>
-                     {brand.is_active ? 'Active' : 'Inactive'}
-                   </span>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center">
+                    {brand.logo ? <img src={brand.logo} className="w-full h-full object-contain" /> : <Award size={20} className="text-gold-500/20" />}
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-gold-100 mb-1">{brand.name}</div>
+                  <div className="text-xs text-gold-500/40 mb-3">{brand.product_count || 0} products live</div>
+                  <div className="flex gap-2">
+                    {brand.is_featured && <span className="bg-gold-600/10 text-gold-500 text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border border-gold-500/10">Featured</span>}
+                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border ${brand.is_active ? 'border-green-400/20 text-green-400' : 'border-gold-500/5 text-gold-500/20'}`}>
+                      {brand.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1541,6 +1754,17 @@ const BrandsView = () => {
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-mono"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Logo</label>
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center relative">
+                            {formData.logo ? <img src={formData.logo} className="w-full h-full object-contain" /> : <Award size={20} className="text-gold-500/20" />}
+                            <input type="file" accept="image/*" onChange={handleLogoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                        <p className="text-[9px] text-gold-500/40 uppercase tracking-widest">Click to upload brand logo</p>
+                    </div>
                 </div>
 
                 <div className="space-y-2">
@@ -2445,8 +2669,14 @@ const SettingsView = () => {
                     <input 
                       type="text" 
                       value={settings[f.key] || ''} 
-                      onChange={(e) => setSettings({...settings, [f.key]: e.target.value.toUpperCase()})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase" 
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (!f.key.includes('email') && !f.key.includes('phone')) {
+                          val = val.toUpperCase();
+                        }
+                        setSettings({...settings, [f.key]: val});
+                      }}
+                      className={`w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold ${(!f.key.includes('email') && !f.key.includes('phone')) ? 'uppercase' : ''}`} 
                     />
                   </div>
                 ))}

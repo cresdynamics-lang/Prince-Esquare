@@ -7,14 +7,71 @@ import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
 import { getPremiumImage } from '../utils/productImages';
 import { getDummyProducts } from '../utils/dummyData';
-import { productAPI } from '../services/api';
+import { productAPI, adminCategoryAPI, adminBrandAPI } from '../services/api';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const addToCart = useCartStore((state) => state.addToCart);
   
-  const CATEGORY_DATA = [
+  const [dynamicCategories, setDynamicCategories] = useState([]);
+  const [dynamicBrands, setDynamicBrands] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const currentCategory = searchParams.get('category') || 'All';
+  const currentSub = searchParams.get('sub') || 'All';
+  const currentBrand = searchParams.get('brand') || 'All';
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const params = {};
+        if (currentCategory !== 'All') params.category = currentCategory;
+        if (currentSub !== 'All') params.sub = currentSub;
+        if (currentBrand !== 'All') params.brand = currentBrand;
+        
+        // Fetch products
+        const response = await productAPI.list(params);
+        const fetchedProducts = response.data.data.products || response.data.data || [];
+        
+        // Fetch categories for the filter
+        const catRes = await adminCategoryAPI.getAll().catch(() => ({ data: { data: [] } }));
+        const allCats = catRes.data.data || [];
+        const parents = allCats.filter(c => !c.parent_id);
+        const organized = parents.map(p => ({
+          id: p.slug,
+          name: p.name,
+          sub: allCats.filter(c => c.parent_id === p.id).map(c => c.name)
+        }));
+        setDynamicCategories(organized);
+
+        // Fetch brands for the filter
+        const brandRes = await adminBrandAPI.getAll().catch(() => ({ data: { data: [] } }));
+        setDynamicBrands(brandRes.data.data || []);
+
+        // Get dummy products
+        const dummyData = getDummyProducts(currentCategory, currentSub);
+        
+        // Combine them, filtering out dummies that have the same slug as a fetched product
+        const fetchedSlugs = new Set(fetchedProducts.map(p => p.slug));
+        const uniqueDummies = dummyData.filter(d => !fetchedSlugs.has(d.slug));
+        
+        setProducts([...fetchedProducts, ...uniqueDummies]);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setProducts(getDummyProducts(currentCategory, currentSub));
+      } finally {
+        setLoading(false);
+        window.scrollTo(0, 0);
+      }
+    };
+    fetchData();
+  }, [currentCategory, currentSub, currentBrand]);
+
+  const hardcodedCategories = [
     { id: 'All', name: 'All', sub: [] },
     { id: 'polo-t-shirts', name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
     { id: 'shoes', name: 'Shoes', sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'] },
@@ -25,46 +82,21 @@ const Products = () => {
     { id: 'more', name: 'More', sub: ['Blazers', 'Track Suits', 'Jackets', 'Half jackets', 'Caps & Hats', 'Belts & Ties', 'Sweaters', 'Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'] },
   ];
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const currentCategory = searchParams.get('category') || 'All';
-  const currentSub = searchParams.get('sub') || 'All';
+  const CATEGORY_DATA = [...hardcodedCategories];
+  dynamicCategories.forEach(dCat => {
+    if (!CATEGORY_DATA.find(c => c.name.toLowerCase() === dCat.name.toLowerCase())) {
+        CATEGORY_DATA.push(dCat);
+    }
+  });
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const params = {};
-        if (currentCategory !== 'All') params.category = currentCategory;
-        if (currentSub !== 'All') params.sub = currentSub;
-        
-        // Fetch from backend
-        const response = await productAPI.list(params);
-        const fetchedProducts = response.data.data.products || response.data.data || [];
-        
-        // Get dummy products
-        const dummyData = getDummyProducts(currentCategory, currentSub);
-        
-        // Combine them
-        setProducts([...dummyData, ...fetchedProducts]);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        // Fallback to just dummy products if backend fails
-        setProducts(getDummyProducts(currentCategory, currentSub));
-      } finally {
-        setLoading(false);
-        window.scrollTo(0, 0);
-      }
-    };
-    fetchProducts();
-  }, [currentCategory, currentSub]);
+  const dummyBrands = [...new Set(getDummyProducts().map(p => p.brand_name))];
+  const BRAND_LIST = ['All', ...new Set([...dummyBrands, ...dynamicBrands.map(b => b.name)])];
 
-  const setFilter = (cat, sub = 'All') => {
+  const setFilter = (cat, sub = 'All', brand = 'All') => {
     const params = {};
     if (cat !== 'All') params.category = cat;
     if (sub !== 'All') params.sub = sub;
+    if (brand !== 'All') params.brand = brand;
     setSearchParams(params);
   };
 
@@ -93,7 +125,11 @@ const Products = () => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (product.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    
+    const matchesBrand = currentBrand === 'All' || 
+      product.brand_name?.toLowerCase() === currentBrand.toLowerCase();
+
+    return matchesSearch && matchesBrand;
   });
 
   return (
@@ -105,13 +141,20 @@ const Products = () => {
           <div className="mb-12">
             <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold">Prince Esquire</span>
             <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight mt-2">
-              {currentCategory === 'All' ? 'Our Collections' : CATEGORY_DATA.find(c => c.id === currentCategory)?.name}
+              {currentCategory === 'All' ? 'Our Collections' : CATEGORY_DATA.find(c => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase())?.name}
             </h1>
-            {currentSub !== 'All' && (
-              <p className="text-gold-600/60 text-[12px] uppercase tracking-widest mt-4">
-                Exploring: {currentSub}
-              </p>
-            )}
+            <div className="flex gap-4 mt-4">
+                {currentSub !== 'All' && (
+                <p className="text-gold-600/60 text-[12px] uppercase tracking-widest border-r border-gold-600/20 pr-4">
+                    Exploring: {currentSub}
+                </p>
+                )}
+                {currentBrand !== 'All' && (
+                <p className="text-gold-600/60 text-[12px] uppercase tracking-widest">
+                    Brand: {currentBrand}
+                </p>
+                )}
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-8 md:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
@@ -121,9 +164,9 @@ const Products = () => {
                   <button
                     key={cat.id}
                     type="button"
-                    onClick={() => setFilter(cat.id)}
+                    onClick={() => setFilter(cat.id, 'All', currentBrand)}
                     className={`px-6 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all border ${
-                      currentCategory === cat.id
+                      currentCategory === cat.id || currentCategory.toLowerCase() === cat.name.toLowerCase()
                         ? 'bg-gold-600 text-navy-950 border-gold-600'
                         : 'bg-transparent text-gold-600/50 border-gold-600/10 hover:border-gold-600/30 hover:text-gold-500'
                     }`}
@@ -133,9 +176,27 @@ const Products = () => {
                 ))}
               </div>
 
+              <div className="flex flex-wrap gap-2 pt-4 border-t border-gold-600/5 items-center">
+                 <span className="text-[8px] font-black uppercase text-gold-500/40 mr-2 tracking-widest">Brands:</span>
+                 {BRAND_LIST.map((b) => (
+                   <button
+                    key={b}
+                    type="button"
+                    onClick={() => setFilter(currentCategory, currentSub, b)}
+                    className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
+                        currentBrand === b
+                          ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
+                          : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
+                      }`}
+                   >
+                     {b}
+                   </button>
+                 ))}
+              </div>
+
               <AnimatePresence>
                 {currentCategory !== 'All' &&
-                  CATEGORY_DATA.find((c) => c.id === currentCategory)?.sub.length > 0 && (
+                  CATEGORY_DATA.find((c) => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase())?.sub.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -144,20 +205,20 @@ const Products = () => {
                     >
                       <button
                         type="button"
-                        onClick={() => setFilter(currentCategory, 'All')}
+                        onClick={() => setFilter(currentCategory, 'All', currentBrand)}
                         className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
                           currentSub === 'All'
                             ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
                             : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
                         }`}
                       >
-                        All {CATEGORY_DATA.find(c => c.id === currentCategory)?.name}
+                        All {CATEGORY_DATA.find(c => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase())?.name}
                       </button>
-                      {CATEGORY_DATA.find((c) => c.id === currentCategory).sub.map((sub) => (
+                      {CATEGORY_DATA.find((c) => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase()).sub.map((sub) => (
                         <button
                           key={sub}
                           type="button"
-                          onClick={() => setFilter(currentCategory, sub)}
+                          onClick={() => setFilter(currentCategory, sub, currentBrand)}
                           className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
                             currentSub === sub
                               ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'

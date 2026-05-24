@@ -27,8 +27,11 @@ const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [loadError, setLoadError] = useState('');
+  
+  const [selectedColor, setSelectedColor] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [availableColors, setAvailableColors] = useState([]);
+
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
 
@@ -37,45 +40,54 @@ const ProductDetail = () => {
       setLoadError('');
       setProduct(null);
 
-      // Try dummy first
-      let found = DUMMY_PRODUCTS.find(p => p.slug === slug);
-      let isDummy = !!found;
+      let found = null;
+      let isDummy = false;
 
-      // If not dummy, try backend
-      if (!found) {
-        try {
-          const res = await productAPI.getBySlug(slug);
+      // Try backend first
+      try {
+        const res = await productAPI.getBySlug(slug);
+        if (res.data?.success && res.data.data) {
           found = res.data.data;
-        } catch (error) {
-          setLoadError('Product not found.');
-          return;
         }
+      } catch (error) {
+        console.warn('Backend product fetch failed, checking dummy data...');
+      }
+
+      // Fallback to dummy
+      if (!found) {
+        found = DUMMY_PRODUCTS.find(p => p.slug === slug);
+        if (found) isDummy = true;
+      }
+
+      if (!found) {
+        setLoadError('Product not found.');
+        return;
       }
 
       if (found) {
-        let p, variants = [], rel = [];
+        let p, rawVariants = [], rel = [];
 
         if (isDummy) {
           // Dummy specific logic
           const baseName = found.name.split(' in ')[0];
-          variants = DUMMY_PRODUCTS.filter(p =>
+          rawVariants = DUMMY_PRODUCTS.filter(p =>
             p.name.startsWith(baseName) && p.brand_name === found.brand_name
           ).map(v => ({
             id: v.id,
             value: v.name.includes(' in ') ? v.name.split(' in ')[1] : v.name,
             price_modifier: parseFloat(v.price) - parseFloat(found.price),
             slug: v.slug,
-            thumbnail: v.thumbnail
+            image_url: v.thumbnail
           }));
 
           p = {
             ...found,
             thumbnail: found.thumbnail,
             description: found.description || `Exquisite ${found.name} from our latest collection. Crafted with precision and the finest materials.`,
-            variants: variants.length > 1 ? variants : []
+            variants: rawVariants.length > 1 ? rawVariants : []
           };
 
-          const variantSlugs = variants.map(v => v.slug);
+          const variantSlugs = rawVariants.map(v => v.slug);
           rel = DUMMY_PRODUCTS.filter(item =>
             item.category_name === p.category_name &&
             !variantSlugs.includes(item.slug)
@@ -86,7 +98,7 @@ const ProductDetail = () => {
             ...found,
             thumbnail: found.thumbnail || found.image_url,
             description: found.description || `Exquisite ${found.name} from our latest collection.`,
-            variants: [] // Assumes backend doesn't return variants in this format for now
+            variants: found.variants || []
           };
           
           try {
@@ -97,12 +109,75 @@ const ProductDetail = () => {
           }
         }
 
-        setProduct(p);
-        const initialVariant = variants.find(v => v.slug === slug) || { id: p.id, value: 'Original', price_modifier: 0, slug: p.slug, thumbnail: p.thumbnail };
-        setSelectedVariant(initialVariant);
+        // Parse Variants for unified color/size handling
+        const parsedVariants = (p.variants || []).map(v => {
+          let c = v.color;
+          let s = v.size;
+          
+          // Fallback parsing for old DB structure or dummy data
+          if (!c && !s && v.value && v.value.includes('/')) {
+              const parts = v.value.split('/');
+              s = parts[0].trim();
+              c = parts[1].trim();
+          } else if (!c && !s) {
+              c = v.value || 'Original';
+              s = 'Standard';
+          }
+          return { ...v, color: c, size: s };
+        });
 
-        const sizes = sizesForCategoryName(p.category_name);
-        setSelectedSize(sizes[0] || '');
+        // For dummy products, we need to populate missing size combinations
+        let finalVariants = parsedVariants;
+        if (isDummy) {
+          const mockSizes = sizesForCategoryName(p.category_name);
+          const enrichedVariants = [];
+          parsedVariants.forEach(v => {
+              mockSizes.forEach(ms => {
+                  enrichedVariants.push({...v, size: ms, id: `${v.id}-${ms}`});
+              });
+          });
+          finalVariants = enrichedVariants;
+        }
+
+        // Add a default variant if none exist to ensure UI works smoothly
+        if (finalVariants.length === 0) {
+            finalVariants = sizesForCategoryName(p.category_name).map(size => ({
+                id: `default-${size}`,
+                color: 'Default',
+                size: size,
+                price_modifier: 0,
+                image_url: p.thumbnail,
+                stock: 10
+            }));
+        }
+
+        p.variants = finalVariants;
+
+        // Group unique colors
+        const uniqueColors = [];
+        const colorMap = new Map();
+        finalVariants.forEach(v => {
+          if (!colorMap.has(v.color)) {
+            colorMap.set(v.color, {
+              color: v.color,
+              image_url: v.image_url || p.thumbnail
+            });
+            uniqueColors.push(v.color);
+          }
+        });
+
+        const colorsList = uniqueColors.map(c => colorMap.get(c));
+        setAvailableColors(colorsList);
+
+        // Initialize selections
+        const initialColor = colorsList.length > 0 ? colorsList[0].color : '';
+        setSelectedColor(initialColor);
+
+        const sizesForInitColor = finalVariants.filter(v => v.color === initialColor).map(v => v.size);
+        const uniqueSizes = [...new Set(sizesForInitColor)];
+        setSelectedSize(uniqueSizes[0] || '');
+
+        setProduct(p);
         setRelated(rel);
       }
     };
@@ -110,20 +185,25 @@ const ProductDetail = () => {
     fetchProduct();
   }, [slug]);
 
+  const currentVariant = product?.variants?.find(v => v.color === selectedColor && v.size === selectedSize);
+
   const unitPrice = product
-    ? parseFloat(product.price) + parseFloat(selectedVariant?.price_modifier || 0)
+    ? parseFloat(product.price) + parseFloat(currentVariant?.price_modifier || 0)
     : 0;
+
+  const currentDisplayImage = availableColors.find(c => c.color === selectedColor)?.image_url || product?.thumbnail;
 
   const buildPayload = () => ({
     productId: product?.id,
-    variantId: selectedVariant?.id || null,
+    variantId: currentVariant?.id,
     quantity,
     sizeLabel: selectedSize,
     name: product?.name,
     price: unitPrice,
-    image: selectedVariant?.thumbnail || product?.thumbnail,
+    image: currentDisplayImage,
     slug: product?.slug,
     brandName: product?.brand_name,
+    variantValue: `${selectedSize} / ${selectedColor}`
   });
 
   const handleAddToCart = async () => {
@@ -158,6 +238,9 @@ const ProductDetail = () => {
     );
   }
 
+  // Get unique sizes for the currently selected color
+  const availableSizes = [...new Set(product?.variants?.filter(v => v.color === selectedColor).map(v => v.size))];
+
   return (
     <div className="bg-navy-950 min-h-screen">
       <Navbar />
@@ -169,8 +252,8 @@ const ProductDetail = () => {
               <div className="relative aspect-square md:aspect-[4/5] bg-navy-900 overflow-hidden rounded-sm border border-gold-600/10">
                 <AnimatePresence mode="wait">
                   <motion.img
-                    key={selectedVariant?.thumbnail || product.thumbnail}
-                    src={selectedVariant?.thumbnail || product.thumbnail}
+                    key={currentDisplayImage}
+                    src={currentDisplayImage}
                     alt={product.name}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -189,23 +272,31 @@ const ProductDetail = () => {
                 <p className="text-2xl font-light text-gold-400 italic">KSh {unitPrice.toLocaleString()}</p>
               </div>
 
-              {product.variants?.length > 0 && (
+              {availableColors.length > 0 && availableColors[0].color !== 'Default' && (
                 <div className="space-y-4">
                   <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold-500">Color Selection</h3>
                   <div className="flex flex-col space-y-3">
-                    {product.variants.map((variant) => (
+                    {availableColors.map((colorObj) => (
                       <button
-                        key={variant.id}
+                        key={colorObj.color}
                         type="button"
-                        onClick={() => setSelectedVariant(variant)}
-                        className={`flex items-center justify-between px-6 py-4 border transition-all group ${selectedVariant?.id === variant.id
+                        onClick={() => {
+                           setSelectedColor(colorObj.color);
+                           // Automatically select the first available size for this new color
+                           const newSizes = product.variants.filter(v => v.color === colorObj.color).map(v => v.size);
+                           const uniqueSizes = [...new Set(newSizes)];
+                           if (!uniqueSizes.includes(selectedSize)) {
+                               setSelectedSize(uniqueSizes[0] || '');
+                           }
+                        }}
+                        className={`flex items-center justify-between px-6 py-4 border transition-all group ${selectedColor === colorObj.color
                             ? 'bg-gold-600 text-navy-950 border-gold-600'
                             : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'
                           }`}
                       >
-                        <span className="text-[10px] font-bold uppercase tracking-widest">{variant.value}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{colorObj.color}</span>
                         <div
-                          className={`w-3 h-3 rounded-full border ${selectedVariant?.id === variant.id ? 'bg-navy-950 border-white/20' : 'bg-gold-600/20 border-gold-600/40'
+                          className={`w-3 h-3 rounded-full border ${selectedColor === colorObj.color ? 'bg-navy-950 border-white/20' : 'bg-gold-600/20 border-gold-600/40'
                             }`}
                         />
                       </button>
@@ -214,32 +305,43 @@ const ProductDetail = () => {
                 </div>
               )}
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold-500">Select Size</h3>
-                  <button
-                    type="button"
-                    className="text-[10px] uppercase tracking-widest text-gold-600/50 font-bold hover:text-gold-500 transition-colors"
-                  >
-                    Size Guide
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {sizesForCategoryName(product?.category_name).map((size) => (
+              {availableSizes.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold-500">Select Size</h3>
                     <button
-                      key={size}
                       type="button"
-                      onClick={() => setSelectedSize(size)}
-                      className={`w-12 h-12 flex items-center justify-center text-[10px] font-bold border transition-all ${selectedSize === size
-                          ? 'bg-gold-600 text-navy-950 border-gold-600'
-                          : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'
-                        }`}
+                      className="text-[10px] uppercase tracking-widest text-gold-600/50 font-bold hover:text-gold-500 transition-colors"
                     >
-                      {size}
+                      Size Guide
                     </button>
-                  ))}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {availableSizes.map((size) => {
+                      const variantForSize = product?.variants?.find(v => v.color === selectedColor && v.size === size);
+                      // In dummy mode stock might be undefined, handle gracefully
+                      const isOutOfStock = variantForSize && variantForSize.stock === 0;
+
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          disabled={isOutOfStock}
+                          onClick={() => setSelectedSize(size)}
+                          className={`w-12 h-12 flex items-center justify-center text-[10px] font-bold border transition-all ${
+                            isOutOfStock ? 'opacity-50 cursor-not-allowed bg-navy-900 text-white/30 border-gold-600/10' :
+                            selectedSize === size
+                              ? 'bg-gold-600 text-navy-950 border-gold-600'
+                              : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-4 pt-4">
                 <div className="flex items-center space-x-4">

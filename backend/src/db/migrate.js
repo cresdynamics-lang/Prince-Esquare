@@ -6,9 +6,10 @@ const runMigrations = async () => {
     try {
         console.log('Starting migrations...');
         const dir = path.join(__dirname, 'migrations');
-        const files = ['schema.sql', '002_cart_order_size_label.sql'].filter((f) =>
-            fs.existsSync(path.join(dir, f))
-        );
+        const files = fs.readdirSync(dir)
+            .filter(f => f.endsWith('.sql'))
+            .sort();
+        
         for (const file of files) {
             const sql = fs.readFileSync(path.join(dir, file), 'utf8');
             console.log('Running', file);
