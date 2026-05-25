@@ -532,6 +532,57 @@ const OrdersView = () => {
 };
 
 
+const newColorGroup = () => ({
+  _key: Math.random().toString(36).slice(2),
+  color: '',
+  image_url: '',
+  sizes: [{ _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' }],
+});
+
+const groupVariantsByColor = (flatVariants) => {
+  const map = new Map();
+  for (const v of flatVariants || []) {
+    const colorKey = (v.color || 'UNNAMED').trim().toUpperCase();
+    if (!map.has(colorKey)) {
+      map.set(colorKey, {
+        _key: Math.random().toString(36).slice(2),
+        color: v.color || '',
+        image_url: v.image_url || '',
+        sizes: [],
+      });
+    }
+    const group = map.get(colorKey);
+    if (!group.image_url && v.image_url) group.image_url = v.image_url;
+    group.sizes.push({
+      _key: Math.random().toString(36).slice(2),
+      id: v.id,
+      size: v.size || '',
+      stock: v.stock ?? v.stock_quantity ?? 0,
+      price_override: v.price_override ?? v.price_modifier ?? '',
+    });
+  }
+  return Array.from(map.values());
+};
+
+const flattenColorGroups = (colorGroups) => {
+  const variants = [];
+  for (const g of colorGroups || []) {
+    if (!g.color?.trim()) continue;
+    for (const s of g.sizes || []) {
+      if (!s.size?.trim()) continue;
+      variants.push({
+        id: s.id,
+        color: g.color.trim().toUpperCase(),
+        size: String(s.size).trim().toUpperCase(),
+        stock: parseInt(s.stock, 10) || 0,
+        price_override: s.price_override === '' || s.price_override == null ? 0 : parseFloat(s.price_override) || 0,
+        image_url: g.image_url || null,
+      });
+    }
+  }
+  return variants;
+};
+
 const ProductsView = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -554,7 +605,7 @@ const ProductsView = () => {
     is_active: true,
     thumbnail: '',
     images: [], // This will store the final URLs for saving
-    variants: [],
+    colorGroups: [],
     thumbnailFile: null,
     thumbnailPreview: '',
     gallery: [] // Combined state: { id, preview, url, isUploading }
@@ -681,59 +732,79 @@ const ProductsView = () => {
     }
   };
 
-  const handleVariantImageChange = async (index, e) => {
+  const handleColorGroupImageChange = async (groupIndex, e) => {
     const file = e.target.files[0];
-    if (file) {
-      setUploading(true);
-      const localPreview = URL.createObjectURL(file);
-      
-      // Update locally first
-      setFormData(prev => {
-        const next = [...prev.variants];
-        next[index] = { ...next[index], image_url: localPreview };
-        return { ...prev, variants: next };
-      });
-
-      const uploadData = new FormData();
-      uploadData.append('images', file);
-      try {
-        const res = await adminUploadAPI.upload(uploadData);
-        if (res.data.success) {
-          const finalUrl = res.data.data[0];
-          setFormData(prev => {
-            const next = [...prev.variants];
-            next[index] = { ...next[index], image_url: finalUrl };
-            return { ...prev, variants: next };
-          });
-        }
-      } catch (error) {
-        console.error('Variant image upload failed:', error);
-        alert('Variant image upload failed.');
-      } finally {
-        setUploading(false);
-      }
-    }
-  };
-
-  const handleAddVariant = () => {
-    setFormData({ 
-      ...formData, 
-      variants: [...formData.variants, { color: '', size: '', stock: 0, price_override: '', image_url: '' }] 
+    if (!file) return;
+    setUploading(true);
+    const localPreview = URL.createObjectURL(file);
+    setFormData((prev) => {
+      const next = [...prev.colorGroups];
+      next[groupIndex] = { ...next[groupIndex], image_url: localPreview };
+      return { ...prev, colorGroups: next };
     });
-  };
-
-  const handleVariantChange = (index, field, value) => {
-    const newVariants = [...formData.variants];
-    let finalValue = value;
-    if (typeof finalValue === 'string' && (field === 'color' || field === 'size')) {
-      finalValue = finalValue.toUpperCase();
+    const uploadData = new FormData();
+    uploadData.append('images', file);
+    try {
+      const res = await adminUploadAPI.upload(uploadData);
+      if (res.data.success) {
+        const finalUrl = res.data.data[0];
+        setFormData((prev) => {
+          const next = [...prev.colorGroups];
+          next[groupIndex] = { ...next[groupIndex], image_url: finalUrl };
+          return { ...prev, colorGroups: next };
+        });
+      }
+    } catch (error) {
+      console.error('Color image upload failed:', error);
+      alert('Color image upload failed.');
+    } finally {
+      setUploading(false);
     }
-    newVariants[index][field] = finalValue;
-    setFormData({ ...formData, variants: newVariants });
   };
 
-  const handleRemoveVariant = (index) => {
-    setFormData({ ...formData, variants: formData.variants.filter((_, i) => i !== index) });
+  const handleAddColorGroup = () => {
+    setFormData({ ...formData, colorGroups: [...formData.colorGroups, newColorGroup()] });
+  };
+
+  const handleRemoveColorGroup = (groupIndex) => {
+    setFormData({ ...formData, colorGroups: formData.colorGroups.filter((_, i) => i !== groupIndex) });
+  };
+
+  const handleColorGroupChange = (groupIndex, field, value) => {
+    const next = [...formData.colorGroups];
+    let finalValue = value;
+    if (field === 'color' && typeof finalValue === 'string') finalValue = finalValue.toUpperCase();
+    next[groupIndex] = { ...next[groupIndex], [field]: finalValue };
+    setFormData({ ...formData, colorGroups: next });
+  };
+
+  const handleAddSizeToGroup = (groupIndex) => {
+    const next = [...formData.colorGroups];
+    next[groupIndex] = {
+      ...next[groupIndex],
+      sizes: [
+        ...next[groupIndex].sizes,
+        { _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' },
+      ],
+    };
+    setFormData({ ...formData, colorGroups: next });
+  };
+
+  const handleSizeChange = (groupIndex, sizeIndex, field, value) => {
+    const next = [...formData.colorGroups];
+    const sizes = [...next[groupIndex].sizes];
+    let finalValue = value;
+    if (field === 'size' && typeof finalValue === 'string') finalValue = finalValue.toUpperCase();
+    sizes[sizeIndex] = { ...sizes[sizeIndex], [field]: finalValue };
+    next[groupIndex] = { ...next[groupIndex], sizes };
+    setFormData({ ...formData, colorGroups: next });
+  };
+
+  const handleRemoveSize = (groupIndex, sizeIndex) => {
+    const next = [...formData.colorGroups];
+    const sizes = next[groupIndex].sizes.filter((_, i) => i !== sizeIndex);
+    next[groupIndex] = { ...next[groupIndex], sizes: sizes.length ? sizes : [{ _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' }] };
+    setFormData({ ...formData, colorGroups: next });
   };
 
   const fetchData = async () => {
@@ -775,7 +846,7 @@ const ProductsView = () => {
         is_active: product.is_active ?? true,
         thumbnail: product.thumbnail || '',
         images: Array.isArray(product.images) ? product.images : [],
-        variants: Array.isArray(product.variants) ? product.variants : [],
+        colorGroups: groupVariantsByColor(Array.isArray(product.variants) ? product.variants : []),
         thumbnailPreview: product.thumbnail || '',
         gallery: (Array.isArray(product.images) ? product.images : []).map(url => ({
           id: Math.random().toString(36).substring(7),
@@ -800,7 +871,7 @@ const ProductsView = () => {
         is_active: true,
         thumbnail: '',
         images: [],
-        variants: [],
+        colorGroups: [],
         thumbnailPreview: '',
         gallery: []
       });
@@ -824,14 +895,16 @@ const ProductsView = () => {
     setSubmitting(true);
     try {
       const payload = { ...formData };
-      
+      payload.variants = flattenColorGroups(formData.colorGroups);
+
       // Remove frontend-only state fields
       delete payload.thumbnailPreview;
       delete payload.galleryPreviews;
       delete payload.gallery;
       delete payload.thumbnailFile;
       delete payload.galleryFiles;
-      delete payload.galleryPreviews; // in case it was still there
+      delete payload.galleryPreviews;
+      delete payload.colorGroups;
 
       if (currentProduct) {
         await adminProductAPI.update(currentProduct.id, payload);
@@ -1153,87 +1226,119 @@ const ProductsView = () => {
                 </div>
               </div>
 
-              {/* Variants Section */}
+              {/* Variants Section — grouped by color */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
-                  <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Product Variants (COLOUR, SIZE, ETC.)</h5>
-                  <button type="button" onClick={handleAddVariant} className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
-                    <Plus size={14} /> Add Variant Option
+                  <div>
+                    <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Color &amp; Size Variants</h5>
+                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">One image per color · multiple sizes with stock under each</p>
+                  </div>
+                  <button type="button" onClick={handleAddColorGroup} className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
+                    <Plus size={14} /> Add Color Option
                   </button>
                 </div>
-                
-                <div className="space-y-4">
-                  {formData.variants.length > 0 ? formData.variants.map((variant, idx) => (
-                    <div key={idx} className="bg-navy-950/50 border border-gold-500/10 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-6 gap-4 items-end relative group">
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Image</label>
-                        <div className="w-12 h-12 rounded border border-gold-500/10 overflow-hidden bg-navy-900 flex items-center justify-center relative group-hover:border-gold-500/30 transition-all">
-                          {variant.image_url ? (
-                            <img src={variant.image_url} className={`w-full h-full object-cover ${variant.image_url.startsWith('blob:') ? 'opacity-50 grayscale' : ''}`} />
-                          ) : (
-                            <ImageIcon size={14} className="text-gold-500/20" />
-                          )}
-                          {variant.image_url?.startsWith('blob:') && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-3 h-3 border border-gold-500 border-t-transparent animate-spin rounded-full" />
+
+                <div className="space-y-6">
+                  {formData.colorGroups.length > 0 ? formData.colorGroups.map((group, groupIdx) => (
+                    <div key={group._key || groupIdx} className="bg-navy-950/50 border border-gold-500/15 rounded-2xl overflow-hidden">
+                      <div className="flex items-start justify-between gap-4 p-6 border-b border-gold-500/10 bg-navy-950/80">
+                        <div className="flex items-start gap-5 flex-1">
+                          <div className="space-y-2 shrink-0">
+                            <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Color Image</label>
+                            <div className="w-20 h-20 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-900 flex items-center justify-center relative hover:border-gold-500/30 transition-all">
+                              {group.image_url ? (
+                                <img src={group.image_url} alt="" className={`w-full h-full object-cover ${group.image_url.startsWith('blob:') ? 'opacity-50 grayscale' : ''}`} />
+                              ) : (
+                                <ImageIcon size={20} className="text-gold-500/20" />
+                              )}
+                              {group.image_url?.startsWith('blob:') && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-4 h-4 border-2 border-gold-500 border-t-transparent animate-spin rounded-full" />
+                                </div>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleColorGroupImageChange(groupIdx, e)}
+                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                              />
                             </div>
-                          )}
-                          <input 
-                            type="file" 
-                            accept="image/*"
-                            onChange={(e) => handleVariantImageChange(idx, e)}
-                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                          />
+                          </div>
+                          <div className="space-y-2 flex-1 max-w-md">
+                            <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Color Name (e.g. BLACK LEATHER)</label>
+                            <input
+                              type="text"
+                              placeholder="E.G. BLACK LEATHER"
+                              value={group.color}
+                              onChange={(e) => handleColorGroupChange(groupIdx, 'color', e.target.value)}
+                              className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                            />
+                          </div>
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Colour (E.G. BLACK, NAVY)</label>
-                        <input 
-                          type="text" 
-                          placeholder="E.G. BLACK"
-                          value={variant.color}
-                          onChange={(e) => handleVariantChange(idx, 'color', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size (E.G. 42, 46, XXL)</label>
-                        <input 
-                          type="text" 
-                          placeholder="E.G. 42"
-                          value={variant.size}
-                          onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Stock</label>
-                        <input 
-                          type="number" 
-                          value={variant.stock}
-                          onChange={(e) => handleVariantChange(idx, 'stock', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Mod</label>
-                        <input 
-                          type="number" 
-                          placeholder="± KSH"
-                          value={variant.price_override}
-                          onChange={(e) => handleVariantChange(idx, 'price_override', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
-                        />
-                      </div>
-                      <div className="pb-1 text-right">
-                        <button type="button" onClick={() => handleRemoveVariant(idx)} className="p-2 text-red-400/40 hover:text-red-400 transition-colors">
-                          <Trash2 size={16} />
+                        <button type="button" onClick={() => handleRemoveColorGroup(groupIdx)} className="p-2 text-red-400/40 hover:text-red-400 transition-colors mt-6" title="Remove color">
+                          <Trash2 size={18} />
                         </button>
+                      </div>
+
+                      <div className="p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-black text-gold-500/50 uppercase tracking-[0.2em]">Sizes for this color</span>
+                          <button type="button" onClick={() => handleAddSizeToGroup(groupIdx)} className="text-[9px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-1.5">
+                            <Plus size={12} /> Add Size
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {group.sizes.map((sizeRow, sizeIdx) => (
+                            <div key={sizeRow._key || sizeIdx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-navy-900/40 p-4 rounded-xl border border-gold-500/5">
+                              <div className="sm:col-span-3 space-y-1">
+                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size</label>
+                                <input
+                                  type="text"
+                                  placeholder="E.G. 42"
+                                  value={sizeRow.size}
+                                  onChange={(e) => handleSizeChange(groupIdx, sizeIdx, 'size', e.target.value)}
+                                  className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                                />
+                              </div>
+                              <div className="sm:col-span-3 space-y-1">
+                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">In Stock</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={sizeRow.stock}
+                                  onChange={(e) => handleSizeChange(groupIdx, sizeIdx, 'stock', e.target.value)}
+                                  className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
+                                />
+                              </div>
+                              <div className="sm:col-span-4 space-y-1">
+                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Mod (± KSh)</label>
+                                <input
+                                  type="number"
+                                  placeholder="0"
+                                  value={sizeRow.price_override}
+                                  onChange={(e) => handleSizeChange(groupIdx, sizeIdx, 'price_override', e.target.value)}
+                                  className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
+                                />
+                              </div>
+                              <div className="sm:col-span-2 flex justify-end pb-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSize(groupIdx, sizeIdx)}
+                                  className="p-2 text-red-400/40 hover:text-red-400 transition-colors"
+                                  disabled={group.sizes.length === 1}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )) : (
-                    <div className="py-8 text-center border-2 border-dashed border-gold-500/5 rounded-2xl text-[10px] text-gold-500/20 uppercase font-black tracking-widest">
-                      No variants added. Click above to add sizes or colours.
+                    <div className="py-10 text-center border-2 border-dashed border-gold-500/5 rounded-2xl text-[10px] text-gold-500/20 uppercase font-black tracking-widest">
+                      No color options yet. Add a color, upload its image, then add sizes with stock.
                     </div>
                   )}
                 </div>

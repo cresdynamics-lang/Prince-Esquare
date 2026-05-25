@@ -168,7 +168,7 @@ const Products = () => {
                     className={`px-6 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all border ${
                       currentCategory === cat.id || currentCategory.toLowerCase() === cat.name.toLowerCase()
                         ? 'bg-gold-600 text-navy-950 border-gold-600'
-                        : 'bg-transparent text-gold-600/50 border-gold-600/10 hover:border-gold-600/30 hover:text-gold-500'
+                        : 'bg-navy-900/50 text-gold-400 border-gold-600/30 hover:border-gold-500 hover:text-gold-200 hover:bg-navy-800'
                     }`}
                   >
                     {cat.name}
@@ -177,7 +177,7 @@ const Products = () => {
               </div>
 
               <div className="flex flex-wrap gap-2 pt-4 border-t border-gold-600/5 items-center">
-                 <span className="text-[8px] font-black uppercase text-gold-500/40 mr-2 tracking-widest">Brands:</span>
+                 <span className="text-[8px] font-black uppercase text-gold-500/80 mr-2 tracking-widest">Brands:</span>
                  {BRAND_LIST.map((b) => (
                    <button
                     key={b}
@@ -185,8 +185,8 @@ const Products = () => {
                     onClick={() => setFilter(currentCategory, currentSub, b)}
                     className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
                         currentBrand === b
-                          ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
-                          : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
+                          ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
+                          : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
                       }`}
                    >
                      {b}
@@ -208,8 +208,8 @@ const Products = () => {
                         onClick={() => setFilter(currentCategory, 'All', currentBrand)}
                         className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
                           currentSub === 'All'
-                            ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
-                            : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
+                            ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
+                            : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
                         }`}
                       >
                         All {CATEGORY_DATA.find(c => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase())?.name}
@@ -221,8 +221,8 @@ const Products = () => {
                           onClick={() => setFilter(currentCategory, sub, currentBrand)}
                           className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
                             currentSub === sub
-                              ? 'bg-gold-600/10 text-gold-500 border-gold-500/30'
-                              : 'bg-transparent text-gold-600/30 border-transparent hover:text-gold-600'
+                              ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
+                              : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
                           }`}
                         >
                           {sub}

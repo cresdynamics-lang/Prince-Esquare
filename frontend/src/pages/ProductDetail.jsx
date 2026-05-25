@@ -19,6 +19,23 @@ function sizesForCategoryName(name) {
   return ['M', 'L', 'XL', 'XXL'];
 }
 
+function sortSizes(sizes) {
+  const unique = [...new Set(sizes.filter(Boolean))];
+  const allNumeric = unique.every((s) => /^\d+$/.test(String(s).trim()));
+  if (allNumeric) {
+    return unique.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+  }
+  const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'];
+  return unique.sort((a, b) => {
+    const ai = order.indexOf(String(a).toUpperCase());
+    const bi = order.indexOf(String(b).toUpperCase());
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return String(a).localeCompare(String(b));
+  });
+}
+
 const ProductDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -174,7 +191,7 @@ const ProductDetail = () => {
         setSelectedColor(initialColor);
 
         const sizesForInitColor = finalVariants.filter(v => v.color === initialColor).map(v => v.size);
-        const uniqueSizes = [...new Set(sizesForInitColor)];
+        const uniqueSizes = sortSizes(sizesForInitColor);
         setSelectedSize(uniqueSizes[0] || '');
 
         setProduct(p);
@@ -238,8 +255,9 @@ const ProductDetail = () => {
     );
   }
 
-  // Get unique sizes for the currently selected color
-  const availableSizes = [...new Set(product?.variants?.filter(v => v.color === selectedColor).map(v => v.size))];
+  const availableSizes = sortSizes(
+    product?.variants?.filter((v) => v.color === selectedColor).map((v) => v.size) || []
+  );
 
   return (
     <div className="bg-navy-950 min-h-screen">
@@ -284,7 +302,7 @@ const ProductDetail = () => {
                            setSelectedColor(colorObj.color);
                            // Automatically select the first available size for this new color
                            const newSizes = product.variants.filter(v => v.color === colorObj.color).map(v => v.size);
-                           const uniqueSizes = [...new Set(newSizes)];
+                           const uniqueSizes = sortSizes(newSizes);
                            if (!uniqueSizes.includes(selectedSize)) {
                                setSelectedSize(uniqueSizes[0] || '');
                            }
@@ -320,7 +338,8 @@ const ProductDetail = () => {
                     {availableSizes.map((size) => {
                       const variantForSize = product?.variants?.find(v => v.color === selectedColor && v.size === size);
                       // In dummy mode stock might be undefined, handle gracefully
-                      const isOutOfStock = variantForSize && variantForSize.stock === 0;
+                      const stock = variantForSize?.stock;
+                      const isOutOfStock = variantForSize != null && Number(stock) === 0;
 
                       return (
                         <button
@@ -328,8 +347,9 @@ const ProductDetail = () => {
                           type="button"
                           disabled={isOutOfStock}
                           onClick={() => setSelectedSize(size)}
+                          title={isOutOfStock ? 'Out of stock' : undefined}
                           className={`w-12 h-12 flex items-center justify-center text-[10px] font-bold border transition-all ${
-                            isOutOfStock ? 'opacity-50 cursor-not-allowed bg-navy-900 text-white/30 border-gold-600/10' :
+                            isOutOfStock ? 'opacity-40 cursor-not-allowed line-through bg-navy-900 text-white/30 border-gold-600/10' :
                             selectedSize === size
                               ? 'bg-gold-600 text-navy-950 border-gold-600'
                               : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'

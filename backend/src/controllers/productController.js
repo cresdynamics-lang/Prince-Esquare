@@ -262,9 +262,38 @@ exports.getRelatedProducts = async (req, res, next) => {
 
 exports.adminGetProducts = async (req, res, next) => {
     try {
-        const result = await db.query('SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.created_at DESC');
-        formatResponse(res, 200, true, 'Admin products fetched', result.rows);
-    } catch (error) { next(error); }
+        const result = await db.query(
+            'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.created_at DESC'
+        );
+        const products = result.rows;
+
+        if (products.length > 0) {
+            const productIds = products.map((p) => p.id);
+            const variantsResult = await db.query(
+                'SELECT * FROM product_variants WHERE product_id = ANY($1::uuid[]) ORDER BY color, size',
+                [productIds]
+            );
+            const variantsByProduct = {};
+            for (const v of variantsResult.rows) {
+                if (!variantsByProduct[v.product_id]) variantsByProduct[v.product_id] = [];
+                variantsByProduct[v.product_id].push({
+                    id: v.id,
+                    color: v.color,
+                    size: v.size,
+                    stock: v.stock_quantity,
+                    price_override: v.price_modifier,
+                    image_url: v.image_url,
+                });
+            }
+            for (const p of products) {
+                p.variants = variantsByProduct[p.id] || [];
+            }
+        }
+
+        formatResponse(res, 200, true, 'Admin products fetched', products);
+    } catch (error) {
+        next(error);
+    }
 };
 
 exports.uploadProductImages = async (req, res, next) => {
