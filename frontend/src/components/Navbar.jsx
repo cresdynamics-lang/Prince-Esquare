@@ -61,8 +61,9 @@ const Navbar = () => {
   ];
 
   const handleCategoryClick = (category, sub = null) => {
-    let url = `/products?category=${category}`;
-    if (sub) url += `&sub=${encodeURIComponent(sub)}`;
+    const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
+    let url = categoryPages.includes(category) ? `/${category}` : `/products?category=${category}`;
+    if (sub && !categoryPages.includes(category)) url += `&sub=${encodeURIComponent(sub)}`;
     navigate(url);
     setIsOpen(false);
   };

@@ -83,26 +83,15 @@ export const useCartStore = create(
         const { isAuthenticated, token } = useAuthStore.getState();
         const qty = Math.max(1, payload.quantity || 1);
         const isDummy = String(payload.productId).length < 32;
-        
-        if (isAuthenticated && token && !isDummy) {
-          await cartAPI.addItem({
-            product_id: payload.productId,
-            variant_id: payload.variantId,
-            quantity: qty,
-            size_label: payload.sizeLabel || null,
-          });
-          await get().loadCart();
-          return;
-        }
-        
         const items = get().items;
         const idx = items.findIndex(
           (i) =>
-            !i.cartItemId &&
             i.productId === payload.productId &&
             i.variantId === payload.variantId &&
             (i.sizeLabel || '') === (payload.sizeLabel || '')
         );
+        const snapshot = items;
+
         if (idx !== -1) {
           const next = [...items];
           next[idx] = { ...next[idx], quantity: next[idx].quantity + qty };
@@ -124,6 +113,22 @@ export const useCartStore = create(
               },
             ],
           });
+        }
+
+        if (isAuthenticated && token && !isDummy) {
+          try {
+            await cartAPI.addItem({
+              product_id: payload.productId,
+              variant_id: payload.variantId,
+              quantity: qty,
+              size_label: payload.sizeLabel || null,
+            });
+            await get().loadCart();
+          } catch (e) {
+            console.error('addToCart', e);
+            set({ items: snapshot });
+            throw e;
+          }
         }
       },
 

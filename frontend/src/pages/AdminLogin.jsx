@@ -26,7 +26,7 @@ const AdminLogin = () => {
         navigate('/admin/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid admin credentials');
+      setError(err.response?.data?.message || 'Invalid staff credentials');
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ const AdminLogin = () => {
             </div>
             <h1 className="text-3xl font-serif text-white uppercase tracking-[0.2em]">Staff Access</h1>
             <p className="text-gold-500/40 font-bold text-[10px] uppercase tracking-widest">
-              Prince Esquire Administrative Portal
+              Prince Esquire Staff Portal
             </p>
           </div>
 
@@ -68,7 +68,7 @@ const AdminLogin = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black ml-1">Admin ID / Email</label>
+              <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black ml-1">Staff ID / Email</label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-600/40 group-focus-within:text-gold-500 transition-colors" size={18} />
                 <input

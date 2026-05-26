@@ -58,7 +58,7 @@ export const adminAuthAPI = {
 // ── ADMIN – DASHBOARD / ANALYTICS ────────────────────────────────────
 export const adminAnalyticsAPI = {
   getStats: () => API.get('/admin/dashboard/stats'),
-  getSalesChart: () => API.get('/admin/dashboard/sales-chart'),
+  getSalesChart: (params) => API.get('/admin/dashboard/sales-chart', { params }),
   getTopProducts: () => API.get('/admin/dashboard/top-products'),
   getLowStock: () => API.get('/admin/dashboard/low-stock'),
   getOrderReport: () => API.get('/admin/reports/orders'),

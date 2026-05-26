@@ -267,7 +267,7 @@ const ProductDetail = () => {
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-12 lg:gap-16 items-start">
             <div className="lg:col-span-6">
-              <div className="relative aspect-square md:aspect-[4/5] bg-navy-900 overflow-hidden rounded-sm border border-gold-600/10">
+              <div className="relative aspect-square md:aspect-[4/5] bg-white overflow-hidden rounded-sm border border-gold-600/10">
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={currentDisplayImage}
@@ -277,7 +277,7 @@ const ProductDetail = () => {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain p-8"
                   />
                 </AnimatePresence>
               </div>
@@ -434,11 +434,11 @@ const ProductDetail = () => {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
                 {related.map((p) => (
                   <Link to={`/product/${p.slug}`} key={p.id} className="group block">
-                    <div className="aspect-square bg-navy-900 overflow-hidden mb-6 border border-gold-600/10">
+                    <div className="aspect-square bg-white overflow-hidden mb-6 border border-gold-600/10">
                       <img
                         src={getPremiumImage(p)}
                         alt={p.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
                       />
                     </div>
                     <div className="space-y-2">

@@ -53,9 +53,9 @@ const Footer = () => {
           <div>
             <h3 className="text-gold-400 font-serif text-xl mb-8 tracking-widest">Support</h3>
             <ul className="space-y-4">
-              {['Contact Us', 'Bespoke Services', 'Shipping & Returns', 'Size Guide', 'Privacy Policy', 'Admin'].map((link) => (
+              {['Contact Us', 'Bespoke Services', 'Shipping & Returns', 'Size Guide', 'Privacy Policy', 'Staff'].map((link) => (
                 <li key={link}>
-                  <a href={link === 'Admin' ? '/admin' : '#'} className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  <a href={link === 'Staff' ? '/admin' : '#'} className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
                     {link}
                   </a>
                 </li>

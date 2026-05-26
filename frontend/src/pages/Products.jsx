@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Search, ArrowRight } from 'lucide-react';
+import { Search } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
@@ -9,7 +9,9 @@ import { getPremiumImage } from '../utils/productImages';
 import { getDummyProducts } from '../utils/dummyData';
 import { productAPI, adminCategoryAPI, adminBrandAPI } from '../services/api';
 
-const Products = () => {
+const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
+
+const Products = ({ categoryOverride = null }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const addToCart = useCartStore((state) => state.addToCart);
@@ -19,8 +21,10 @@ const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [addedProductId, setAddedProductId] = useState(null);
   
-  const currentCategory = searchParams.get('category') || 'All';
+  const isDedicatedCategoryPage = Boolean(categoryOverride);
+  const currentCategory = categoryOverride || searchParams.get('category') || 'All';
   const currentSub = searchParams.get('sub') || 'All';
   const currentBrand = searchParams.get('brand') || 'All';
 
@@ -89,24 +93,39 @@ const Products = () => {
     }
   });
 
-  const dummyBrands = [...new Set(getDummyProducts().map(p => p.brand_name))];
-  const BRAND_LIST = ['All', ...new Set([...dummyBrands, ...dynamicBrands.map(b => b.name)])];
+  const productBrands = products.map(p => p.brand_name).filter(Boolean);
+  const fallbackBrands = dynamicBrands.map(b => b.name).filter(Boolean);
+  const BRAND_LIST = ['All', ...new Set([...(productBrands.length ? productBrands : fallbackBrands)])];
 
   const setFilter = (cat, sub = 'All', brand = 'All') => {
     const params = {};
-    if (cat !== 'All') params.category = cat;
-    if (sub !== 'All') params.sub = sub;
     if (brand !== 'All') params.brand = brand;
+
+    if (cat === 'All') {
+      if (brand !== 'All') params.brand = brand;
+      navigate(`/products${Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : ''}`);
+      return;
+    }
+
+    if (sub !== 'All' && !categoryPages.includes(cat)) params.sub = sub;
+
+    if (categoryPages.includes(cat)) {
+      navigate(`/${cat}${Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : ''}`);
+      return;
+    }
+
+    params.category = cat;
+    if (sub !== 'All') params.sub = sub;
     setSearchParams(params);
   };
 
   const handleQuickAdd = async (product) => {
-    const needsSize = ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts'].includes((product.category_name || '').toLowerCase());
+    const needsSize = ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts', 'polo-t-shirts'].includes((product.category_name || '').toLowerCase());
     
     if (needsSize) {
       navigate(`/product/${product.slug}`);
     } else {
-      addToCart({
+      await addToCart({
         productId: product.id,
         variantId: null,
         quantity: 1,
@@ -117,7 +136,8 @@ const Products = () => {
         slug: product.slug,
         brandName: product.brand_name,
       });
-      alert(`Added ${product.name} to your collection.`);
+      setAddedProductId(product.id);
+      setTimeout(() => setAddedProductId(null), 1400);
     }
   };
 
@@ -159,6 +179,7 @@ const Products = () => {
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-8 md:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
             <div className="w-full space-y-8">
+              {!isDedicatedCategoryPage && (
               <div className="flex flex-wrap gap-3">
                 {CATEGORY_DATA.map((cat) => (
                   <button
@@ -175,15 +196,18 @@ const Products = () => {
                   </button>
                 ))}
               </div>
+              )}
 
-              <div className="flex flex-wrap gap-2 pt-4 border-t border-gold-600/5 items-center">
-                 <span className="text-[8px] font-black uppercase text-gold-500/80 mr-2 tracking-widest">Brands:</span>
+              <div className={`flex gap-2 items-center overflow-x-auto custom-scrollbar pb-2 ${isDedicatedCategoryPage ? '' : 'pt-4 border-t border-gold-600/5'}`}>
+                 <span className="text-[8px] font-black uppercase text-gold-500/80 mr-2 tracking-widest">
+                   {isDedicatedCategoryPage ? 'Sub Categories:' : currentCategory === 'All' ? 'Brands:' : 'Shop by Brand:'}
+                 </span>
                  {BRAND_LIST.map((b) => (
                    <button
                     key={b}
                     type="button"
                     onClick={() => setFilter(currentCategory, currentSub, b)}
-                    className={`px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
+                    className={`shrink-0 px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
                         currentBrand === b
                           ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
                           : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
@@ -194,6 +218,7 @@ const Products = () => {
                  ))}
               </div>
 
+              {!categoryPages.includes(currentCategory) && (
               <AnimatePresence>
                 {currentCategory !== 'All' &&
                   CATEGORY_DATA.find((c) => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase())?.sub.length > 0 && (
@@ -231,6 +256,7 @@ const Products = () => {
                     </motion.div>
                   )}
               </AnimatePresence>
+              )}
             </div>
 
             <div className="relative w-full md:w-80 group">
@@ -267,17 +293,26 @@ const Products = () => {
                         <img
                           src={getPremiumImage(product)}
                           alt={product.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          className="w-full h-full object-contain p-3 bg-white transition-transform duration-700 group-hover:scale-105"
                         />
-                        <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 px-4">
                           <button 
                             onClick={(e) => {
                               e.preventDefault();
                               handleQuickAdd(product);
                             }}
-                            className="bg-white text-navy-950 px-6 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500"
+                            className="bg-white text-navy-950 px-5 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500"
                           >
-                            Quick Add
+                            {addedProductId === product.id ? 'Added' : 'Add to Cart'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              navigate(`/product/${product.slug}`);
+                            }}
+                            className="border border-white/70 text-white px-5 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 hover:bg-white hover:text-navy-950"
+                          >
+                            View Product
                           </button>
                         </div>
                       </div>

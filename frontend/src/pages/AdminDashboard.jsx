@@ -63,6 +63,7 @@ const AdminDashboard = () => {
     { id: 'coupons', label: 'Coupons', icon: Ticket, section: 'Marketing' },
     { id: 'banners', label: 'Banners', icon: ImageIcon, section: 'Marketing' },
     { id: 'newsletter', label: 'Newsletter', icon: Mail, section: 'Marketing' },
+    { id: 'finance', label: 'Finance', icon: CardIcon, section: 'Finance' },
     { id: 'payments', label: 'Payments', icon: CreditCard, section: 'Finance' },
     { id: 'reviews', label: 'Reviews', icon: Star, section: 'Finance', badge: '5' },
     { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
@@ -106,6 +107,7 @@ const AdminDashboard = () => {
       case 'coupons': return <CouponsView />;
       case 'banners': return <BannersView />;
       case 'newsletter': return <NewsletterView />;
+      case 'finance': return <FinanceView />;
       case 'payments': return <PaymentsView />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
@@ -531,6 +533,407 @@ const OrdersView = () => {
   );
 };
 
+const formatMoney = (value) => `KSh ${Math.round(Number(value) || 0).toLocaleString()}`;
+
+const getPeriodStart = (period) => {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  if (period === 'daily') return start;
+  if (period === 'weekly') {
+    start.setDate(start.getDate() - 6);
+    return start;
+  }
+
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
+const getPeriodLabel = (period) => {
+  if (period === 'daily') return 'Today';
+  if (period === 'weekly') return 'Last 7 days';
+  return 'This month';
+};
+
+const buildSeries = (orders, period) => {
+  const buckets = new Map();
+  const now = new Date();
+  const size = period === 'daily' ? 7 : period === 'weekly' ? 8 : 6;
+
+  for (let i = size - 1; i >= 0; i -= 1) {
+    const d = new Date(now);
+    if (period === 'daily') d.setDate(now.getDate() - i);
+    if (period === 'weekly') d.setDate(now.getDate() - i * 7);
+    if (period === 'monthly') d.setMonth(now.getMonth() - i);
+
+    const label = period === 'daily'
+      ? d.toLocaleDateString(undefined, { weekday: 'short' })
+      : period === 'weekly'
+        ? `W${Math.ceil(d.getDate() / 7)} ${d.toLocaleDateString(undefined, { month: 'short' })}`
+        : d.toLocaleDateString(undefined, { month: 'short' });
+    buckets.set(label, 0);
+  }
+
+  orders.forEach((order) => {
+    const d = new Date(order.created_at);
+    const label = period === 'daily'
+      ? d.toLocaleDateString(undefined, { weekday: 'short' })
+      : period === 'weekly'
+        ? `W${Math.ceil(d.getDate() / 7)} ${d.toLocaleDateString(undefined, { month: 'short' })}`
+        : d.toLocaleDateString(undefined, { month: 'short' });
+    if (buckets.has(label)) {
+      buckets.set(label, buckets.get(label) + Number(order.total_amount || 0));
+    }
+  });
+
+  return Array.from(buckets, ([label, total]) => ({ label, total }));
+};
+
+const FinanceView = () => {
+  const [period, setPeriod] = useState('daily');
+  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orderDetails, setOrderDetails] = useState([]);
+  const [stats, setStats] = useState({ revenue: 0, profit: 0, orders: 0 });
+  const [topProducts, setTopProducts] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
+  const [stockDrafts, setStockDrafts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [savingStockId, setSavingStockId] = useState(null);
+
+  const stockKey = (product, variant = null) => variant
+    ? `${product.id}:variant:${variant.id || `${variant.color}-${variant.size}`}`
+    : `${product.id}:total`;
+
+  const getVariantRows = (product) => Array.isArray(product.variants)
+    ? product.variants.filter((variant) => variant.color || variant.size || variant.id)
+    : [];
+
+  const fetchFinance = async () => {
+    setLoading(true);
+    try {
+      const [statsRes, topRes, lowRes, orderRes, productRes] = await Promise.all([
+        adminAnalyticsAPI.getStats().catch(() => ({ data: { data: {} } })),
+        adminAnalyticsAPI.getTopProducts().catch(() => ({ data: { data: [] } })),
+        adminAnalyticsAPI.getLowStock().catch(() => ({ data: { data: [] } })),
+        adminOrderAPI.getAll().catch(() => ({ data: { data: [] } })),
+        adminProductAPI.getAll().catch(() => ({ data: { data: [] } })),
+      ]);
+
+      const fetchedOrders = orderRes.data.data || [];
+      const fetchedProducts = productRes.data.data || [];
+      const recentOrders = fetchedOrders.slice(0, 60);
+      const details = await Promise.all(
+        recentOrders.map((order) =>
+          adminOrderAPI.getOne(order.id)
+            .then((res) => res.data.data)
+            .catch(() => ({ ...order, items: [] }))
+        )
+      );
+
+      setStats(statsRes.data.data || {});
+      setTopProducts(topRes.data.data || []);
+      setLowStock(lowRes.data.data || []);
+      setOrders(fetchedOrders);
+      setProducts(fetchedProducts);
+      setOrderDetails(details);
+      const drafts = {};
+      fetchedProducts.forEach((product) => {
+        drafts[stockKey(product)] = product.stock_quantity ?? 0;
+        getVariantRows(product).forEach((variant) => {
+          drafts[stockKey(product, variant)] = variant.stock ?? variant.stock_quantity ?? 0;
+        });
+      });
+      setStockDrafts(drafts);
+    } catch (error) {
+      console.error('Error loading finance data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFinance();
+  }, []);
+
+  const periodOrders = orders.filter((order) => {
+    const createdAt = new Date(order.created_at);
+    return createdAt >= getPeriodStart(period) && order.status !== 'cancelled';
+  });
+
+  const productCost = new Map(products.map((p) => [p.id, Number(p.cost_price || 0)]));
+  const productMeta = new Map(products.map((p) => [p.id, p]));
+  const periodOrderIds = new Set(periodOrders.map((order) => order.id));
+  const soldMap = new Map();
+
+  orderDetails
+    .filter((order) => periodOrderIds.has(order.id))
+    .forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const productId = item.product_id;
+        const unitPrice = Number(item.price || 0);
+        const quantity = Number(item.quantity || 0);
+        const revenue = unitPrice * quantity;
+        const unitCost = productCost.get(productId) || unitPrice * 0.65;
+        const profit = revenue - unitCost * quantity;
+        const existing = soldMap.get(productId) || {
+          id: productId,
+          name: item.name || productMeta.get(productId)?.name || 'Product',
+          quantity: 0,
+          revenue: 0,
+          profit: 0,
+        };
+
+        existing.quantity += quantity;
+        existing.revenue += revenue;
+        existing.profit += profit;
+        soldMap.set(productId, existing);
+      });
+    });
+
+  const soldProducts = Array.from(soldMap.values()).sort((a, b) => b.quantity - a.quantity);
+  const periodRevenue = periodOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+  const periodProfit = soldProducts.length
+    ? soldProducts.reduce((sum, item) => sum + item.profit, 0)
+    : periodRevenue * 0.35;
+  const getProductStockTotal = (product) => {
+    const variants = getVariantRows(product);
+    if (!variants.length) return Number(product.stock_quantity || 0);
+    return variants.reduce((sum, variant) => sum + Number(variant.stock ?? variant.stock_quantity ?? 0), 0);
+  };
+
+  const inventoryValue = products.reduce((sum, p) => sum + Number(p.price || 0) * getProductStockTotal(p), 0);
+  const totalStock = products.reduce((sum, p) => sum + getProductStockTotal(p), 0);
+  const chartData = buildSeries(orders.filter((order) => order.status !== 'cancelled'), period);
+  const maxChart = Math.max(...chartData.map((item) => item.total), 1);
+
+  const handleStockSave = async (product) => {
+    setSavingStockId(product.id);
+    try {
+      const variants = getVariantRows(product);
+      const nextVariants = variants.map((variant) => ({
+        ...variant,
+        stock: Number(stockDrafts[stockKey(product, variant)]) || 0,
+        price_override: variant.price_override ?? variant.price_modifier ?? 0,
+      }));
+      const nextProductStock = variants.length
+        ? nextVariants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0)
+        : Number(stockDrafts[stockKey(product)]) || 0;
+
+      await adminProductAPI.update(product.id, {
+        ...product,
+        stock_quantity: nextProductStock,
+        images: Array.isArray(product.images) ? product.images : [],
+        variants: variants.length ? nextVariants : [],
+      });
+      await fetchFinance();
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      alert('Could not update stock.');
+    } finally {
+      setSavingStockId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="py-24 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Money, stock, and movement</span>
+          <h3 className="text-3xl font-serif font-bold text-gold-100 mt-2">Finance Control Room</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {['daily', 'weekly', 'monthly'].map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriod(p)}
+              className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                period === p
+                  ? 'bg-gold-600 text-navy-950 border-gold-600'
+                  : 'bg-navy-900/50 text-gold-500/70 border-gold-500/10 hover:border-gold-500/40'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {[
+          { label: `${getPeriodLabel(period)} Revenue`, value: formatMoney(periodRevenue), detail: `${periodOrders.length} orders`, icon: CreditCard },
+          { label: `${getPeriodLabel(period)} Profit`, value: formatMoney(periodProfit), detail: 'Uses cost price when available', icon: ArrowUpRight },
+          { label: 'Inventory Value', value: formatMoney(inventoryValue), detail: `${totalStock.toLocaleString()} pieces in stock`, icon: Package },
+          { label: 'Low Stock Alerts', value: lowStock.length, detail: 'Products below 10 units', icon: AlertCircle },
+        ].map((card) => (
+          <div key={card.label} className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div className="w-11 h-11 rounded-xl bg-gold-600/10 border border-gold-500/10 flex items-center justify-center text-gold-500">
+                <card.icon size={20} />
+              </div>
+              <span className="text-[10px] text-green-400 font-black uppercase tracking-widest">Live</span>
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/40 font-black">{card.label}</p>
+            <h4 className="text-2xl font-serif font-bold text-gold-100 mt-2">{card.value}</h4>
+            <p className="text-xs text-gold-500/40 mt-2">{card.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-8">
+            <h4 className="font-serif font-bold text-xl text-gold-100">Revenue Graph</h4>
+            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">{getPeriodLabel(period)}</span>
+          </div>
+          <div className="h-72 flex items-end gap-3">
+            {chartData.map((item) => (
+              <div key={item.label} className="flex-1 h-full flex flex-col justify-end gap-3">
+                <div className="text-[10px] text-gold-500/50 text-center">{formatMoney(item.total).replace('KSh ', '')}</div>
+                <div className="h-56 flex items-end">
+                  <div
+                    className="w-full rounded-t-xl bg-gradient-to-t from-gold-700 to-gold-400 min-h-[8px]"
+                    style={{ height: `${Math.max(5, (item.total / maxChart) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-gold-500/40 text-center">{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
+          <h4 className="font-serif font-bold text-xl text-gold-100 mb-6">Top Movers</h4>
+          <div className="space-y-4">
+            {(soldProducts.length ? soldProducts : topProducts).slice(0, 6).map((item, index) => (
+              <div key={item.id || item.name} className="flex items-center justify-between p-4 rounded-xl bg-navy-950/50 border border-gold-500/5">
+                <div>
+                  <p className="text-sm font-bold text-gold-100">{item.name}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40">Rank #{index + 1}</p>
+                </div>
+                <span className="text-gold-500 font-black">{item.quantity || item.sales || 0}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+          <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
+            <h4 className="font-serif font-bold text-xl text-gold-100">Products Sold - {getPeriodLabel(period)}</h4>
+            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">{soldProducts.length} products</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-navy-800/50">
+                <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+                  <th className="px-6 py-4">Product</th>
+                  <th className="px-6 py-4">Sold</th>
+                  <th className="px-6 py-4">Revenue</th>
+                  <th className="px-6 py-4">Profit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gold-500/5">
+                {soldProducts.length ? soldProducts.map((item) => (
+                  <tr key={item.id} className="hover:bg-navy-800/30 transition-colors">
+                    <td className="px-6 py-4 text-sm font-bold text-gold-100">{item.name}</td>
+                    <td className="px-6 py-4 text-gold-500 font-black">{item.quantity}</td>
+                    <td className="px-6 py-4 text-gold-100">{formatMoney(item.revenue)}</td>
+                    <td className="px-6 py-4 text-green-400">{formatMoney(item.profit)}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-12 text-center text-gold-500/40 text-sm">No sold products in this period yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+          <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
+            <h4 className="font-serif font-bold text-xl text-gold-100">Stock Manager</h4>
+            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">Update inventory</span>
+          </div>
+          <div className="max-h-[520px] overflow-y-auto custom-scrollbar divide-y divide-gold-500/5">
+            {products.slice(0, 18).map((product) => (
+              <div key={product.id} className="p-5 space-y-4 hover:bg-navy-800/20 transition-colors">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-gold-100 uppercase">{product.name}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40">
+                      {product.category_name || 'Uncategorized'} - {formatMoney(product.price)} - Total stock {getProductStockTotal(product)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleStockSave(product)}
+                    disabled={savingStockId === product.id}
+                    className="px-4 py-2 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                  >
+                    {savingStockId === product.id ? 'Saving' : 'Update Stock'}
+                  </button>
+                </div>
+
+                {getVariantRows(product).length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {getVariantRows(product).map((variant) => (
+                      <div key={stockKey(product, variant)} className="flex items-center justify-between gap-3 bg-navy-950/60 border border-gold-500/5 rounded-xl p-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-gold-100">
+                            {variant.color || 'Default'} / {variant.size || 'Standard'}
+                          </p>
+                          <p className="text-[9px] uppercase tracking-widest text-gold-500/30">Color and size stock</p>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={stockDrafts[stockKey(product, variant)] ?? 0}
+                          onChange={(e) => setStockDrafts({ ...stockDrafts, [stockKey(product, variant)]: e.target.value })}
+                          className="w-20 bg-navy-900 border border-gold-500/10 rounded-lg py-2 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/40 font-bold"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 bg-navy-950/60 border border-gold-500/5 rounded-xl p-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gold-100">Product total stock</p>
+                      <p className="text-[9px] uppercase tracking-widest text-gold-500/30">No color/size variants saved</p>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stockDrafts[stockKey(product)] ?? 0}
+                      onChange={(e) => setStockDrafts({ ...stockDrafts, [stockKey(product)]: e.target.value })}
+                      className="w-24 bg-navy-900 border border-gold-500/10 rounded-lg py-2 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/40 font-bold"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/30">
+        Finance data is loaded through the live admin orders, order-detail, product, and analytics APIs. Stock updates are saved back to the product API by color and size.
+      </p>
+    </div>
+  );
+};
+
 
 const newColorGroup = () => ({
   _key: Math.random().toString(36).slice(2),
@@ -596,7 +999,6 @@ const ProductsView = () => {
     slug: '',
     description: '',
     price: '',
-    discount_price: '',
     cost_price: '',
     category_id: '',
     brand_id: '',
@@ -837,7 +1239,6 @@ const ProductsView = () => {
         slug: product.slug || '',
         description: product.description || '',
         price: product.price || '',
-        discount_price: product.discount_price || '',
         cost_price: product.cost_price || '',
         category_id: product.category_id || '',
         brand_id: product.brand_id || '',
@@ -862,7 +1263,6 @@ const ProductsView = () => {
         slug: '',
         description: '',
         price: '',
-        discount_price: '',
         cost_price: '',
         category_id: '',
         brand_id: '',
@@ -905,6 +1305,7 @@ const ProductsView = () => {
       delete payload.galleryFiles;
       delete payload.galleryPreviews;
       delete payload.colorGroups;
+      delete payload.discount_price;
 
       if (currentProduct) {
         await adminProductAPI.update(currentProduct.id, payload);
@@ -1054,7 +1455,7 @@ const ProductsView = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Price (KSh)</label>
                     <input 
@@ -1062,15 +1463,6 @@ const ProductsView = () => {
                       required
                       value={formData.price}
                       onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Discount Price</label>
-                    <input 
-                      type="number" 
-                      value={formData.discount_price}
-                      onChange={(e) => setFormData({...formData, discount_price: e.target.value})}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                     />
                   </div>
@@ -2230,7 +2622,7 @@ const AdminsView = () => {
                 <div>
                   <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access Permissions</label>
                   <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
-                    {['dashboard', 'orders', 'products', 'categories', 'brands', 'customers', 'admins', 'coupons', 'banners', 'newsletter', 'payments', 'reviews', 'settings'].map(perm => (
+                    {['dashboard', 'orders', 'products', 'categories', 'brands', 'customers', 'admins', 'coupons', 'banners', 'newsletter', 'finance', 'payments', 'reviews', 'settings'].map(perm => (
                       <label key={perm} className="flex items-center gap-2 cursor-pointer group">
                         <input 
                           type="checkbox"

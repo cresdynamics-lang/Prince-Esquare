@@ -29,6 +29,12 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/polo-t-shirts" element={<Products categoryOverride="polo-t-shirts" />} />
+        <Route path="/shoes" element={<Products categoryOverride="shoes" />} />
+        <Route path="/shirts" element={<Products categoryOverride="shirts" />} />
+        <Route path="/suits" element={<Products categoryOverride="suits" />} />
+        <Route path="/trousers" element={<Products categoryOverride="trousers" />} />
+        <Route path="/linen" element={<Products categoryOverride="linen" />} />
         <Route path="/product/:slug" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/login" element={<Login />} />
