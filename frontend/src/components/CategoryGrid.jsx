@@ -8,29 +8,58 @@ const dummyCategories = [
     title: 'The Shoe Atelier',
     subtitle: 'Premium Italian Craftsmanship',
     image: '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
-    span: 'col-span-1 row-span-2',
+    span: 'md:col-span-1 md:row-span-2',
     category: 'shoes',
   },
   {
     title: 'Luxury Tracksuits',
     subtitle: 'Prada & Zegna Collections',
     image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
-    span: 'col-span-1 row-span-1',
+    span: 'md:col-span-1 md:row-span-1',
     category: 'tracksuits',
   },
   {
     title: 'Executive Shirts',
     subtitle: 'The Presidential Series',
     image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
-    span: 'col-span-1 row-span-1',
+    span: 'md:col-span-1 md:row-span-1',
     category: 'shirts',
   },
   {
     title: 'Tailored Essentials',
     subtitle: 'Dockers & Smart Trousers',
     image: '/WhatsApp Image 2026-05-12 at 8.07.20 PM.jpeg',
-    span: 'col-span-2 row-span-1',
+    span: 'md:col-span-2 md:row-span-1',
     category: 'trousers',
+  },
+  {
+    title: 'The Polo Salon',
+    subtitle: 'Six Shades of Weekend Elegance',
+    image: '/polo light blue.jpeg',
+    span: 'md:col-span-2 md:row-span-1',
+    category: 'polo-t-shirts',
+    path: '/polo-t-shirts',
+  },
+  {
+    title: 'Outerwear Gallery',
+    subtitle: 'Layered Jackets & Half Jackets',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.33 PM.jpeg',
+    span: 'md:col-span-1 md:row-span-1',
+    category: 'jackets',
+  },
+  {
+    title: 'Leisure House',
+    subtitle: 'Relaxed Luxury for Off-Duty Hours',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
+    span: 'md:col-span-1 md:row-span-1',
+    category: 'track-suits',
+  },
+  {
+    title: 'The Finishing Room',
+    subtitle: 'Belts, Ties & Final Details',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg',
+    span: 'md:col-span-2 md:row-span-1',
+    category: 'belts-ties',
   },
 ];
 
@@ -50,7 +79,7 @@ const CategoryGrid = () => {
           title: c.name,
           subtitle: c.description || 'Premium Collection',
           image: c.image || '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
-          span: 'col-span-1 row-span-1',
+          span: 'md:col-span-1 md:row-span-1',
           category: c.slug || c.name.toLowerCase(),
         }));
         
@@ -93,7 +122,7 @@ const CategoryGrid = () => {
           </motion.button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 grid-rows-2 gap-8 h-auto md:h-[900px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 auto-rows-[360px] md:auto-rows-[260px] gap-8">
           {categories.map((cat, index) => (
             <motion.div
               key={cat.title}
@@ -101,8 +130,8 @@ const CategoryGrid = () => {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1, duration: 0.8 }}
-              className={`relative overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
-              onClick={() => navigate(`/products?category=${cat.category}`)}
+              className={`relative min-h-[360px] md:min-h-0 overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
+              onClick={() => navigate(cat.path || `/products?category=${cat.category}`)}
             >
               <div 
                 className="absolute inset-0 bg-cover bg-center transition-transform duration-[1.5s] group-hover:scale-110"

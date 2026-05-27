@@ -19,7 +19,7 @@ export const products = [
       { name: "Dark Brown Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.14 PM.jpeg" },
       { name: "Tan Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.13 PM.jpeg" }
     ],
-    sizes: ["40", "41", "42", "43", "44", "45"],
+    sizes: ["39", "40", "41", "42", "43", "44", "45", "46"],
     featured: true
   },
   {
@@ -42,7 +42,7 @@ export const products = [
       { name: "Navy Blue Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.22 PM (1).jpeg" },
       { name: "Dark Brown Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.22 PM.jpeg" }
     ],
-    sizes: ["39", "40", "41", "42", "43", "44", "45"],
+    sizes: ["39", "40", "41", "42", "43", "44", "45", "46"],
     featured: true
   },
   {
@@ -64,7 +64,7 @@ export const products = [
       { name: "Black Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.25 PM.jpeg" },
       { name: "Dark Brown Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.26 PM.jpeg" }
     ],
-    sizes: ["40", "41", "42", "43", "44"],
+    sizes: ["39", "40", "41", "42", "43", "44", "45", "46"],
     featured: false
   },
   {
@@ -175,7 +175,7 @@ export const products = [
       { name: "Dark Brown Leather", image: "/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg" },
       { name: "Grey Suede", image: "/WhatsApp Image 2026-05-12 at 8.07.37 PM (2).jpeg" }
     ],
-    sizes: ["40", "41", "42", "43", "44", "45"],
+    sizes: ["39", "40", "41", "42", "43", "44", "45", "46"],
     featured: true
   },
   {
@@ -199,7 +199,7 @@ export const products = [
       { name: "Navy Blue Bit Loafers", image: "/WhatsApp Image 2026-05-12 at 8.07.41 PM.jpeg" },
       { name: "Black Bit Loafers", image: "/WhatsApp Image 2026-05-12 at 8.07.43 PM (1).jpeg" }
     ],
-    sizes: ["40", "41", "42", "43", "44", "45"],
+    sizes: ["39", "40", "41", "42", "43", "44", "45", "46"],
     featured: false
   },
   {
@@ -224,7 +224,7 @@ export const products = [
       { name: "Dark Brown Wingtip", image: "/WhatsApp Image 2026-05-12 at 8.07.45 PM (1).jpeg" },
       { name: "Tan Wingtip", image: "/WhatsApp Image 2026-05-12 at 8.07.45 PM.jpeg" }
     ],
-    sizes: ["39", "40", "41", "42", "43", "44", "45"],
+    sizes: ["39", "40", "41", "42", "43", "44", "45", "46"],
     featured: true
   },
   {

@@ -715,6 +715,7 @@ const FinanceView = () => {
         ...variant,
         stock: Number(stockDrafts[stockKey(product, variant)]) || 0,
         price_override: variant.price_override ?? variant.price_modifier ?? 0,
+        stock_id: variant.stock_id || null,
       }));
       const nextProductStock = variants.length
         ? nextVariants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0)
@@ -894,7 +895,9 @@ const FinanceView = () => {
                           <p className="text-[10px] font-black uppercase tracking-widest text-gold-100">
                             {variant.color || 'Default'} / {variant.size || 'Standard'}
                           </p>
-                          <p className="text-[9px] uppercase tracking-widest text-gold-500/30">Color and size stock</p>
+                          <p className="text-[9px] uppercase tracking-widest text-gold-500/30">
+                            Stock ID: {variant.stock_id || 'Not set'}
+                          </p>
                         </div>
                         <input
                           type="number"
@@ -937,10 +940,23 @@ const FinanceView = () => {
 
 const newColorGroup = () => ({
   _key: Math.random().toString(36).slice(2),
+  stock_id: '',
   color: '',
   image_url: '',
   sizes: [{ _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' }],
 });
+
+const toStockIdPart = (value) => String(value || '')
+  .trim()
+  .toUpperCase()
+  .replace(/[^A-Z0-9]+/g, '-')
+  .replace(/^-|-$/g, '');
+
+const buildStockId = (productName, color) => {
+  const productPart = toStockIdPart(productName) || 'PRODUCT';
+  const colorPart = toStockIdPart(color) || 'COLOR';
+  return `${productPart}-${colorPart}`;
+};
 
 const groupVariantsByColor = (flatVariants) => {
   const map = new Map();
@@ -949,6 +965,7 @@ const groupVariantsByColor = (flatVariants) => {
     if (!map.has(colorKey)) {
       map.set(colorKey, {
         _key: Math.random().toString(36).slice(2),
+        stock_id: v.stock_id || '',
         color: v.color || '',
         image_url: v.image_url || '',
         sizes: [],
@@ -956,6 +973,7 @@ const groupVariantsByColor = (flatVariants) => {
     }
     const group = map.get(colorKey);
     if (!group.image_url && v.image_url) group.image_url = v.image_url;
+    if (!group.stock_id && v.stock_id) group.stock_id = v.stock_id;
     group.sizes.push({
       _key: Math.random().toString(36).slice(2),
       id: v.id,
@@ -980,6 +998,7 @@ const flattenColorGroups = (colorGroups) => {
         stock: parseInt(s.stock, 10) || 0,
         price_override: s.price_override === '' || s.price_override == null ? 0 : parseFloat(s.price_override) || 0,
         image_url: g.image_url || null,
+        stock_id: g.stock_id?.trim() || null,
       });
     }
   }
@@ -999,7 +1018,8 @@ const ProductsView = () => {
     slug: '',
     description: '',
     price: '',
-    cost_price: '',
+    discount_price: '',
+    show_offer: false,
     category_id: '',
     brand_id: '',
     stock_quantity: 0,
@@ -1175,8 +1195,11 @@ const ProductsView = () => {
   const handleColorGroupChange = (groupIndex, field, value) => {
     const next = [...formData.colorGroups];
     let finalValue = value;
-    if (field === 'color' && typeof finalValue === 'string') finalValue = finalValue.toUpperCase();
+    if ((field === 'color' || field === 'stock_id') && typeof finalValue === 'string') finalValue = finalValue.toUpperCase();
     next[groupIndex] = { ...next[groupIndex], [field]: finalValue };
+    if (field === 'color' && !next[groupIndex].stock_id?.trim()) {
+      next[groupIndex].stock_id = buildStockId(formData.name, finalValue);
+    }
     setFormData({ ...formData, colorGroups: next });
   };
 
@@ -1239,7 +1262,8 @@ const ProductsView = () => {
         slug: product.slug || '',
         description: product.description || '',
         price: product.price || '',
-        cost_price: product.cost_price || '',
+        discount_price: product.discount_price || '',
+        show_offer: Boolean(product.discount_price),
         category_id: product.category_id || '',
         brand_id: product.brand_id || '',
         stock_quantity: product.stock_quantity || 0,
@@ -1263,7 +1287,8 @@ const ProductsView = () => {
         slug: '',
         description: '',
         price: '',
-        cost_price: '',
+        discount_price: '',
+        show_offer: false,
         category_id: '',
         brand_id: '',
         stock_quantity: 0,
@@ -1305,7 +1330,9 @@ const ProductsView = () => {
       delete payload.galleryFiles;
       delete payload.galleryPreviews;
       delete payload.colorGroups;
-      delete payload.discount_price;
+      delete payload.show_offer;
+      delete payload.cost_price;
+      payload.discount_price = formData.show_offer ? formData.discount_price || null : null;
 
       if (currentProduct) {
         await adminProductAPI.update(currentProduct.id, payload);
@@ -1455,7 +1482,7 @@ const ProductsView = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Price (KSh)</label>
                     <input 
@@ -1463,15 +1490,6 @@ const ProductsView = () => {
                       required
                       value={formData.price}
                       onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Cost Price</label>
-                    <input 
-                      type="number" 
-                      value={formData.cost_price}
-                      onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                     />
                   </div>
@@ -1485,6 +1503,40 @@ const ProductsView = () => {
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                     />
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gold-400">Offers</p>
+                      <p className="text-[9px] uppercase tracking-wider text-gold-500/35 mt-1">Enable when this product has a sale or special price.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        ...formData,
+                        show_offer: !formData.show_offer,
+                        discount_price: formData.show_offer ? '' : formData.discount_price
+                      })}
+                      className={`relative h-8 w-16 rounded-full border transition-all ${formData.show_offer ? 'bg-gold-600 border-gold-500' : 'bg-navy-900 border-gold-500/20'}`}
+                      aria-pressed={formData.show_offer}
+                    >
+                      <span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-all ${formData.show_offer ? 'left-9' : 'left-1'}`} />
+                    </button>
+                  </div>
+
+                  {formData.show_offer && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Offer Price (KSh)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.discount_price}
+                        onChange={(e) => setFormData({ ...formData, discount_price: e.target.value })}
+                        className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1665,6 +1717,18 @@ const ProductsView = () => {
                               onChange={(e) => handleColorGroupChange(groupIdx, 'color', e.target.value)}
                               className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
                             />
+                            <label className="block text-[8px] text-gold-500/40 uppercase tracking-widest font-black pt-2">Stock ID for this color</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="E.G. SHIRT-BLUE-001"
+                              value={group.stock_id}
+                              onChange={(e) => handleColorGroupChange(groupIdx, 'stock_id', e.target.value)}
+                              className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                            />
+                            <p className="text-[8px] text-gold-500/30 uppercase tracking-wider">
+                              Shared by every size under this color.
+                            </p>
                           </div>
                         </div>
                         <button type="button" onClick={() => handleRemoveColorGroup(groupIdx)} className="p-2 text-red-400/40 hover:text-red-400 transition-colors mt-6" title="Remove color">

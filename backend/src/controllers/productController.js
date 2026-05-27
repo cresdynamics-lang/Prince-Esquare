@@ -1,6 +1,21 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
 
+const toStockIdPart = (value) => String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+const getVariantStockId = (productKey, variant) => {
+    const provided = toStockIdPart(variant.stock_id);
+    if (provided) return provided;
+
+    const productPart = toStockIdPart(productKey) || 'PRODUCT';
+    const colorPart = toStockIdPart(variant.color) || 'DEFAULT';
+    return `${productPart}-${colorPart}`;
+};
+
 // @desc    Get all products (with filtering, sorting, pagination)
 // @route   GET /api/products
 exports.getProducts = async (req, res, next) => {
@@ -127,7 +142,8 @@ exports.getProductBySlug = async (req, res, next) => {
             price_modifier: v.price_modifier,
             image_url: v.image_url,
             color: v.color,
-            size: v.size
+            size: v.size,
+            stock_id: v.stock_id
         }));
 
         formatResponse(res, 200, true, 'Product details fetched', product);
@@ -154,9 +170,10 @@ exports.createProduct = async (req, res, next) => {
         if (variants && Array.isArray(variants)) {
             for (const v of variants) {
                 const value = `${v.size || ''} / ${v.color || ''}`;
+                const stockId = getVariantStockId(slug || name, v);
                 await db.query(
-                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null]
+                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, stockId]
                 );
             }
         }
@@ -197,15 +214,16 @@ exports.updateProduct = async (req, res, next) => {
             // Insert or update
             for (const v of variants) {
                 const value = `${v.size || ''} / ${v.color || ''}`;
+                const stockId = getVariantStockId(slug || name, v);
                 if (v.id) {
                     await db.query(
-                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4, image_url = $5, color = $6, size = $7 WHERE id = $8',
-                        ['Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, v.id]
+                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4, image_url = $5, color = $6, size = $7, stock_id = $8 WHERE id = $9',
+                        ['Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, stockId, v.id]
                     );
                 } else {
                     await db.query(
-                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                        [id, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null]
+                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                        [id, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, stockId]
                     );
                 }
             }
@@ -283,6 +301,7 @@ exports.adminGetProducts = async (req, res, next) => {
                     stock: v.stock_quantity,
                     price_override: v.price_modifier,
                     image_url: v.image_url,
+                    stock_id: v.stock_id,
                 });
             }
             for (const p of products) {

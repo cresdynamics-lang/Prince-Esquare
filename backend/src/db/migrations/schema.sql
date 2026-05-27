@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
     value VARCHAR(100) NOT NULL,
     price_modifier DECIMAL(10, 2) DEFAULT 0.0,
     stock_quantity INTEGER DEFAULT 0,
+    stock_id VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

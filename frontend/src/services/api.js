@@ -32,6 +32,11 @@ export const productAPI = {
   related: (productId) => API.get(`/products/${productId}/related`),
 };
 
+export const catalogueAPI = {
+  get: () => API.get('/catalogue'),
+  ads: () => API.get('/catalogue/ads'),
+};
+
 export const cartAPI = {
   get: () => API.get('/cart'),
   addItem: (body) => API.post('/cart/items', body),

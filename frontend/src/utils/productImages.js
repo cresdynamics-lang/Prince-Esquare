@@ -2,6 +2,12 @@
 // Sourced from local assets in public folder
 
 const LOCAL_IMAGES = [
+  '/polo black.jpeg',
+  '/polo brown.jpeg',
+  '/polo dark black.jpeg',
+  '/polo light blue.jpeg',
+  '/polo red.jpeg',
+  '/polo white.jpeg',
   '/WhatsApp Image 2026-05-12 at 8.07.10 PM.jpeg',
   '/WhatsApp Image 2026-05-12 at 8.07.12 PM (1).jpeg',
   '/WhatsApp Image 2026-05-12 at 8.07.12 PM.jpeg',
@@ -50,8 +56,9 @@ const LOCAL_IMAGES = [
 ];
 
 export const PREMIUM_IMAGES = {
-  'polo-t-shirts': '/WhatsApp Image 2026-05-12 at 8.07.10 PM.jpeg',
-  'knitted-polos': '/WhatsApp Image 2026-05-12 at 8.07.12 PM (1).jpeg',
+  'polo-t-shirts': '/polo black.jpeg',
+  'polos': '/polo black.jpeg',
+  'knitted-polos': '/polo black.jpeg',
   'shoes': '/WhatsApp Image 2026-05-12 at 8.07.12 PM.jpeg',
   'formal-shoes': '/WhatsApp Image 2026-05-12 at 8.07.13 PM (1).jpeg',
   'casual-shoes': '/WhatsApp Image 2026-05-12 at 8.07.13 PM.jpeg',
@@ -100,4 +107,19 @@ export const getPremiumImage = (product) => {
   // If no match, use product ID to pick a consistent "random" local image
   const id = product.id || 0;
   return LOCAL_IMAGES[id % LOCAL_IMAGES.length];
+};
+
+const preloadedImages = new Set();
+
+export const preloadProductImages = (urls = []) => {
+  if (typeof window === 'undefined') return;
+
+  urls.filter(Boolean).forEach((url) => {
+    if (preloadedImages.has(url)) return;
+    preloadedImages.add(url);
+
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = url;
+  });
 };

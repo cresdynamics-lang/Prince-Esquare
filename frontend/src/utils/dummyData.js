@@ -1,5 +1,67 @@
 
 export const DUMMY_PRODUCTS = [
+  // Polo T-shirts
+  {
+    id: 45,
+    name: 'Prince Esquire Polo in Black',
+    category_name: 'polo-t-shirts',
+    subcategory: 'Polos',
+    price: 6500,
+    brand_name: 'Prince Esquire',
+    slug: 'prince-esquire-polo-black',
+    thumbnail: '/polo black.jpeg'
+  },
+  {
+    id: 46,
+    name: 'Prince Esquire Polo in Dark Black',
+    category_name: 'polo-t-shirts',
+    subcategory: 'Polos',
+    price: 6500,
+    brand_name: 'Prince Esquire',
+    slug: 'prince-esquire-polo-dark-black',
+    thumbnail: '/polo dark black.jpeg'
+  },
+  {
+    id: 47,
+    name: 'Prince Esquire Polo in Brown',
+    category_name: 'polo-t-shirts',
+    subcategory: 'Polos',
+    price: 6500,
+    brand_name: 'Prince Esquire',
+    slug: 'prince-esquire-polo-brown',
+    thumbnail: '/polo brown.jpeg'
+  },
+  {
+    id: 48,
+    name: 'Prince Esquire Polo in Light Blue',
+    category_name: 'polo-t-shirts',
+    subcategory: 'Polos',
+    price: 6500,
+    brand_name: 'Prince Esquire',
+    slug: 'prince-esquire-polo-light-blue',
+    thumbnail: '/polo light blue.jpeg'
+  },
+  {
+    id: 49,
+    name: 'Prince Esquire Polo in Red',
+    category_name: 'polo-t-shirts',
+    subcategory: 'Polos',
+    price: 6500,
+    brand_name: 'Prince Esquire',
+    slug: 'prince-esquire-polo-red',
+    thumbnail: '/polo red.jpeg'
+  },
+  {
+    id: 50,
+    name: 'Prince Esquire Polo in White',
+    category_name: 'polo-t-shirts',
+    subcategory: 'Polos',
+    price: 6500,
+    brand_name: 'Prince Esquire',
+    slug: 'prince-esquire-polo-white',
+    thumbnail: '/polo white.jpeg'
+  },
+
   // Shoes - Formal shoes / Clarks Gereld Tie
   { 
     id: 1, 

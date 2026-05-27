@@ -11,7 +11,7 @@ import { DUMMY_PRODUCTS } from '../utils/dummyData';
 
 function sizesForCategoryName(name) {
   const n = (name || '').toLowerCase();
-  if (n.includes('shoe')) return ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
+  if (n.includes('shoe')) return ['39', '40', '41', '42', '43', '44', '45', '46'];
   if (n.includes('trouser') || n.includes('pant')) return ['30', '32', '34', '36', '38'];
   if (n.includes('shirt')) return ['M', 'L', 'XL', 'XXL', '3XL'];
   if (n.includes('track')) return ['M', 'L', 'XL', 'XXL'];
@@ -145,11 +145,14 @@ const ProductDetail = () => {
 
         // For dummy products, we need to populate missing size combinations
         let finalVariants = parsedVariants;
-        if (isDummy) {
-          const mockSizes = sizesForCategoryName(p.category_name);
+        const categorySizes = sizesForCategoryName(p.category_name);
+        const isShoeProduct = (p.category_name || '').toLowerCase().includes('shoe');
+        const hasOnlyGenericSizes = finalVariants.length > 0 && finalVariants.every((v) => !v.size || v.size === 'Standard');
+
+        if (isDummy || (isShoeProduct && hasOnlyGenericSizes)) {
           const enrichedVariants = [];
           parsedVariants.forEach(v => {
-              mockSizes.forEach(ms => {
+              categorySizes.forEach(ms => {
                   enrichedVariants.push({...v, size: ms, id: `${v.id}-${ms}`});
               });
           });
