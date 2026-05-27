@@ -7,10 +7,10 @@ const streamifier = require('streamifier');
  * @param {string} folder - Optional folder name in Cloudinary.
  * @returns {Promise<Object>} - Cloudinary upload result.
  */
-const uploadToCloudinary = (buffer, folder = 'prince-esquire') => {
+const uploadToCloudinary = (buffer, folder = 'PRINCE-eSQUIIRE') => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder, upload_preset: 'prince-esquire' },
+            { folder },
             (error, result) => {
                 if (error) return reject(error);
                 resolve(result);
