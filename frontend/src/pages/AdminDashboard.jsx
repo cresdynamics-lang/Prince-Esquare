@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Package, ShoppingBag, Tag, Award, Users, 
-  ShieldCheck, Ticket, Image as ImageIcon, Mail, CreditCard, 
+  ShieldCheck, Ticket, Image as ImageIcon, Mail, 
   Star, Settings, LogOut, Bell, Search, Menu, X, 
   ArrowUpRight, ArrowDownRight, MoreVertical, Plus, 
   Download, Filter, CheckCircle2, AlertCircle, Clock, 
   UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight,
-  Phone, Globe, Truck, CreditCard as CardIcon, Laptop
+  Phone, Globe, Truck, CreditCard, CreditCard as CardIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
@@ -22,15 +22,21 @@ import {
   adminBannerAPI,
   adminNewsletterAPI,
   adminReviewAPI,
-  adminPaymentAPI,
   adminSettingsAPI,
   adminUploadAPI
 } from '../services/api';
 import { useEffect } from 'react';
+import { getUploadUrl, getImageSrc, parseProductImages, toImageJson } from '../utils/cloudinary';
+
+/** Scrollable table wrapper for mobile */
+const AdminTable = ({ children }) => (
+  <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">{children}</div>
+);
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const navigate = useNavigate();
   const logout = useAuthStore(state => state.logout);
   const { user, isAuthenticated, isAdmin } = useAuthStore();
@@ -56,15 +62,12 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
-    { id: 'categories', label: 'Categories', icon: Tag, section: 'Store' },
-    { id: 'brands', label: 'Brands', icon: Award, section: 'Store' },
     { id: 'customers', label: 'Customers', icon: Users, section: 'People' },
     { id: 'admins', label: 'Admins', icon: ShieldCheck, section: 'People' },
     { id: 'coupons', label: 'Coupons', icon: Ticket, section: 'Marketing' },
     { id: 'banners', label: 'Banners', icon: ImageIcon, section: 'Marketing' },
     { id: 'newsletter', label: 'Newsletter', icon: Mail, section: 'Marketing' },
     { id: 'finance', label: 'Finance', icon: CardIcon, section: 'Finance' },
-    { id: 'payments', label: 'Payments', icon: CreditCard, section: 'Finance' },
     { id: 'reviews', label: 'Reviews', icon: Star, section: 'Finance', badge: '5' },
     { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
   ];
@@ -100,28 +103,49 @@ const AdminDashboard = () => {
       case 'dashboard': return <DashboardView />;
       case 'orders': return <OrdersView />;
       case 'products': return <ProductsView />;
-      case 'categories': return <CategoriesView />;
-      case 'brands': return <BrandsView />;
       case 'customers': return <CustomersView />;
       case 'admins': return <AdminsView />;
       case 'coupons': return <CouponsView />;
       case 'banners': return <BannersView />;
       case 'newsletter': return <NewsletterView />;
       case 'finance': return <FinanceView />;
-      case 'payments': return <PaymentsView />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
       default: return <DashboardView />;
     }
   };
 
+  const handleNavClick = (sectionId) => {
+    setActiveSection(sectionId);
+    setIsMobileNavOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileNavOpen((open) => !open);
+    } else {
+      setIsSidebarOpen((open) => !open);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-navy-950 text-gold-50 font-sans overflow-hidden">
+      {isMobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 bg-navy-950/80 z-30 lg:hidden"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-navy-900/50 border-r border-gold-500/10 transition-all duration-300 flex flex-col z-20 backdrop-blur-xl`}
+        } fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 bg-navy-900/95 lg:bg-navy-900/50 border-r border-gold-500/10 transition-all duration-300 flex flex-col backdrop-blur-xl ${
+          isMobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
         <div className="p-6 border-b border-gold-500/10 flex items-center gap-3">
           <div className="w-10 h-10 bg-gold-600 rounded-lg flex items-center justify-center text-navy-950 font-bold text-xl">
@@ -151,7 +175,7 @@ const AdminDashboard = () => {
                 .map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => setActiveSection(item.id)}
+                    onClick={() => handleNavClick(item.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
                       activeSection === item.id 
                         ? 'bg-gold-600 text-navy-950 shadow-lg shadow-gold-600/20' 
@@ -187,26 +211,27 @@ const AdminDashboard = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0 w-full lg:ml-0">
         {/* Topbar */}
-        <header className="h-20 bg-navy-900/30 border-b border-gold-500/10 flex items-center justify-between px-8 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="h-16 sm:h-20 bg-navy-900/30 border-b border-gold-500/10 flex items-center justify-between px-4 sm:px-6 lg:px-8 backdrop-blur-md shrink-0 gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-gold-500/60 hover:text-gold-500 transition-colors bg-navy-800/50 rounded-lg border border-gold-500/10"
+              type="button"
+              onClick={toggleSidebar}
+              className="p-2 text-gold-500/60 hover:text-gold-500 transition-colors bg-navy-800/50 rounded-lg border border-gold-500/10 shrink-0"
             >
-              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+              {(isMobileNavOpen || isSidebarOpen) ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="h-8 w-[1px] bg-gold-500/10 mx-2" />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Admin / Overview</span>
-              <h2 className="text-xl font-serif font-bold text-gold-100 capitalize">
+            <div className="hidden sm:block h-8 w-[1px] bg-gold-500/10 mx-1 sm:mx-2" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-gold-500/40 uppercase tracking-widest truncate">Admin / Overview</span>
+              <h2 className="text-base sm:text-xl font-serif font-bold text-gold-100 capitalize truncate">
                 {activeSection.replace('-', ' ')}
               </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             <div className="hidden md:flex items-center gap-2 bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl focus-within:border-gold-500/30 transition-all">
               <Search size={18} className="text-gold-500/40" />
               <input 
@@ -228,7 +253,7 @@ const AdminDashboard = () => {
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gradient-to-b from-navy-950 to-navy-900/50">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 custom-scrollbar bg-gradient-to-b from-navy-950 to-navy-900/50">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}
@@ -596,8 +621,9 @@ const FinanceView = () => {
   const [orderDetails, setOrderDetails] = useState([]);
   const [stats, setStats] = useState({ revenue: 0, profit: 0, orders: 0 });
   const [topProducts, setTopProducts] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
   const [stockDrafts, setStockDrafts] = useState({});
+  const [stockModalProduct, setStockModalProduct] = useState(null);
+  const [isLowStockOpen, setIsLowStockOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingStockId, setSavingStockId] = useState(null);
 
@@ -612,10 +638,9 @@ const FinanceView = () => {
   const fetchFinance = async () => {
     setLoading(true);
     try {
-      const [statsRes, topRes, lowRes, orderRes, productRes] = await Promise.all([
+      const [statsRes, topRes, orderRes, productRes] = await Promise.all([
         adminAnalyticsAPI.getStats().catch(() => ({ data: { data: {} } })),
         adminAnalyticsAPI.getTopProducts().catch(() => ({ data: { data: [] } })),
-        adminAnalyticsAPI.getLowStock().catch(() => ({ data: { data: [] } })),
         adminOrderAPI.getAll().catch(() => ({ data: { data: [] } })),
         adminProductAPI.getAll().catch(() => ({ data: { data: [] } })),
       ]);
@@ -633,7 +658,6 @@ const FinanceView = () => {
 
       setStats(statsRes.data.data || {});
       setTopProducts(topRes.data.data || []);
-      setLowStock(lowRes.data.data || []);
       setOrders(fetchedOrders);
       setProducts(fetchedProducts);
       setOrderDetails(details);
@@ -702,8 +726,36 @@ const FinanceView = () => {
     return variants.reduce((sum, variant) => sum + Number(variant.stock ?? variant.stock_quantity ?? 0), 0);
   };
 
+  const inventoryRows = products.flatMap((product) => {
+    const variants = getVariantRows(product);
+    if (!variants.length) {
+      return [{
+        product,
+        variant: null,
+        key: stockKey(product),
+        name: product.name,
+        size: 'Standard',
+        color: null,
+        stock: Number(product.stock_quantity || 0),
+        stockId: null,
+      }];
+    }
+
+    return variants.map((variant) => ({
+      product,
+      variant,
+      key: stockKey(product, variant),
+      name: product.name,
+      size: variant.size || 'Standard',
+      color: variant.color || null,
+      stock: Number(variant.stock ?? variant.stock_quantity ?? 0),
+      stockId: variant.stock_id || null,
+    }));
+  });
+
   const inventoryValue = products.reduce((sum, p) => sum + Number(p.price || 0) * getProductStockTotal(p), 0);
   const totalStock = products.reduce((sum, p) => sum + getProductStockTotal(p), 0);
+  const lowStockRows = inventoryRows.filter((row) => row.stock <= 5).sort((a, b) => a.stock - b.stock);
   const chartData = buildSeries(orders.filter((order) => order.status !== 'cancelled'), period);
   const maxChart = Math.max(...chartData.map((item) => item.total), 1);
 
@@ -727,7 +779,8 @@ const FinanceView = () => {
         images: Array.isArray(product.images) ? product.images : [],
         variants: variants.length ? nextVariants : [],
       });
-      await fetchFinance();
+        await fetchFinance();
+        setStockModalProduct(null);
     } catch (error) {
       console.error('Error updating stock:', error);
       alert('Could not update stock.');
@@ -774,9 +827,15 @@ const FinanceView = () => {
           { label: `${getPeriodLabel(period)} Revenue`, value: formatMoney(periodRevenue), detail: `${periodOrders.length} orders`, icon: CreditCard },
           { label: `${getPeriodLabel(period)} Profit`, value: formatMoney(periodProfit), detail: 'Uses cost price when available', icon: ArrowUpRight },
           { label: 'Inventory Value', value: formatMoney(inventoryValue), detail: `${totalStock.toLocaleString()} pieces in stock`, icon: Package },
-          { label: 'Low Stock Alerts', value: lowStock.length, detail: 'Products below 10 units', icon: AlertCircle },
+          { label: 'Low Stock Alerts', value: lowStockRows.length, detail: 'Sizes at 5 units or less', icon: AlertCircle, action: () => setIsLowStockOpen(true) },
         ].map((card) => (
-          <div key={card.label} className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
+          <button
+            key={card.label}
+            type="button"
+            onClick={card.action}
+            className="text-left bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm transition-all hover:border-gold-500/40 disabled:hover:border-gold-500/10"
+            disabled={!card.action}
+          >
             <div className="flex items-center justify-between mb-6">
               <div className="w-11 h-11 rounded-xl bg-gold-600/10 border border-gold-500/10 flex items-center justify-center text-gold-500">
                 <card.icon size={20} />
@@ -786,7 +845,7 @@ const FinanceView = () => {
             <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/40 font-black">{card.label}</p>
             <h4 className="text-2xl font-serif font-bold text-gold-100 mt-2">{card.value}</h4>
             <p className="text-xs text-gold-500/40 mt-2">{card.detail}</p>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -865,86 +924,193 @@ const FinanceView = () => {
         <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
           <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
             <h4 className="font-serif font-bold text-xl text-gold-100">Stock Manager</h4>
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">Update inventory</span>
+            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">{totalStock.toLocaleString()} total pieces</span>
           </div>
           <div className="max-h-[520px] overflow-y-auto custom-scrollbar divide-y divide-gold-500/5">
             {products.slice(0, 18).map((product) => (
-              <div key={product.id} className="p-5 space-y-4 hover:bg-navy-800/20 transition-colors">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div>
+              <button
+                type="button"
+                key={product.id}
+                onClick={() => setStockModalProduct(product)}
+                className="w-full p-5 hover:bg-navy-800/20 transition-colors text-left"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-navy-950 border border-gold-500/10 shrink-0">
+                      {product.thumbnail ? (
+                        <img src={product.thumbnail} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gold-500/30">
+                          <Package size={20} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
                     <p className="text-sm font-bold text-gold-100 uppercase">{product.name}</p>
                     <p className="text-[10px] uppercase tracking-widest text-gold-500/40">
                       {product.category_name || 'Uncategorized'} - {formatMoney(product.price)} - Total stock {getProductStockTotal(product)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleStockSave(product)}
-                    disabled={savingStockId === product.id}
-                    className="px-4 py-2 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
-                  >
-                    {savingStockId === product.id ? 'Saving' : 'Update Stock'}
-                  </button>
                 </div>
-
-                {getVariantRows(product).length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {getVariantRows(product).map((variant) => (
-                      <div key={stockKey(product, variant)} className="flex items-center justify-between gap-3 bg-navy-950/60 border border-gold-500/5 rounded-xl p-3">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-gold-100">
-                            {variant.color || 'Default'} / {variant.size || 'Standard'}
-                          </p>
-                          <p className="text-[9px] uppercase tracking-widest text-gold-500/30">
-                            Stock ID: {variant.stock_id || 'Not set'}
-                          </p>
-                        </div>
-                        <input
-                          type="number"
-                          min="0"
-                          value={stockDrafts[stockKey(product, variant)] ?? 0}
-                          onChange={(e) => setStockDrafts({ ...stockDrafts, [stockKey(product, variant)]: e.target.value })}
-                          className="w-20 bg-navy-900 border border-gold-500/10 rounded-lg py-2 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/40 font-bold"
-                        />
-                      </div>
-                    ))}
+                  <span className="px-4 py-2 border border-gold-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold-500">
+                    Manage
+                  </span>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3 bg-navy-950/60 border border-gold-500/5 rounded-xl p-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gold-100">Product total stock</p>
-                      <p className="text-[9px] uppercase tracking-widest text-gold-500/30">No color/size variants saved</p>
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      value={stockDrafts[stockKey(product)] ?? 0}
-                      onChange={(e) => setStockDrafts({ ...stockDrafts, [stockKey(product)]: e.target.value })}
-                      className="w-24 bg-navy-900 border border-gold-500/10 rounded-lg py-2 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/40 font-bold"
-                    />
-                  </div>
-                )}
-              </div>
+              </button>
             ))}
           </div>
         </div>
       </div>
 
+      {stockModalProduct && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+          <div className="bg-navy-900 border border-gold-500/20 rounded-3xl p-6 w-full max-w-3xl max-h-[88vh] overflow-y-auto custom-scrollbar shadow-2xl">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-navy-950 border border-gold-500/10 shrink-0">
+                  {stockModalProduct.thumbnail ? (
+                    <img src={stockModalProduct.thumbnail} alt={stockModalProduct.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gold-500/30">
+                      <Package size={24} />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xl font-serif font-bold text-gold-100 uppercase">{stockModalProduct.name}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mt-1">
+                    {stockModalProduct.category_name || 'Uncategorized'} - {formatMoney(stockModalProduct.price)}
+                  </p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setStockModalProduct(null)} className="text-gold-500/40 hover:text-gold-500">
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {getVariantRows(stockModalProduct).length > 0 ? getVariantRows(stockModalProduct).map((variant) => (
+                <div key={stockKey(stockModalProduct, variant)} className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center bg-navy-950/60 border border-gold-500/5 rounded-2xl p-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-gold-100">
+                      Size {variant.size || 'Standard'}{variant.color ? ` - ${variant.color}` : ''}
+                    </p>
+                    <p className="text-[9px] uppercase tracking-widest text-gold-500/30 mt-1">
+                      Stock ID: {variant.stock_id || 'Not set'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStockDrafts({
+                        ...stockDrafts,
+                        [stockKey(stockModalProduct, variant)]: Math.max(0, Number(stockDrafts[stockKey(stockModalProduct, variant)] ?? 0) - 1),
+                      })}
+                      className="w-10 h-10 rounded-xl bg-navy-800 border border-gold-500/10 text-gold-500 font-black"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stockDrafts[stockKey(stockModalProduct, variant)] ?? 0}
+                      onChange={(e) => setStockDrafts({ ...stockDrafts, [stockKey(stockModalProduct, variant)]: e.target.value })}
+                      className="w-24 bg-navy-900 border border-gold-500/10 rounded-xl py-3 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/40 font-bold text-center"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setStockDrafts({
+                        ...stockDrafts,
+                        [stockKey(stockModalProduct, variant)]: Number(stockDrafts[stockKey(stockModalProduct, variant)] ?? 0) + 1,
+                      })}
+                      className="w-10 h-10 rounded-xl bg-navy-800 border border-gold-500/10 text-gold-500 font-black"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )) : (
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center bg-navy-950/60 border border-gold-500/5 rounded-2xl p-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-gold-100">Product total stock</p>
+                    <p className="text-[9px] uppercase tracking-widest text-gold-500/30 mt-1">No size variants saved</p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={stockDrafts[stockKey(stockModalProduct)] ?? 0}
+                    onChange={(e) => setStockDrafts({ ...stockDrafts, [stockKey(stockModalProduct)]: e.target.value })}
+                    className="w-28 bg-navy-900 border border-gold-500/10 rounded-xl py-3 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/40 font-bold text-center"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gold-500/10">
+              <button type="button" onClick={() => setStockModalProduct(null)} className="px-6 py-3 rounded-xl bg-navy-800 text-gold-500/70 text-[10px] font-black uppercase tracking-widest">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStockSave(stockModalProduct)}
+                disabled={savingStockId === stockModalProduct.id}
+                className="px-6 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+              >
+                {savingStockId === stockModalProduct.id ? 'Updating' : 'Update Stock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLowStockOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+          <div className="bg-navy-900 border border-gold-500/20 rounded-3xl p-6 w-full max-w-3xl max-h-[88vh] overflow-y-auto custom-scrollbar shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">Low Stock Sizes</h4>
+              <button type="button" onClick={() => setIsLowStockOpen(false)} className="text-gold-500/40 hover:text-gold-500">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {lowStockRows.length ? lowStockRows.map((row) => (
+                <button
+                  type="button"
+                  key={row.key}
+                  onClick={() => {
+                    setIsLowStockOpen(false);
+                    setStockModalProduct(row.product);
+                  }}
+                  className="w-full flex items-center justify-between gap-4 bg-navy-950/60 border border-gold-500/5 rounded-2xl p-4 text-left hover:border-gold-500/30"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-navy-950 border border-gold-500/10 shrink-0">
+                      {row.product.thumbnail && <img src={row.product.thumbnail} alt={row.product.name} className="w-full h-full object-cover" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gold-100 uppercase">{row.name}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-gold-500/40">
+                        Size {row.size}{row.color ? ` - ${row.color}` : ''} - {row.stockId || 'No stock ID'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-red-400 text-sm font-black">{row.stock} left</span>
+                </button>
+              )) : (
+                <div className="py-12 text-center text-gold-500/40 text-sm">No low stock sizes right now.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/30">
-        Finance data is loaded through the live admin orders, order-detail, product, and analytics APIs. Stock updates are saved back to the product API by color and size.
+        Finance data is loaded through the live admin orders, order-detail, product, and analytics APIs. Stock updates are saved back to the product API by size.
       </p>
     </div>
   );
 };
 
-
-const newColorGroup = () => ({
-  _key: Math.random().toString(36).slice(2),
-  stock_id: '',
-  color: '',
-  image_url: '',
-  sizes: [{ _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' }],
-});
 
 const toStockIdPart = (value) => String(value || '')
   .trim()
@@ -952,67 +1118,56 @@ const toStockIdPart = (value) => String(value || '')
   .replace(/[^A-Z0-9]+/g, '-')
   .replace(/^-|-$/g, '');
 
-const buildStockId = (productName, color) => {
+const buildStockId = (productName) => {
   const productPart = toStockIdPart(productName) || 'PRODUCT';
-  const colorPart = toStockIdPart(color) || 'COLOR';
-  return `${productPart}-${colorPart}`;
+  return `${productPart}-STOCK`;
 };
 
-const groupVariantsByColor = (flatVariants) => {
-  const map = new Map();
-  for (const v of flatVariants || []) {
-    const colorKey = (v.color || 'UNNAMED').trim().toUpperCase();
-    if (!map.has(colorKey)) {
-      map.set(colorKey, {
-        _key: Math.random().toString(36).slice(2),
-        stock_id: v.stock_id || '',
-        color: v.color || '',
-        image_url: v.image_url || '',
-        sizes: [],
-      });
-    }
-    const group = map.get(colorKey);
-    if (!group.image_url && v.image_url) group.image_url = v.image_url;
-    if (!group.stock_id && v.stock_id) group.stock_id = v.stock_id;
-    group.sizes.push({
+const buildSizeRows = (flatVariants) => {
+  return (flatVariants || [])
+    .filter((variant) => variant.size)
+    .map((variant) => ({
       _key: Math.random().toString(36).slice(2),
-      id: v.id,
-      size: v.size || '',
-      stock: v.stock ?? v.stock_quantity ?? 0,
-      price_override: v.price_override ?? v.price_modifier ?? '',
-    });
-  }
-  return Array.from(map.values());
+      id: variant.id,
+      size: String(variant.size || '').toUpperCase(),
+      stock: variant.stock ?? variant.stock_quantity ?? 0,
+      price_override: variant.price_override ?? variant.price_modifier ?? '',
+    }));
 };
 
-const flattenColorGroups = (colorGroups) => {
-  const variants = [];
-  for (const g of colorGroups || []) {
-    if (!g.color?.trim()) continue;
-    for (const s of g.sizes || []) {
-      if (!s.size?.trim()) continue;
-      variants.push({
-        id: s.id,
-        color: g.color.trim().toUpperCase(),
-        size: String(s.size).trim().toUpperCase(),
-        stock: parseInt(s.stock, 10) || 0,
-        price_override: s.price_override === '' || s.price_override == null ? 0 : parseFloat(s.price_override) || 0,
-        image_url: g.image_url || null,
-        stock_id: g.stock_id?.trim() || null,
-      });
-    }
+const flattenSizeRows = (sizeRows, stockId, imageUrl) => {
+  return (sizeRows || [])
+    .filter((row) => row.size?.trim())
+    .map((row) => ({
+      id: row.id,
+      color: null,
+      size: String(row.size).trim().toUpperCase(),
+      stock: parseInt(row.stock, 10) || 0,
+      price_override: row.price_override === '' || row.price_override == null ? 0 : parseFloat(row.price_override) || 0,
+      image_url: imageUrl || null,
+      stock_id: stockId?.trim() || null,
+    }));
+};
+
+const getSizeOptionsForCategory = (categoryName = '') => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('shoe') || name.includes('loafer') || name.includes('boot') || name.includes('sandal')) {
+    return ['39', '40', '41', '42', '43', '44', '45', '46'];
   }
-  return variants;
+  if (name.includes('trouser') || name.includes('chino') || name.includes('jeans') || name.includes('khaki') || name.includes('gurkha')) {
+    return ['28', '30', '32', '34', '36', '38', '40', '42', '44'];
+  }
+  return ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
 };
 
 const ProductsView = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [customSize, setCustomSize] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -1020,14 +1175,15 @@ const ProductsView = () => {
     price: '',
     discount_price: '',
     show_offer: false,
+    stock_id: '',
+    parent_category_id: '',
     category_id: '',
-    brand_id: '',
     stock_quantity: 0,
     is_featured: false,
     is_active: true,
     thumbnail: '',
     images: [], // This will store the final URLs for saving
-    colorGroups: [],
+    sizeRows: [],
     thumbnailFile: null,
     thumbnailPreview: '',
     gallery: [] // Combined state: { id, preview, url, isUploading }
@@ -1083,11 +1239,12 @@ const ProductsView = () => {
       try {
         const res = await adminUploadAPI.upload(uploadData);
         if (res.data.success) {
-          const finalUrl = res.data.data[0];
+          const uploaded = res.data.data[0];
+          const finalUrl = getUploadUrl(uploaded);
           setFormData(prev => ({ 
             ...prev, 
             thumbnail: finalUrl,
-            thumbnailPreview: finalUrl 
+            thumbnailPreview: getImageSrc(uploaded) || finalUrl 
           }));
         }
       } catch (error) {
@@ -1130,14 +1287,16 @@ const ProductsView = () => {
             let urlIdx = 0;
             const updatedGallery = nextGallery.map(item => {
                 if (item.isUploading && urlIdx < uploadedUrls.length) {
-                    return { ...item, url: uploadedUrls[urlIdx++], isUploading: false };
+                    const uploaded = uploadedUrls[urlIdx++];
+                    const url = getUploadUrl(uploaded);
+                    return { ...item, url, urlJson: toImageJson(uploaded), preview: getImageSrc(uploaded) || url, isUploading: false };
                 }
                 return item;
             });
             return { 
                 ...prev, 
                 gallery: updatedGallery,
-                images: updatedGallery.map(i => i.url).filter(Boolean)
+                images: updatedGallery.map(i => i.urlJson || toImageJson(i.url)).filter(Boolean)
             };
         });
       }
@@ -1154,95 +1313,53 @@ const ProductsView = () => {
     }
   };
 
-  const handleColorGroupImageChange = async (groupIndex, e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    const localPreview = URL.createObjectURL(file);
-    setFormData((prev) => {
-      const next = [...prev.colorGroups];
-      next[groupIndex] = { ...next[groupIndex], image_url: localPreview };
-      return { ...prev, colorGroups: next };
+  const handleToggleSize = (size) => {
+    const exists = formData.sizeRows.some((row) => row.size === size);
+    const nextRows = exists
+      ? formData.sizeRows.filter((row) => row.size !== size)
+      : [...formData.sizeRows, { _key: Math.random().toString(36).slice(2), id: undefined, size, stock: 0, price_override: '' }];
+    setFormData({
+      ...formData,
+      sizeRows: nextRows,
+      stock_quantity: nextRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0),
     });
-    const uploadData = new FormData();
-    uploadData.append('images', file);
-    try {
-      const res = await adminUploadAPI.upload(uploadData);
-      if (res.data.success) {
-        const finalUrl = res.data.data[0];
-        setFormData((prev) => {
-          const next = [...prev.colorGroups];
-          next[groupIndex] = { ...next[groupIndex], image_url: finalUrl };
-          return { ...prev, colorGroups: next };
-        });
-      }
-    } catch (error) {
-      console.error('Color image upload failed:', error);
-      alert('Color image upload failed.');
-    } finally {
-      setUploading(false);
+  };
+
+  const handleAddCustomSize = () => {
+    const nextSize = customSize.trim().toUpperCase();
+    if (!nextSize) return;
+    if (!formData.sizeRows.some((row) => row.size === nextSize)) {
+      const nextRows = [
+        ...formData.sizeRows,
+        { _key: Math.random().toString(36).slice(2), id: undefined, size: nextSize, stock: 0, price_override: '' },
+      ];
+      setFormData({
+        ...formData,
+        sizeRows: nextRows,
+        stock_quantity: nextRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0),
+      });
     }
+    setCustomSize('');
   };
 
-  const handleAddColorGroup = () => {
-    setFormData({ ...formData, colorGroups: [...formData.colorGroups, newColorGroup()] });
-  };
-
-  const handleRemoveColorGroup = (groupIndex) => {
-    setFormData({ ...formData, colorGroups: formData.colorGroups.filter((_, i) => i !== groupIndex) });
-  };
-
-  const handleColorGroupChange = (groupIndex, field, value) => {
-    const next = [...formData.colorGroups];
-    let finalValue = value;
-    if ((field === 'color' || field === 'stock_id') && typeof finalValue === 'string') finalValue = finalValue.toUpperCase();
-    next[groupIndex] = { ...next[groupIndex], [field]: finalValue };
-    if (field === 'color' && !next[groupIndex].stock_id?.trim()) {
-      next[groupIndex].stock_id = buildStockId(formData.name, finalValue);
-    }
-    setFormData({ ...formData, colorGroups: next });
-  };
-
-  const handleAddSizeToGroup = (groupIndex) => {
-    const next = [...formData.colorGroups];
-    next[groupIndex] = {
-      ...next[groupIndex],
-      sizes: [
-        ...next[groupIndex].sizes,
-        { _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' },
-      ],
-    };
-    setFormData({ ...formData, colorGroups: next });
-  };
-
-  const handleSizeChange = (groupIndex, sizeIndex, field, value) => {
-    const next = [...formData.colorGroups];
-    const sizes = [...next[groupIndex].sizes];
-    let finalValue = value;
-    if (field === 'size' && typeof finalValue === 'string') finalValue = finalValue.toUpperCase();
-    sizes[sizeIndex] = { ...sizes[sizeIndex], [field]: finalValue };
-    next[groupIndex] = { ...next[groupIndex], sizes };
-    setFormData({ ...formData, colorGroups: next });
-  };
-
-  const handleRemoveSize = (groupIndex, sizeIndex) => {
-    const next = [...formData.colorGroups];
-    const sizes = next[groupIndex].sizes.filter((_, i) => i !== sizeIndex);
-    next[groupIndex] = { ...next[groupIndex], sizes: sizes.length ? sizes : [{ _key: Math.random().toString(36).slice(2), id: undefined, size: '', stock: 0, price_override: '' }] };
-    setFormData({ ...formData, colorGroups: next });
+  const handleSizeChange = (size, field, value) => {
+    const nextRows = formData.sizeRows.map((row) => row.size === size ? { ...row, [field]: value } : row);
+    setFormData({
+      ...formData,
+      sizeRows: nextRows,
+      stock_quantity: field === 'stock' ? nextRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0) : formData.stock_quantity,
+    });
   };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, brandRes] = await Promise.all([
+      const [prodRes, catRes] = await Promise.all([
         adminProductAPI.getAll(),
         adminCategoryAPI.getAll(),
-        adminBrandAPI.getAll()
       ]);
       setProducts(prodRes.data.data);
       setCategories(catRes.data.data);
-      setBrands(brandRes.data.data);
     } catch (error) {
       console.error('Error fetching product data:', error);
     } finally {
@@ -1254,9 +1371,41 @@ const ProductsView = () => {
     fetchData();
   }, []);
 
+  const parentCategories = categories.filter((category) => !category.parent_id);
+  const selectedParentCategory = categories.find((category) => category.id === formData.parent_category_id);
+  const selectedCategory = categories.find((category) => category.id === formData.category_id);
+  const subCategories = formData.parent_category_id ? categories.filter((category) => category.parent_id === formData.parent_category_id) : [];
+  const sizeOptions = getSizeOptionsForCategory(selectedCategory?.name || selectedParentCategory?.name || '');
+  const displaySizeOptions = [...new Set([...sizeOptions, ...formData.sizeRows.map((row) => row.size)])];
+
+  const handleCategorySelect = (category) => {
+    setFormData({
+      ...formData,
+      parent_category_id: category.id,
+      category_id: category.id,
+      sizeRows: [],
+      stock_quantity: 0,
+    });
+  };
+
+  const handleSubCategorySelect = (category) => {
+    setFormData({
+      ...formData,
+      category_id: category.id,
+      sizeRows: [],
+      stock_quantity: 0,
+    });
+  };
+
   const handleOpenModal = (product = null) => {
+    const productCategory = categories.find((category) => category.id === product?.category_id);
+    const parentCategoryId = productCategory?.parent_id || productCategory?.id || '';
+    const productSizeRows = buildSizeRows(Array.isArray(product?.variants) ? product.variants : []);
+    const productStockId = product?.variants?.find((variant) => variant.stock_id)?.stock_id || buildStockId(product?.name);
+
     if (product) {
       setCurrentProduct(product);
+      setCustomSize('');
       setFormData({
         name: product.name || '',
         slug: product.slug || '',
@@ -1264,24 +1413,27 @@ const ProductsView = () => {
         price: product.price || '',
         discount_price: product.discount_price || '',
         show_offer: Boolean(product.discount_price),
+        stock_id: productStockId,
+        parent_category_id: parentCategoryId,
         category_id: product.category_id || '',
-        brand_id: product.brand_id || '',
-        stock_quantity: product.stock_quantity || 0,
+        stock_quantity: productSizeRows.length ? productSizeRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0) : product.stock_quantity || 0,
         is_featured: product.is_featured || false,
         is_active: product.is_active ?? true,
         thumbnail: product.thumbnail || '',
         images: Array.isArray(product.images) ? product.images : [],
-        colorGroups: groupVariantsByColor(Array.isArray(product.variants) ? product.variants : []),
+        sizeRows: productSizeRows,
         thumbnailPreview: product.thumbnail || '',
-        gallery: (Array.isArray(product.images) ? product.images : []).map(url => ({
+        gallery: parseProductImages(product.images).map((img) => ({
           id: Math.random().toString(36).substring(7),
-          preview: url,
-          url: url,
-          isUploading: false
+          preview: getImageSrc(img),
+          url: getImageSrc(img),
+          urlJson: img,
+          isUploading: false,
         }))
       });
     } else {
       setCurrentProduct(null);
+      setCustomSize('');
       setFormData({
         name: '',
         slug: '',
@@ -1289,14 +1441,15 @@ const ProductsView = () => {
         price: '',
         discount_price: '',
         show_offer: false,
+        stock_id: '',
+        parent_category_id: '',
         category_id: '',
-        brand_id: '',
         stock_quantity: 0,
         is_featured: false,
         is_active: true,
         thumbnail: '',
         images: [],
-        colorGroups: [],
+        sizeRows: [],
         thumbnailPreview: '',
         gallery: []
       });
@@ -1317,10 +1470,18 @@ const ProductsView = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.category_id) {
+      alert('Please select a category before saving this product.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = { ...formData };
-      payload.variants = flattenColorGroups(formData.colorGroups);
+      payload.variants = flattenSizeRows(formData.sizeRows, formData.stock_id || buildStockId(formData.name), formData.thumbnail);
+      payload.stock_quantity = formData.sizeRows.length
+        ? formData.sizeRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0)
+        : parseInt(formData.stock_quantity, 10) || 0;
+      payload.brand_id = null;
 
       // Remove frontend-only state fields
       delete payload.thumbnailPreview;
@@ -1329,7 +1490,9 @@ const ProductsView = () => {
       delete payload.thumbnailFile;
       delete payload.galleryFiles;
       delete payload.galleryPreviews;
-      delete payload.colorGroups;
+      delete payload.sizeRows;
+      delete payload.stock_id;
+      delete payload.parent_category_id;
       delete payload.show_offer;
       delete payload.cost_price;
       payload.discount_price = formData.show_offer ? formData.discount_price || null : null;
@@ -1351,11 +1514,12 @@ const ProductsView = () => {
 
   return (
     <div className="space-y-6 relative">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">Inventory Management ({products.length})</h3>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">Inventory ({products.length})</h3>
         <button 
+          type="button"
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20"
+          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-xs sm:text-sm"
         >
           <Plus size={20} /> Add Product
         </button>
@@ -1367,7 +1531,8 @@ const ProductsView = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
           </div>
         ) : products.length > 0 ? (
-          <table className="w-full text-left">
+          <AdminTable>
+          <table className="w-full text-left min-w-[800px]">
             <thead className="bg-navy-800/50">
               <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
                 <th className="px-6 py-4">Product Details</th>
@@ -1428,6 +1593,7 @@ const ProductsView = () => {
               ))}
             </tbody>
           </table>
+          </AdminTable>
         ) : (
           <div className="py-24 text-center text-gold-500/40 text-sm uppercase tracking-widest">
             No products found in inventory.
@@ -1437,11 +1603,11 @@ const ProductsView = () => {
 
       {/* Product Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-6 bg-navy-950/80 backdrop-blur-sm">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-navy-900 border border-gold-500/20 rounded-3xl p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl custom-scrollbar"
+            className="bg-navy-900 border border-gold-500/20 rounded-t-3xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl custom-scrollbar"
           >
             <div className="flex items-center justify-between mb-8">
               <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">
@@ -1465,7 +1631,12 @@ const ProductsView = () => {
                       value={formData.name}
                       onChange={(e) => {
                         const val = e.target.value.toUpperCase();
-                        setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
+                        setFormData({
+                          ...formData,
+                          name: val,
+                          slug: val.toLowerCase().replace(/ /g, '-'),
+                          stock_id: formData.stock_id ? formData.stock_id : buildStockId(val),
+                        });
                       }}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
                     />
@@ -1539,34 +1710,58 @@ const ProductsView = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Category</label>
-                    <select 
-                      required
-                      value={formData.category_id}
-                      onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+                <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gold-400">Category</p>
+                    <p className="text-[9px] uppercase tracking-wider text-gold-500/35 mt-1">Tick the main category first, then tick a subcategory when it applies.</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Brand</label>
-                    <select 
-                      value={formData.brand_id}
-                      onChange={(e) => setFormData({...formData, brand_id: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
-                    >
-                      <option value="">Select Brand</option>
-                      {brands.map(brand => (
-                        <option key={brand.id} value={brand.id}>{brand.name}</option>
-                      ))}
-                    </select>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {parentCategories.map((category) => (
+                      <label
+                        key={category.id}
+                        className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all ${
+                          formData.parent_category_id === category.id
+                            ? 'border-gold-500 bg-gold-600/10 text-gold-100'
+                            : 'border-gold-500/10 bg-navy-900/50 text-gold-500/60 hover:border-gold-500/30'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.parent_category_id === category.id}
+                          onChange={() => handleCategorySelect(category)}
+                          className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
+                        />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{category.name}</span>
+                      </label>
+                    ))}
                   </div>
+
+                  {subCategories.length > 0 && (
+                    <div className="space-y-3 pt-4 border-t border-gold-500/10">
+                      <p className="text-[9px] font-black uppercase tracking-[0.25em] text-gold-500/50">Subcategory</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {subCategories.map((category) => (
+                          <label
+                            key={category.id}
+                            className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all ${
+                              formData.category_id === category.id
+                                ? 'border-gold-500 bg-gold-600/10 text-gold-100'
+                                : 'border-gold-500/10 bg-navy-900/50 text-gold-500/60 hover:border-gold-500/30'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.category_id === category.id}
+                              onChange={() => handleSubCategorySelect(category)}
+                              className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
+                            />
+                            <span className="text-[10px] font-black uppercase tracking-widest">{category.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -1674,129 +1869,96 @@ const ProductsView = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
                   <div>
-                    <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Color &amp; Size Variants</h5>
-                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">One image per color · multiple sizes with stock under each</p>
+                    <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Stock By Size</h5>
+                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">Tick available sizes and enter how many pieces are in stock for each size.</p>
                   </div>
-                  <button type="button" onClick={handleAddColorGroup} className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
-                    <Plus size={14} /> Add Color Option
-                  </button>
                 </div>
 
-                <div className="space-y-6">
-                  {formData.colorGroups.length > 0 ? formData.colorGroups.map((group, groupIdx) => (
-                    <div key={group._key || groupIdx} className="bg-navy-950/50 border border-gold-500/15 rounded-2xl overflow-hidden">
-                      <div className="flex items-start justify-between gap-4 p-6 border-b border-gold-500/10 bg-navy-950/80">
-                        <div className="flex items-start gap-5 flex-1">
-                          <div className="space-y-2 shrink-0">
-                            <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Color Image</label>
-                            <div className="w-20 h-20 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-900 flex items-center justify-center relative hover:border-gold-500/30 transition-all">
-                              {group.image_url ? (
-                                <img src={group.image_url} alt="" className={`w-full h-full object-cover ${group.image_url.startsWith('blob:') ? 'opacity-50 grayscale' : ''}`} />
-                              ) : (
-                                <ImageIcon size={20} className="text-gold-500/20" />
-                              )}
-                              {group.image_url?.startsWith('blob:') && (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="w-4 h-4 border-2 border-gold-500 border-t-transparent animate-spin rounded-full" />
-                                </div>
-                              )}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleColorGroupImageChange(groupIdx, e)}
-                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2 flex-1 max-w-md">
-                            <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Color Name (e.g. BLACK LEATHER)</label>
-                            <input
-                              type="text"
-                              placeholder="E.G. BLACK LEATHER"
-                              value={group.color}
-                              onChange={(e) => handleColorGroupChange(groupIdx, 'color', e.target.value)}
-                              className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                            />
-                            <label className="block text-[8px] text-gold-500/40 uppercase tracking-widest font-black pt-2">Stock ID for this color</label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="E.G. SHIRT-BLUE-001"
-                              value={group.stock_id}
-                              onChange={(e) => handleColorGroupChange(groupIdx, 'stock_id', e.target.value)}
-                              className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                            />
-                            <p className="text-[8px] text-gold-500/30 uppercase tracking-wider">
-                              Shared by every size under this color.
-                            </p>
-                          </div>
-                        </div>
-                        <button type="button" onClick={() => handleRemoveColorGroup(groupIdx)} className="p-2 text-red-400/40 hover:text-red-400 transition-colors mt-6" title="Remove color">
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                <div className="bg-navy-950/50 border border-gold-500/15 rounded-2xl p-6 space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Stock ID</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="E.G. SHIRT-BLUE-001"
+                      value={formData.stock_id}
+                      onChange={(e) => setFormData({ ...formData, stock_id: e.target.value.toUpperCase() })}
+                      className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                    />
+                    <p className="text-[8px] text-gold-500/30 uppercase tracking-wider">This ID is shared by every selected size for this product.</p>
+                  </div>
 
-                      <div className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-black text-gold-500/50 uppercase tracking-[0.2em]">Sizes for this color</span>
-                          <button type="button" onClick={() => handleAddSizeToGroup(groupIdx)} className="text-[9px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-1.5">
-                            <Plus size={12} /> Add Size
-                          </button>
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+                    <input
+                      type="text"
+                      value={customSize}
+                      onChange={(e) => setCustomSize(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomSize();
+                        }
+                      }}
+                      placeholder="ADD SIZE: 40, 50, XXL"
+                      className="w-full bg-navy-900 border border-gold-500/5 rounded-xl py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomSize}
+                      className="px-5 py-3 rounded-xl border border-gold-500/20 text-gold-500 text-[10px] font-black uppercase tracking-widest hover:border-gold-500/50"
+                    >
+                      Add Size
+                    </button>
+                  </div>
 
-                        <div className="space-y-3">
-                          {group.sizes.map((sizeRow, sizeIdx) => (
-                            <div key={sizeRow._key || sizeIdx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-navy-900/40 p-4 rounded-xl border border-gold-500/5">
-                              <div className="sm:col-span-3 space-y-1">
-                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size</label>
-                                <input
-                                  type="text"
-                                  placeholder="E.G. 42"
-                                  value={sizeRow.size}
-                                  onChange={(e) => handleSizeChange(groupIdx, sizeIdx, 'size', e.target.value)}
-                                  className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                                />
-                              </div>
-                              <div className="sm:col-span-3 space-y-1">
-                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">In Stock</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {displaySizeOptions.map((size) => {
+                      const row = formData.sizeRows.find((item) => item.size === size);
+                      return (
+                        <div
+                          key={size}
+                          className={`rounded-xl border p-3 space-y-3 transition-all ${
+                            row ? 'border-gold-500 bg-gold-600/10' : 'border-gold-500/10 bg-navy-900/50'
+                          }`}
+                        >
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(row)}
+                              onChange={() => handleToggleSize(size)}
+                              className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
+                            />
+                            <span className="text-[11px] font-black uppercase tracking-widest text-gold-100">{size}</span>
+                          </label>
+
+                          {row && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Stock</label>
                                 <input
                                   type="number"
                                   min="0"
-                                  value={sizeRow.stock}
-                                  onChange={(e) => handleSizeChange(groupIdx, sizeIdx, 'stock', e.target.value)}
+                                  value={row.stock}
+                                  onChange={(e) => handleSizeChange(size, 'stock', e.target.value)}
                                   className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
                                 />
                               </div>
-                              <div className="sm:col-span-4 space-y-1">
-                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Mod (± KSh)</label>
+                              <div className="space-y-1">
+                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price +</label>
                                 <input
                                   type="number"
                                   placeholder="0"
-                                  value={sizeRow.price_override}
-                                  onChange={(e) => handleSizeChange(groupIdx, sizeIdx, 'price_override', e.target.value)}
+                                  value={row.price_override}
+                                  onChange={(e) => handleSizeChange(size, 'price_override', e.target.value)}
                                   className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
                                 />
                               </div>
-                              <div className="sm:col-span-2 flex justify-end pb-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveSize(groupIdx, sizeIdx)}
-                                  className="p-2 text-red-400/40 hover:text-red-400 transition-colors"
-                                  disabled={group.sizes.length === 1}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
                             </div>
-                          ))}
+                          )}
                         </div>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="py-10 text-center border-2 border-dashed border-gold-500/5 rounded-2xl text-[10px] text-gold-500/20 uppercase font-black tracking-widest">
-                      No color options yet. Add a color, upload its image, then add sizes with stock.
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -2159,7 +2321,7 @@ const BrandsView = () => {
       try {
         const res = await adminUploadAPI.upload(uploadData);
         if (res.data.success) {
-          setFormData({ ...formData, logo: res.data.data[0] });
+          setFormData({ ...formData, logo: getUploadUrl(res.data.data[0]) });
         }
       } catch (error) {
         console.error('Brand logo upload failed:', error);
@@ -2382,8 +2544,8 @@ const CustomersView = () => {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await adminCustomerAPI.getAll();
-        setCustomers(res.data.data);
+        const res = await adminCustomerAPI.getAll({ role: 'customer' });
+        setCustomers(res.data.data || []);
       } catch (error) {
         console.error('Error fetching customers:', error);
       } finally {
@@ -2410,12 +2572,12 @@ const CustomersView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div className="flex flex-col">
-          <h3 className="text-2xl font-serif font-bold text-gold-100">Customer Directory</h3>
+          <h3 className="text-xl sm:text-2xl font-serif font-bold text-gold-100">Customer Directory</h3>
           <p className="text-xs text-gold-500/40 mt-1">Managing {customers.length} registered clients</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 w-full sm:w-auto">
           <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2">
             <Search size={16} className="text-gold-500/40" />
             <input 
@@ -2438,7 +2600,8 @@ const CustomersView = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
           </div>
         ) : filteredCustomers.length > 0 ? (
-          <table className="w-full text-left">
+          <AdminTable>
+          <table className="w-full text-left min-w-[720px]">
             <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
               <tr>
                 <th className="px-6 py-4">Customer</th>
@@ -2497,6 +2660,7 @@ const CustomersView = () => {
               ))}
             </tbody>
           </table>
+          </AdminTable>
         ) : (
           <div className="py-24 text-center text-gold-500/40 text-sm">
             No customers found matching your search.
@@ -2525,10 +2689,10 @@ const AdminsView = () => {
     try {
       // Fetch both staff and admins
       const [resStaff, resAdmin] = await Promise.all([
-        adminCustomerAPI.getAll({ role: 'staff' }),
-        adminCustomerAPI.getAll({ role: 'admin' })
+        adminCustomerAPI.getStaff(),
+        adminCustomerAPI.getAdmins(),
       ]);
-      const combined = [...resAdmin.data.data, ...resStaff.data.data];
+      const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])];
       setAdmins(combined);
     } catch (error) {
       console.error('Error fetching admins:', error);
@@ -2581,11 +2745,15 @@ const AdminsView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Internal Access Controls</h3>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <div>
+          <h3 className="text-xl font-serif font-bold text-gold-100">Admins &amp; Staff</h3>
+          <p className="text-xs text-gold-500/40 mt-1">{admins.length} users with dashboard access</p>
+        </div>
         <button 
+          type="button"
           onClick={handleOpenModal}
-          className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center gap-2 hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20"
+          className="px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-sm"
         >
           <UserPlus size={20} /> ADD STAFF
         </button>
@@ -2686,7 +2854,7 @@ const AdminsView = () => {
                 <div>
                   <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access Permissions</label>
                   <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
-                    {['dashboard', 'orders', 'products', 'categories', 'brands', 'customers', 'admins', 'coupons', 'banners', 'newsletter', 'finance', 'payments', 'reviews', 'settings'].map(perm => (
+                    {['dashboard', 'orders', 'products', 'customers', 'admins', 'coupons', 'banners', 'newsletter', 'finance', 'reviews', 'settings'].map(perm => (
                       <label key={perm} className="flex items-center gap-2 cursor-pointer group">
                         <input 
                           type="checkbox"
@@ -2961,106 +3129,6 @@ const NewsletterView = () => {
   );
 };
 
-
-const PaymentsView = () => {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const res = await adminPaymentAPI.getAll();
-        setPayments(res.data.data);
-      } catch (error) {
-        console.error('Error fetching payments:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPayments();
-  }, []);
-
-  const totalMpesa = payments
-    .filter(p => p.method === 'M-Pesa' && p.status === 'Success')
-    .reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
-
-  const successRate = payments.length > 0 
-    ? (payments.filter(p => p.status === 'Success').length / payments.length) * 100 
-    : 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-navy-900/40 border border-gold-500/10 p-8 rounded-3xl relative overflow-hidden group">
-          <div className="relative z-10">
-            <div className="text-xs font-bold text-gold-500/40 uppercase tracking-widest mb-2">Total Collections</div>
-            <div className="text-3xl font-serif font-bold text-gold-100 mb-6">KSh {totalMpesa.toLocaleString()}</div>
-            <div className="flex gap-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Transactions</span>
-                <span className="text-lg font-bold text-gold-200">{payments.length}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Success Rate</span>
-                <span className="text-lg font-bold text-green-400">{successRate.toFixed(1)}%</span>
-              </div>
-            </div>
-          </div>
-          <Laptop size={120} className="absolute -bottom-4 -right-4 text-gold-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
-        </div>
-      </div>
-      
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-5 border-b border-gold-500/10 bg-navy-800/30">
-          <h3 className="font-serif font-bold text-lg text-gold-100">Transaction History</h3>
-        </div>
-        {loading ? (
-          <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-          </div>
-        ) : payments.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-              <tr>
-                <th className="px-6 py-4">Reference</th>
-                <th className="px-6 py-4">Order</th>
-                <th className="px-6 py-4">Method</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {payments.map((p, i) => (
-                <tr key={i} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4 font-mono text-xs text-gold-500">{p.transaction_id}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-gold-100">#{p.order_ref?.substring(0, 8).toUpperCase()}</td>
-                  <td className="px-6 py-4 text-xs text-gold-500/60 uppercase">{p.method}</td>
-                  <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.amount).toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
-                      p.status === 'Success' ? 'border-green-400 text-green-400 bg-green-400/5' : 
-                      p.status === 'Refunded' ? 'border-gold-500 text-gold-500 bg-gold-500/5' : 'border-red-400 text-red-400 bg-red-400/5'
-                    }`}>
-                      {p.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-gold-500/40 hover:text-gold-500 transition-colors"><Eye size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
-            No transaction history found.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const ReviewsView = () => {
   const [reviews, setReviews] = useState([]);

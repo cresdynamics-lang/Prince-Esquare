@@ -1,4 +1,5 @@
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
+const { formatUploadResult } = require('../utils/cloudinaryImage');
 const { formatResponse } = require('../utils/responseFormatter');
 
 /**
@@ -15,9 +16,9 @@ exports.uploadImages = async (req, res) => {
         const uploadPromises = req.files.map(file => uploadToCloudinary(file.buffer));
         const results = await Promise.all(uploadPromises);
 
-        const urls = results.map(result => result.secure_url);
+        const images = results.map(formatUploadResult);
 
-        return formatResponse(res, 200, true, 'Images uploaded successfully', urls);
+        return formatResponse(res, 200, true, 'Images uploaded successfully', images);
     } catch (error) {
         console.error('Upload Error:', error);
         return formatResponse(res, 500, false, 'Error uploading images');

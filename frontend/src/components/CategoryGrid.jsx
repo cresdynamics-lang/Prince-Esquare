@@ -1,7 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
-import { adminCategoryAPI } from '../services/api';
 
 const dummyCategories = [
   {
@@ -65,37 +63,6 @@ const dummyCategories = [
 
 const CategoryGrid = () => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState(dummyCategories);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await adminCategoryAPI.getAll();
-        const fetchedCats = res.data.data || [];
-        
-        // Map to our UI format
-        const formattedCats = fetchedCats.map((c, i) => ({
-          title: c.name,
-          subtitle: c.description || 'Premium Collection',
-          image: c.image || '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
-          span: 'md:col-span-1 md:row-span-1',
-          category: c.slug || c.name.toLowerCase(),
-        }));
-        
-        // Combine dummy and fetched categories
-        setCategories([...dummyCategories, ...formattedCats]);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchCategories();
-  }, []);
-
-  if (loading || categories.length === 0) return null;
 
   return (
     <section className="py-32 bg-navy-950">
@@ -123,7 +90,7 @@ const CategoryGrid = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 auto-rows-[360px] md:auto-rows-[260px] gap-8">
-          {categories.map((cat, index) => (
+          {dummyCategories.map((cat, index) => (
             <motion.div
               key={cat.title}
               initial={{ opacity: 0, scale: 0.98 }}

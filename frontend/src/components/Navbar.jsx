@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, Search, User, LogOut } from 'lucide-react';
+import { ChevronDown, Menu, X, ShoppingBag, Search, User, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { adminCategoryAPI } from '../services/api';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [openMobileCategory, setOpenMobileCategory] = useState('polo-t-shirts');
   const navigate = useNavigate();
   
   const getItemCount = useCartStore((state) => state.getItemCount);
@@ -34,9 +34,9 @@ const Navbar = () => {
       sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'],
     },
     {
-      name: 'Shirts',
-      category: 'shirts',
-      sub: ['Formal shirts', 'Casual', 'Presidential'],
+      name: 'Trousers',
+      category: 'trousers',
+      sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'],
     },
     {
       name: 'Suits',
@@ -44,9 +44,24 @@ const Navbar = () => {
       sub: ['Two piece', 'Three piece'],
     },
     {
-      name: 'Trousers',
-      category: 'trousers',
-      sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'],
+      name: 'Shirts',
+      category: 'shirts',
+      sub: ['Formal shirts', 'Casual', 'Presidential'],
+    },
+    {
+      name: 'Blazers',
+      category: 'blazers',
+      sub: ['Modern', 'Casual', 'Classic'],
+    },
+    {
+      name: 'Track Suits',
+      category: 'track-suits',
+      sub: [],
+    },
+    {
+      name: 'Jackets',
+      category: 'jackets',
+      sub: ['Jackets', 'Half jackets'],
     },
     {
       name: 'Linen',
@@ -54,25 +69,59 @@ const Navbar = () => {
       sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'],
     },
     {
+      name: 'Caps & Hats',
+      category: 'caps-hats',
+      sub: [],
+    },
+    {
+      name: 'Belts & Ties',
+      category: 'belts-ties',
+      sub: [],
+    },
+    {
+      name: 'Sweaters',
+      category: 'sweaters',
+      sub: [],
+    },
+    {
+      name: 'T-shirts',
+      category: 't-shirts',
+      sub: ['Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'],
+    },
+  ];
+
+  const desktopMenuItems = [
+    ...menuItems.filter((item) => ['polo-t-shirts', 'shoes', 'trousers', 'shirts', 'suits'].includes(item.category)),
+    {
       name: 'More',
       category: 'more',
-      sub: ['Blazers', 'Track Suits', 'Jackets', 'Half jackets', 'Caps & Hats', 'Belts & Ties', 'Sweaters', 'Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'],
+      sub: menuItems
+        .filter((item) => !['polo-t-shirts', 'shoes', 'trousers', 'shirts', 'suits'].includes(item.category))
+        .map((item) => item.name),
     },
   ];
 
   const handleCategoryClick = (category, sub = null) => {
     const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
     let url = categoryPages.includes(category) ? `/${category}` : `/products?category=${category}`;
-    if (sub && !categoryPages.includes(category)) url += `&sub=${encodeURIComponent(sub)}`;
+    if (sub) {
+      url += categoryPages.includes(category)
+        ? `?sub=${encodeURIComponent(sub)}`
+        : `&sub=${encodeURIComponent(sub)}`;
+    }
     navigate(url);
     setIsOpen(false);
+  };
+
+  const toggleMobileCategory = (category) => {
+    setOpenMobileCategory((current) => (current === category ? '' : category));
   };
 
   return (
     <nav className={`fixed w-full z-50 transition-all duration-500 ${scrolled ? 'py-4 glass shadow-2xl' : 'py-8 bg-transparent'}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
         {/* Mobile Menu Button */}
-        <button onClick={() => setIsOpen(!isOpen)} className="lg:hidden text-gold-400">
+        <button onClick={() => setIsOpen(!isOpen)} className="xl:hidden text-gold-400">
           {isOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
 
@@ -81,19 +130,26 @@ const Navbar = () => {
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl lg:text-3xl font-serif tracking-[0.2em] font-bold text-gradient-gold"
+            className="flex items-center gap-3"
           >
-            PRINCE ESQUIRE
+            <img
+              src="/LOGO.jpeg"
+              alt="Prince Esquire"
+              className="h-10 w-10 lg:h-12 lg:w-12 rounded-full object-cover border border-gold-500/30 bg-navy-950"
+            />
+            <span className="text-xl sm:text-2xl lg:text-3xl font-serif tracking-[0.16em] lg:tracking-[0.2em] font-bold text-gradient-gold">
+              PRINCE ESQUIRE
+            </span>
           </motion.div>
         </Link>
 
         {/* Desktop Menu */}
-        <div className="hidden lg:flex items-center space-x-12">
-          {menuItems.map((item) => (
+        <div className="hidden xl:flex items-center gap-5 2xl:gap-7">
+          {desktopMenuItems.map((item) => (
             <div key={item.name} className="relative group">
               <button 
                 onClick={() => handleCategoryClick(item.category)}
-                className="text-[10px] font-bold tracking-[0.3em] uppercase text-white hover:text-gold-400 transition-colors duration-300"
+                className="text-[9px] 2xl:text-[10px] font-bold tracking-[0.18em] 2xl:tracking-[0.24em] uppercase text-white hover:text-gold-400 transition-colors duration-300"
               >
                 {item.name}
               </button>
@@ -101,15 +157,20 @@ const Navbar = () => {
                 <div className="absolute top-full left-0 mt-6 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
                   <div className="bg-navy-950/95 border border-gold-500/20 backdrop-blur-xl p-8 min-w-[220px] shadow-2xl">
                     <div className="space-y-4">
-                      {item.sub.map((sub) => (
-                        <button 
-                          key={sub} 
-                          onClick={() => handleCategoryClick(item.category, sub)}
+                      {item.sub.map((sub) => {
+                        const moreTarget = item.category === 'more'
+                          ? menuItems.find((menuItem) => menuItem.name === sub)
+                          : null;
+
+                        return (
+                        <button
+                          key={sub}
+                          onClick={() => moreTarget ? handleCategoryClick(moreTarget.category) : handleCategoryClick(item.category, sub)}
                           className="block w-full text-left text-[9px] font-bold uppercase tracking-[0.2em] text-navy-200 hover:text-gold-400 transition-colors"
                         >
                           {sub}
                         </button>
-                      ))}
+                      )})}
                       <div className="pt-2 border-t border-gold-500/10">
                         <button 
                           onClick={() => handleCategoryClick(item.category)}
@@ -177,35 +238,64 @@ const Navbar = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 xl:hidden"
             />
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-[80%] max-w-sm z-40 lg:hidden bg-navy-950 border-r border-gold-500/10 p-8 pt-24"
+              className="fixed inset-y-0 left-0 w-[84%] max-w-sm z-40 xl:hidden bg-navy-950 border-r border-gold-500/10 p-8 pt-24 overflow-y-auto custom-scrollbar"
             >
-              <div className="flex flex-col space-y-10">
+              <div className="flex flex-col space-y-4 pb-16">
                 {menuItems.map((item) => (
-                  <div key={item.name} className="space-y-4">
-                    <h3 
-                      onClick={() => handleCategoryClick(item.category)}
-                      className="text-2xl font-serif text-white uppercase tracking-[0.1em] cursor-pointer"
+                  <div key={item.name} className="border-b border-gold-500/10 pb-4">
+                    <button
+                      type="button"
+                      onClick={() => item.sub.length ? toggleMobileCategory(item.category) : handleCategoryClick(item.category)}
+                      className="flex w-full items-center justify-between gap-4 text-left"
                     >
-                      {item.name}
-                    </h3>
-                    <div className="flex flex-col space-y-3 pl-2">
-                      {item.sub.map((sub) => (
-                        <button 
-                          key={sub} 
-                          onClick={() => handleCategoryClick(item.category, sub)}
-                          className="text-left text-[10px] font-bold uppercase tracking-widest text-navy-300 hover:text-gold-400"
+                      <span className="text-xl font-serif text-white uppercase tracking-[0.08em]">
+                        {item.name}
+                      </span>
+                      {item.sub.length > 0 && (
+                        <ChevronDown
+                          size={18}
+                          className={`text-gold-500 transition-transform ${openMobileCategory === item.category ? 'rotate-180' : ''}`}
+                        />
+                      )}
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {item.sub.length > 0 && openMobileCategory === item.category && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
                         >
-                          {sub}
-                        </button>
-                      ))}
-                    </div>
+                          <div className="flex flex-col space-y-3 pt-5 pl-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCategoryClick(item.category)}
+                              className="text-left text-[10px] font-black uppercase tracking-widest text-gold-400 hover:text-gold-200"
+                            >
+                              Shop All {item.name}
+                            </button>
+                            {item.sub.map((sub) => (
+                              <button
+                                key={sub}
+                                type="button"
+                                onClick={() => handleCategoryClick(item.category, sub)}
+                                className="text-left text-[10px] font-bold uppercase tracking-widest text-navy-300 hover:text-gold-400"
+                              >
+                                {sub}
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 ))}
                 

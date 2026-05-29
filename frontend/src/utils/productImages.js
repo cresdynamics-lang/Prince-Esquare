@@ -1,6 +1,8 @@
 // High-quality premium images for Prince Esquire
 // Sourced from local assets in public folder
 
+import { getImageSrc, optimizeCloudinaryUrl, isCloudinaryUrl } from './cloudinary';
+
 const LOCAL_IMAGES = [
   '/polo black.jpeg',
   '/polo brown.jpeg',
@@ -82,9 +84,16 @@ export const getPremiumImage = (product) => {
   if (!product) return LOCAL_IMAGES[0];
   
   // If product has a custom thumbnail that isn't a placeholder, use it
-  const customImage = product.thumbnail || product.image_url;
+  const customImage =
+    product.thumbnail_optimized ||
+    getImageSrc(product.thumbnail) ||
+    getImageSrc(product.image_url) ||
+    product.thumbnail ||
+    product.image_url;
   if (customImage && !customImage.includes('placeholder') && !customImage.includes('unsplash')) {
-    return customImage;
+    return isCloudinaryUrl(customImage)
+      ? optimizeCloudinaryUrl(customImage, { width: 800 })
+      : customImage;
   }
 
   const name = product.name?.toLowerCase() || '';

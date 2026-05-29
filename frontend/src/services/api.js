@@ -102,9 +102,12 @@ export const adminBrandAPI = {
   remove: (id) => API.delete(`/admin/brands/${id}`),
 };
 
-// ── ADMIN – CUSTOMERS ────────────────────────────────────────────────
+// ── ADMIN – CUSTOMERS & STAFF ─────────────────────────────────────────
 export const adminCustomerAPI = {
   getAll: (params) => API.get('/admin/customers/all', { params }),
+  getCustomers: () => API.get('/admin/customers/all', { params: { role: 'customer' } }),
+  getAdmins: () => API.get('/admin/customers/all', { params: { role: 'admin' } }),
+  getStaff: () => API.get('/admin/customers/all', { params: { role: 'staff' } }),
   getOne: (id) => API.get(`/admin/customers/${id}`),
   updateStatus: (id, status) => API.patch(`/admin/customers/${id}/status`, { is_active: status }),
   createStaff: (data) => API.post('/admin/customers/staff', data),
@@ -144,10 +147,6 @@ export const adminReviewAPI = {
   remove: (id) => API.delete(`/admin/reviews/${id}`),
 };
 
-export const adminPaymentAPI = {
-  getAll: () => API.get('/payments/admin/all'),
-};
-
 export const adminSettingsAPI = {
   get: () => API.get('/admin/settings'),
   update: (data) => API.put('/admin/settings', data),
@@ -158,13 +157,5 @@ export const adminUploadAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 };
-
-// ─────────────────────────────────────────────────────────────────────
-// ⚠️  MISSING / NOT YET IMPLEMENTED ON BACKEND:
-//   - GET /api/admin/payments  → No admin-wide payments list endpoint.
-//     The only payment route is user-specific: GET /api/payments/history
-//   - Admin Users (Staff) CRUD → No /api/admin/users endpoint at all.
-//   - Store Settings            → No /api/admin/settings endpoint.
-// ─────────────────────────────────────────────────────────────────────
 
 export default API;

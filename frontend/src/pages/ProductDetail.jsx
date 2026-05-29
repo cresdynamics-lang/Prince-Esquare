@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
 import { getPremiumImage } from '../utils/productImages';
+import { getImageSrc } from '../utils/cloudinary';
 import { DUMMY_PRODUCTS } from '../utils/dummyData';
 
 function sizesForCategoryName(name) {
@@ -45,9 +46,7 @@ const ProductDetail = () => {
   const [related, setRelated] = useState([]);
   const [loadError, setLoadError] = useState('');
   
-  const [selectedColor, setSelectedColor] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
-  const [availableColors, setAvailableColors] = useState([]);
 
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -85,29 +84,16 @@ const ProductDetail = () => {
         let p, rawVariants = [], rel = [];
 
         if (isDummy) {
-          // Dummy specific logic
-          const baseName = found.name.split(' in ')[0];
-          rawVariants = DUMMY_PRODUCTS.filter(p =>
-            p.name.startsWith(baseName) && p.brand_name === found.brand_name
-          ).map(v => ({
-            id: v.id,
-            value: v.name.includes(' in ') ? v.name.split(' in ')[1] : v.name,
-            price_modifier: parseFloat(v.price) - parseFloat(found.price),
-            slug: v.slug,
-            image_url: v.thumbnail
-          }));
-
           p = {
             ...found,
             thumbnail: found.thumbnail,
             description: found.description || `Exquisite ${found.name} from our latest collection. Crafted with precision and the finest materials.`,
-            variants: rawVariants.length > 1 ? rawVariants : []
+            variants: []
           };
 
-          const variantSlugs = rawVariants.map(v => v.slug);
           rel = DUMMY_PRODUCTS.filter(item =>
             item.category_name === p.category_name &&
-            !variantSlugs.includes(item.slug)
+            item.slug !== p.slug
           ).slice(0, 4).map(item => ({ ...item, thumbnail: item.thumbnail }));
         } else {
           // Backend specific logic
@@ -173,28 +159,7 @@ const ProductDetail = () => {
 
         p.variants = finalVariants;
 
-        // Group unique colors
-        const uniqueColors = [];
-        const colorMap = new Map();
-        finalVariants.forEach(v => {
-          if (!colorMap.has(v.color)) {
-            colorMap.set(v.color, {
-              color: v.color,
-              image_url: v.image_url || p.thumbnail
-            });
-            uniqueColors.push(v.color);
-          }
-        });
-
-        const colorsList = uniqueColors.map(c => colorMap.get(c));
-        setAvailableColors(colorsList);
-
-        // Initialize selections
-        const initialColor = colorsList.length > 0 ? colorsList[0].color : '';
-        setSelectedColor(initialColor);
-
-        const sizesForInitColor = finalVariants.filter(v => v.color === initialColor).map(v => v.size);
-        const uniqueSizes = sortSizes(sizesForInitColor);
+        const uniqueSizes = sortSizes(finalVariants.map(v => v.size));
         setSelectedSize(uniqueSizes[0] || '');
 
         setProduct(p);
@@ -205,13 +170,16 @@ const ProductDetail = () => {
     fetchProduct();
   }, [slug]);
 
-  const currentVariant = product?.variants?.find(v => v.color === selectedColor && v.size === selectedSize);
+  const currentVariant = product?.variants?.find(v => v.size === selectedSize);
 
   const unitPrice = product
     ? parseFloat(product.price) + parseFloat(currentVariant?.price_modifier || 0)
     : 0;
 
-  const currentDisplayImage = availableColors.find(c => c.color === selectedColor)?.image_url || product?.thumbnail;
+  const currentDisplayImage =
+    product?.thumbnail_optimized ||
+    getImageSrc(product?.thumbnail) ||
+    product?.thumbnail;
 
   const buildPayload = () => ({
     productId: product?.id,
@@ -223,7 +191,7 @@ const ProductDetail = () => {
     image: currentDisplayImage,
     slug: product?.slug,
     brandName: product?.brand_name,
-    variantValue: `${selectedSize} / ${selectedColor}`
+    variantValue: selectedSize
   });
 
   const handleAddToCart = async () => {
@@ -259,7 +227,7 @@ const ProductDetail = () => {
   }
 
   const availableSizes = sortSizes(
-    product?.variants?.filter((v) => v.color === selectedColor).map((v) => v.size) || []
+    product?.variants?.map((v) => v.size) || []
   );
 
   return (
@@ -293,39 +261,6 @@ const ProductDetail = () => {
                 <p className="text-2xl font-light text-gold-400 italic">KSh {unitPrice.toLocaleString()}</p>
               </div>
 
-              {availableColors.length > 0 && availableColors[0].color !== 'Default' && (
-                <div className="space-y-4">
-                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold-500">Color Selection</h3>
-                  <div className="flex flex-col space-y-3">
-                    {availableColors.map((colorObj) => (
-                      <button
-                        key={colorObj.color}
-                        type="button"
-                        onClick={() => {
-                           setSelectedColor(colorObj.color);
-                           // Automatically select the first available size for this new color
-                           const newSizes = product.variants.filter(v => v.color === colorObj.color).map(v => v.size);
-                           const uniqueSizes = sortSizes(newSizes);
-                           if (!uniqueSizes.includes(selectedSize)) {
-                               setSelectedSize(uniqueSizes[0] || '');
-                           }
-                        }}
-                        className={`flex items-center justify-between px-6 py-4 border transition-all group ${selectedColor === colorObj.color
-                            ? 'bg-gold-600 text-navy-950 border-gold-600'
-                            : 'bg-navy-900 text-white border-gold-600/20 hover:border-gold-600'
-                          }`}
-                      >
-                        <span className="text-[10px] font-bold uppercase tracking-widest">{colorObj.color}</span>
-                        <div
-                          className={`w-3 h-3 rounded-full border ${selectedColor === colorObj.color ? 'bg-navy-950 border-white/20' : 'bg-gold-600/20 border-gold-600/40'
-                            }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {availableSizes.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -339,7 +274,7 @@ const ProductDetail = () => {
                   </div>
                   <div className="flex flex-wrap gap-3">
                     {availableSizes.map((size) => {
-                      const variantForSize = product?.variants?.find(v => v.color === selectedColor && v.size === size);
+                      const variantForSize = product?.variants?.find(v => v.size === size);
                       // In dummy mode stock might be undefined, handle gracefully
                       const stock = variantForSize?.stock;
                       const isOutOfStock = variantForSize != null && Number(stock) === 0;

@@ -1,16 +1,18 @@
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
+const { UPLOAD_PRESET, UPLOAD_FOLDER } = require('./cloudinaryImage');
 
 /**
- * Uploads a file buffer to Cloudinary.
- * @param {Buffer} buffer - File buffer from multer.
- * @param {string} folder - Optional folder name in Cloudinary.
- * @returns {Promise<Object>} - Cloudinary upload result.
+ * Uploads a file buffer to Cloudinary using upload preset prince-esquire.
  */
-const uploadToCloudinary = (buffer, folder = 'PRINCE-eSQUIIRE') => {
+const uploadToCloudinary = (buffer, folder = UPLOAD_FOLDER) => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder },
+            {
+                folder,
+                upload_preset: UPLOAD_PRESET,
+                resource_type: 'image',
+            },
             (error, result) => {
                 if (error) return reject(error);
                 resolve(result);
@@ -20,4 +22,4 @@ const uploadToCloudinary = (buffer, folder = 'PRINCE-eSQUIIRE') => {
     });
 };
 
-module.exports = { uploadToCloudinary };
+module.exports = { uploadToCloudinary, UPLOAD_PRESET, UPLOAD_FOLDER };

@@ -1,4 +1,5 @@
 const { formatResponse } = require('../utils/responseFormatter');
+const { applyProductImageOptimization } = require('../utils/cloudinaryImage');
 const db = require('../config/db');
 
 const toStockIdPart = (value) => String(value || '')
@@ -88,8 +89,9 @@ exports.getProducts = async (req, res, next) => {
         const countResult = await db.query(countQuery);
         const total = parseInt(countResult.rows[0].count);
 
+        const products = result.rows.map((p) => applyProductImageOptimization(p));
         formatResponse(res, 200, true, 'Products fetched successfully', {
-            products: result.rows,
+            products,
             pagination: {
                 total,
                 page: parseInt(page),
@@ -146,7 +148,7 @@ exports.getProductBySlug = async (req, res, next) => {
             stock_id: v.stock_id
         }));
 
-        formatResponse(res, 200, true, 'Product details fetched', product);
+        formatResponse(res, 200, true, 'Product details fetched', applyProductImageOptimization(product));
     } catch (error) {
         next(error);
     }
@@ -306,6 +308,7 @@ exports.adminGetProducts = async (req, res, next) => {
             }
             for (const p of products) {
                 p.variants = variantsByProduct[p.id] || [];
+                applyProductImageOptimization(p);
             }
         }
 

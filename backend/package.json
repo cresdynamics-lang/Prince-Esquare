@@ -9,7 +9,10 @@
     "db:migrate": "node src/db/migrate.js",
     "db:rebuild-commerce": "node src/db/rebuild-commerce.js",
     "seed:admin": "node seed-admin.js",
+    "seed:dummy-products": "node seed-dummy-products.js",
     "seed:store": "node seed-store.js",
+    "export:products": "node scripts/export-products-json.js",
+    "import:products": "node scripts/import-products-json.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
