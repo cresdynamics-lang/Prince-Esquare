@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Plus, Minus } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, ChevronLeft } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
@@ -236,6 +236,12 @@ const ProductDetail = () => {
 
       <main className="pt-24 pb-24">
         <div className="container mx-auto px-4 md:px-6">
+          <div className="flex items-center space-x-4 mb-8">
+            <button onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
+              <ChevronLeft size={24} />
+            </button>
+            <span className="text-[10px] uppercase tracking-widest text-gold-600/50">Back</span>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-12 lg:gap-16 items-start">
             <div className="lg:col-span-6">
               <div className="relative aspect-square md:aspect-[4/5] bg-white overflow-hidden rounded-sm border border-gold-600/10">
@@ -244,6 +250,8 @@ const ProductDetail = () => {
                     key={currentDisplayImage}
                     src={currentDisplayImage}
                     alt={product.name}
+                    loading="eager"
+                    decoding="async"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -376,6 +384,8 @@ const ProductDetail = () => {
                       <img
                         src={getPremiumImage(p)}
                         alt={p.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
                       />
                     </div>

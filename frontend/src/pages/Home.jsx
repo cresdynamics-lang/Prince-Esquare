@@ -43,7 +43,7 @@ const Home = () => {
 
         {/* Video Background CTA */}
         <section className="relative h-[600px] flex items-center overflow-hidden">
-          <div className="absolute inset-0 bg-fixed bg-cover bg-center" style={{ backgroundImage: 'url("/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg")' }}>
+          <div className="absolute inset-0 bg-fixed bg-cover bg-center" style={{ backgroundImage: 'url("/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg")', backgroundSize: 'cover', backgroundPosition: 'center' }}>
             <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-[2px]" />
           </div>
           <div className="container mx-auto px-6 relative z-10 text-center space-y-8">

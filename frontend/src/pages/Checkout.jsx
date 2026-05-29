@@ -26,7 +26,7 @@ const Checkout = () => {
     if (isAuthenticated) loadCart();
   }, [isAuthenticated, loadCart]);
 
-  if (!isAuthenticated) return <Navigate to="/login?redirect=checkout" />;
+  // Guest checkout enabled - no authentication required
   if (items.length === 0) return <Navigate to="/cart" />;
 
   const totals = getCheckoutTotals();
@@ -190,7 +190,7 @@ const Checkout = () => {
                     {items.map((item) => (
                       <div key={item.cartItemId || `${item.productId}-${item.variantId}-${item.sizeLabel}`} className="flex space-x-4">
                         <div className="w-16 h-16 bg-navy-800 overflow-hidden shrink-0">
-                          <img src={item.image} alt="" className="w-full h-full object-cover" />
+                          <img src={item.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-grow">
                           <p className="text-white text-xs font-serif uppercase tracking-wider">{item.name}</p>

@@ -17,7 +17,6 @@ const Payment = () => {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
       try {
@@ -32,17 +31,7 @@ const Payment = () => {
     return () => {
       cancelled = true;
     };
-  }, [orderId, isAuthenticated, navigate]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="bg-navy-950 min-h-screen pt-32 text-center text-white">
-        <Link to={`/login?redirect=${encodeURIComponent(`payment/${orderId}`)}`} className="text-gold-500 underline text-[10px] uppercase tracking-widest">
-          Sign in to complete payment
-        </Link>
-      </div>
-    );
-  }
+  }, [orderId, navigate]);
 
   const total = order ? parseFloat(order.total_amount) : 0;
   const method = order?.payment_method || 'mpesa';

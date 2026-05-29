@@ -50,6 +50,12 @@ const HeroSlider = () => {
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
+    // Preload all slider images for smooth transitions
+    slides.forEach((slide) => {
+      const img = new Image();
+      img.src = slide.image;
+    });
+
     const timer = setInterval(() => {
       setCurrent((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
     }, 6000);

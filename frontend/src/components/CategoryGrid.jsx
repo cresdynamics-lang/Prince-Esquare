@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -63,6 +64,14 @@ const dummyCategories = [
 
 const CategoryGrid = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Preload category images for smooth loading
+    dummyCategories.forEach((cat) => {
+      const img = new Image();
+      img.src = cat.image;
+    });
+  }, []);
 
   return (
     <section className="py-32 bg-navy-950">

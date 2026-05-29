@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../store/useCartStore';
-import { Trash2, ShoppingBag, ArrowRight, Minus, Plus } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, ChevronLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import Navbar from '../components/Navbar';
@@ -20,6 +20,12 @@ const Cart = () => {
 
       <main className="pt-32 pb-24">
         <div className="container mx-auto px-6 max-w-6xl">
+          <div className="flex items-center space-x-4 mb-8">
+            <button onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
+              <ChevronLeft size={24} />
+            </button>
+            <span className="text-[10px] uppercase tracking-widest text-gold-600/50">Back</span>
+          </div>
           <div className="flex flex-col lg:flex-row gap-16">
             <div className="lg:w-2/3">
               <div className="flex justify-between items-end mb-12 border-b border-gold-600/10 pb-8">
@@ -54,7 +60,7 @@ const Cart = () => {
                         className="flex flex-col sm:flex-row gap-8 p-8 bg-navy-950/50 border border-gold-600/10 relative group"
                       >
                         <div className="w-full sm:w-32 aspect-square bg-navy-950 overflow-hidden shrink-0 border border-gold-600/10">
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                          <img src={item.image} alt={item.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         </div>
 
                         <div className="flex-1 flex flex-col justify-between">
@@ -136,14 +142,14 @@ const Cart = () => {
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     disabled={items.length === 0}
-                    onClick={() => navigate(isAuthenticated ? '/checkout' : '/login?redirect=checkout')}
+                    onClick={() => navigate('/checkout')}
                     className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group shadow-xl shadow-gold-600/10"
                   >
-                    <span>{isAuthenticated ? 'Begin Checkout' : 'Sign In to Checkout'}</span>
+                    <span>Proceed to Checkout</span>
                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </motion.button>
                   <p className="text-[9px] text-gold-600/30 text-center uppercase tracking-[0.3em] font-bold">
-                    {isAuthenticated ? 'Secure Global Delivery' : 'Authentication Required for Safety'}
+                    Guest Checkout Available
                   </p>
                 </div>
               </div>

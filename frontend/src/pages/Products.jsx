@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { Search, ChevronLeft } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useCartStore } from '../store/useCartStore';
@@ -209,6 +209,12 @@ const Products = ({ categoryOverride = null }) => {
 
       <main className="pt-32 pb-20">
         <div className="container mx-auto px-6">
+          <div className="flex items-center space-x-4 mb-8">
+            <button onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
+              <ChevronLeft size={24} />
+            </button>
+            <span className="text-[10px] uppercase tracking-widest text-gold-600/50">Back</span>
+          </div>
           <div className="mb-12">
             <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold">Prince Esquire</span>
             <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight mt-2">
