@@ -6,7 +6,7 @@ exports.getCustomers = async (req, res, next) => {
     try {
         const result = await db.query(
             `SELECT 
-                u.id, u.name, u.email, u.phone, u.avatar, u.role, u.is_verified, u.is_active, u.created_at,
+                u.id, u.name, u.email, u.avatar, u.role, u.is_verified, u.created_at,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE user_id = u.id AND status != 'cancelled') as total_spent
              FROM users u
              WHERE u.role = $1 
@@ -23,7 +23,7 @@ exports.getCustomerDetail = async (req, res, next) => {
     const { id } = req.params;
     try {
         const userResult = await db.query(
-            'SELECT id, name, email, phone, avatar, is_verified, is_active, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, avatar, is_verified, created_at FROM users WHERE id = $1',
             [id]
         );
 
@@ -49,11 +49,11 @@ exports.getCustomerDetail = async (req, res, next) => {
 
 exports.updateCustomerStatus = async (req, res, next) => {
     const { id } = req.params;
-    const { is_active } = req.body;
+    const { is_verified } = req.body;
     try {
         const result = await db.query(
-            'UPDATE users SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, is_active',
-            [is_active, id]
+            'UPDATE users SET is_verified = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, is_verified',
+            [is_verified, id]
         );
 
         if (result.rows.length === 0) {
@@ -98,6 +98,24 @@ exports.updateStaffPermissions = async (req, res, next) => {
         }
 
         formatResponse(res, 200, true, 'Staff permissions updated', result.rows[0]);
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.deleteStaff = async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query(
+            'DELETE FROM users WHERE id = $1 AND role = $2 RETURNING id, name',
+            [id, 'staff']
+        );
+
+        if (result.rows.length === 0) {
+            return formatResponse(res, 404, false, 'Staff not found');
+        }
+
+        formatResponse(res, 200, true, 'Staff deleted successfully', result.rows[0]);
     } catch (error) {
         next(error);
     }

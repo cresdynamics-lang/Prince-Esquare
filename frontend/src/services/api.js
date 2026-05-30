@@ -111,6 +111,7 @@ export const adminCustomerAPI = {
   getOne: (id) => API.get(`/admin/customers/${id}`),
   updateStatus: (id, status) => API.patch(`/admin/customers/${id}/status`, { is_active: status }),
   createStaff: (data) => API.post('/admin/customers/staff', data),
+  deleteStaff: (id) => API.delete(`/admin/customers/staff/${id}`),
 };
 
 // ── FRONTEND – BANNERS ───────────────────────────────────────────────────

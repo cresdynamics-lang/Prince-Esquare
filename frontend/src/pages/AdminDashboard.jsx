@@ -2743,6 +2743,18 @@ const AdminsView = () => {
     }
   };
 
+  const handleDeleteStaff = async (id) => {
+    if (window.confirm('Are you sure you want to remove this staff member?')) {
+      try {
+        await adminCustomerAPI.deleteStaff(id);
+        fetchAdmins();
+      } catch (error) {
+        console.error('Error deleting staff:', error);
+        alert('Error deleting staff member.');
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
@@ -2782,6 +2794,15 @@ const AdminsView = () => {
               <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
                 <span className="text-gold-500/30 uppercase">ID: {admin.id.substring(0, 8)}</span>
                 <div className="flex gap-2">
+                  {admin.role === 'staff' && (
+                    <button 
+                      onClick={() => handleDeleteStaff(admin.id)}
+                      className="p-1.5 rounded-lg text-red-400/40 hover:text-red-400 hover:bg-red-400/5 transition-all"
+                      title="Remove Staff"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                   <button 
                     onClick={() => handleToggleStatus(admin.id, admin.is_active !== false)}
                     className="p-1.5 rounded-lg text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 transition-all"
