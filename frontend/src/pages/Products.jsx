@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronLeft } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import SEO from '../components/SEO';
 import { useCartStore } from '../store/useCartStore';
 import { getPremiumImage, preloadProductImages } from '../utils/productImages';
 import { getDummyProducts } from '../utils/dummyData';
 import { catalogueAPI, productAPI, adminCategoryAPI } from '../services/api';
+import { buildBreadcrumbSchema, categoryFallbackIntro, routeSeo } from '../seo/seoData';
 
 const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
 
@@ -148,6 +150,10 @@ const Products = ({ categoryOverride = null }) => {
   const allCategoryData = dynamicCategories.length ? orderDatabaseCategories(dynamicCategories) : CATEGORY_DATA;
 
   const selectedCategory = allCategoryData.find(c => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase());
+  const seo = routeSeo[currentCategory] || routeSeo.products;
+  const intro = seo.introCopy
+    ? { title: seo.introTitle, copy: seo.introCopy }
+    : categoryFallbackIntro;
   const subCategoryList = currentCategory === 'All'
     ? [...new Set(allCategoryData.flatMap((category) => category.sub || []))]
     : selectedCategory?.sub || [];
@@ -205,6 +211,15 @@ const Products = ({ categoryOverride = null }) => {
 
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
+      <SEO
+        {...seo}
+        schema={[
+          buildBreadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: currentCategory === 'All' ? 'Collections' : selectedCategory?.name || 'Collections', path: seo.path },
+          ]),
+        ]}
+      />
       <Navbar />
 
       <main className="pt-32 pb-20">
@@ -220,6 +235,10 @@ const Products = ({ categoryOverride = null }) => {
             <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight mt-2">
               {currentCategory === 'All' ? 'Our Collections' : selectedCategory?.name}
             </h1>
+            <div className="max-w-3xl mt-6 space-y-3">
+              <h2 className="text-xl md:text-2xl font-serif text-gold-300">{intro.title}</h2>
+              <p className="text-sm md:text-base text-navy-300 font-light leading-relaxed">{intro.copy}</p>
+            </div>
             <div className="flex gap-4 mt-4">
                 {currentSub !== 'All' && (
                 <p className="text-gold-600/60 text-[12px] uppercase tracking-widest">

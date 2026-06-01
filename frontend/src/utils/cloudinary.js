@@ -1,8 +1,8 @@
 /**
- * Cloudinary image helpers (preset: prince-esquire)
+ * Cloudinary image helpers (preset: PRINCE-eSQUIIRE)
  */
 
-export const CLOUDINARY_PRESET = 'prince-esquire';
+export const CLOUDINARY_PRESET = 'PRINCE-eSQUIIRE';
 
 export const isCloudinaryUrl = (url) =>
   typeof url === 'string' && url.includes('res.cloudinary.com');

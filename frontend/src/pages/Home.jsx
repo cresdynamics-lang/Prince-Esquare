@@ -6,10 +6,16 @@ import HeroSlider from '../components/HeroSlider';
 import ProductShowcase from '../components/ProductShowcase';
 import CategoryGrid from '../components/CategoryGrid';
 import Footer from '../components/Footer';
+import SEO from '../components/SEO';
+import { localBusinessSchema, organizationSchema, routeSeo, websiteSchema } from '../seo/seoData';
 
 const Home = () => {
   return (
     <div className="bg-navy-950 min-h-screen">
+      <SEO
+        {...routeSeo.home}
+        schema={[organizationSchema, localBusinessSchema, websiteSchema]}
+      />
       <Navbar />
       
       <main>
@@ -40,6 +46,45 @@ const Home = () => {
         <ProductShowcase />
 
         <CategoryGrid />
+
+        <section className="py-28 bg-navy-950 border-y border-gold-600/10">
+          <div className="container mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
+            <div className="lg:col-span-5 space-y-6">
+              <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold">Luxury Fashion Kenya</span>
+              <h1 className="text-4xl md:text-6xl font-serif text-white leading-tight">
+                Curated Luxury Fashion in Kenya
+              </h1>
+            </div>
+            <div className="lg:col-span-7 space-y-6 text-navy-200 font-light leading-relaxed">
+              <p>
+                Prince Esquire is Nairobi's destination for luxury fashion in Kenya, bringing together premium menswear,
+                designer shoes, refined linen, tailored suits and polished accessories for wardrobes with presence.
+              </p>
+              <p>
+                Our edit is built for discerning Kenyan professionals, diaspora clients and East African style enthusiasts
+                who value authenticity, considered detail and pieces that move confidently from business to private occasions.
+              </p>
+              <p>
+                Every collection is selected with a careful eye for fabric, silhouette and finish. From luxury suits in
+                Nairobi to designer shoes and elegant casualwear, Prince Esquire offers a composed shopping experience with
+                delivery across Kenya and attentive customer care.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                {['Curated premium labels', 'Nairobi-based service', 'Delivery across Kenya'].map((item) => (
+                  <div key={item} className="border-l border-gold-600/30 pl-5">
+                    <p className="text-gold-400 text-[10px] uppercase tracking-[0.25em] font-bold">{item}</p>
+                  </div>
+                ))}
+              </div>
+              <Link
+                to="/products"
+                className="inline-block mt-4 bg-gold-600 text-navy-950 px-10 py-4 text-[10px] font-bold uppercase tracking-[0.25em] hover:bg-gold-500 transition-all"
+              >
+                Shop the Collection
+              </Link>
+            </div>
+          </div>
+        </section>
 
         {/* Video Background CTA */}
         <section className="relative h-[600px] flex items-center overflow-hidden">

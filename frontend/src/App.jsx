@@ -11,8 +11,21 @@ import Payment from './pages/Payment';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
+import SEO from './components/SEO';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
+
+const NoIndexPage = ({ title, children }) => (
+  <>
+    <SEO
+      title={title}
+      description="Private Prince Esquire customer area."
+      path={window.location.pathname}
+      noindex
+    />
+    {children}
+  </>
+);
 
 function App() {
   useEffect(() => {
@@ -36,17 +49,17 @@ function App() {
         <Route path="/trousers" element={<Products categoryOverride="trousers" />} />
         <Route path="/linen" element={<Products categoryOverride="linen" />} />
         <Route path="/product/:slug" element={<ProductDetail />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/payment/:orderId" element={<Payment />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/cart" element={<NoIndexPage title="Shopping Bag"><Cart /></NoIndexPage>} />
+        <Route path="/login" element={<NoIndexPage title="Client Login"><Login /></NoIndexPage>} />
+        <Route path="/signup" element={<NoIndexPage title="Create Account"><SignUp /></NoIndexPage>} />
+        <Route path="/checkout" element={<NoIndexPage title="Checkout"><Checkout /></NoIndexPage>} />
+        <Route path="/payment/:orderId" element={<NoIndexPage title="Payment"><Payment /></NoIndexPage>} />
+        <Route path="/profile" element={<NoIndexPage title="Profile"><Profile /></NoIndexPage>} />
 
         {/* Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/admin/login" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
+        <Route path="/admin/dashboard" element={<NoIndexPage title="Admin Dashboard"><AdminDashboard /></NoIndexPage>} />
+        <Route path="/admin" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
       </Routes>
     </Router>
   );

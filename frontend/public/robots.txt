@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment/
+Disallow: /profile
+Disallow: /login
+Disallow: /signup
+Disallow: /admin
+
+Sitemap: https://prince-esquire.co.ke/sitemap.xml

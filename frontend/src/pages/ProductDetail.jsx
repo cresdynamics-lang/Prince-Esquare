@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Plus, Minus, ChevronLeft } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import SEO from '../components/SEO';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
 import { getPremiumImage } from '../utils/productImages';
 import { getImageSrc } from '../utils/cloudinary';
 import { DUMMY_PRODUCTS } from '../utils/dummyData';
+import { buildBreadcrumbSchema, buildProductSchema } from '../seo/seoData';
 
 function sizesForCategoryName(name) {
   const n = (name || '').toLowerCase();
@@ -232,6 +234,22 @@ const ProductDetail = () => {
 
   return (
     <div className="bg-navy-950 min-h-screen">
+      <SEO
+        title={`${product.name} Kenya`}
+        description={`Shop ${product.name} at Prince Esquire Kenya. Discover premium styling, curated detail and Nairobi delivery for luxury wardrobes. Order today.`}
+        path={`/product/${product.slug}`}
+        type="product"
+        image={currentDisplayImage}
+        keywords={[product.name, product.brand_name, product.category_name, 'luxury fashion Kenya'].filter(Boolean)}
+        schema={[
+          buildBreadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: product.category_name || 'Products', path: '/products' },
+            { name: product.name, path: `/product/${product.slug}` },
+          ]),
+          buildProductSchema(product, currentDisplayImage, unitPrice),
+        ]}
+      />
       <Navbar />
 
       <main className="pt-24 pb-24">
