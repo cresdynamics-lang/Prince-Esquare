@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Plus, Minus, ChevronLeft } from 'lucide-react';
+import { Check, ShoppingBag, Plus, Minus, ChevronLeft } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
 import { getPremiumImage } from '../utils/productImages';
-import { getImageSrc } from '../utils/cloudinary';
+import { getImageSrc, parseProductImages } from '../utils/cloudinary';
 import { DUMMY_PRODUCTS } from '../utils/dummyData';
 import { buildBreadcrumbSchema, buildProductSchema } from '../seo/seoData';
 
@@ -39,6 +39,68 @@ function sortSizes(sizes) {
   });
 }
 
+const getVariantImage = (variant) => (
+  variant?.image_url_optimized ||
+  getImageSrc(variant?.image_url) ||
+  variant?.image_url ||
+  getImageSrc(variant?.image)
+);
+
+const getProductBaseImage = (product) => (
+  product?.thumbnail_optimized ||
+  getImageSrc(product?.thumbnail) ||
+  getImageSrc(product?.image_url) ||
+  product?.thumbnail ||
+  product?.image_url
+);
+
+const buildProductGallery = (product) => {
+  if (!product) return [];
+
+  const seen = new Set();
+  const addImage = (items, item) => {
+    const src = item.src || '';
+    if (!src || seen.has(src)) return items;
+    seen.add(src);
+    return [...items, item];
+  };
+
+  let gallery = [];
+  gallery = addImage(gallery, {
+    id: 'main-image',
+    src: getProductBaseImage(product) || getPremiumImage(product),
+    thumb: getImageSrc(product?.thumbnail, 'thumbnail') || getProductBaseImage(product) || getPremiumImage(product),
+    label: product.name,
+    size: '',
+    variantId: '',
+  });
+
+  parseProductImages(product.images).forEach((image, index) => {
+    gallery = addImage(gallery, {
+      id: `gallery-${index}`,
+      src: getImageSrc(image),
+      thumb: getImageSrc(image, 'thumbnail'),
+      label: `${product.name} view ${index + 1}`,
+      size: '',
+      variantId: '',
+    });
+  });
+
+  (product.variants || []).forEach((variant) => {
+    const src = getVariantImage(variant);
+    gallery = addImage(gallery, {
+      id: `variant-${variant.id || `${variant.color || 'colour'}-${variant.size || 'size'}`}`,
+      src,
+      thumb: getImageSrc(variant.image_url, 'thumbnail') || src,
+      label: [variant.color, variant.size].filter(Boolean).join(' / ') || product.name,
+      size: variant.size || '',
+      variantId: variant.id || '',
+    });
+  });
+
+  return gallery;
+};
+
 const ProductDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -49,6 +111,7 @@ const ProductDetail = () => {
   const [loadError, setLoadError] = useState('');
   
   const [selectedSize, setSelectedSize] = useState('');
+  const [selectedImage, setSelectedImage] = useState('');
 
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -163,6 +226,7 @@ const ProductDetail = () => {
 
         const uniqueSizes = sortSizes(finalVariants.map(v => v.size));
         setSelectedSize(uniqueSizes[0] || '');
+        setSelectedImage(getProductBaseImage(p) || getPremiumImage(p));
 
         setProduct(p);
         setRelated(rel);
@@ -172,16 +236,17 @@ const ProductDetail = () => {
     fetchProduct();
   }, [slug]);
 
-  const currentVariant = product?.variants?.find(v => v.size === selectedSize);
+  const galleryImages = buildProductGallery(product);
+  const currentVariant = product?.variants?.find(v => (
+    v.size === selectedSize &&
+    (!selectedImage || getVariantImage(v) === selectedImage)
+  )) || product?.variants?.find(v => v.size === selectedSize);
 
   const unitPrice = product
     ? parseFloat(product.price) + parseFloat(currentVariant?.price_modifier || 0)
     : 0;
 
-  const currentDisplayImage =
-    product?.thumbnail_optimized ||
-    getImageSrc(product?.thumbnail) ||
-    product?.thumbnail;
+  const currentDisplayImage = selectedImage || galleryImages[0]?.src || getProductBaseImage(product) || getPremiumImage(product);
 
   const buildPayload = () => ({
     productId: product?.id,
@@ -195,6 +260,21 @@ const ProductDetail = () => {
     brandName: product?.brand_name,
     variantValue: selectedSize
   });
+
+  const handleSizeSelect = (size) => {
+    setSelectedSize(size);
+    const variantForSize = product?.variants?.find(v => v.size === size && getVariantImage(v));
+    if (variantForSize) {
+      setSelectedImage(getVariantImage(variantForSize));
+    }
+  };
+
+  const handleImageSelect = (image) => {
+    setSelectedImage(image.src);
+    if (image.size) {
+      setSelectedSize(image.size);
+    }
+  };
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -310,7 +390,7 @@ const ProductDetail = () => {
                           key={size}
                           type="button"
                           disabled={isOutOfStock}
-                          onClick={() => setSelectedSize(size)}
+                          onClick={() => handleSizeSelect(size)}
                           title={isOutOfStock ? 'Out of stock' : undefined}
                           className={`w-12 h-12 flex items-center justify-center text-[10px] font-bold border transition-all ${
                             isOutOfStock ? 'opacity-40 cursor-not-allowed line-through bg-navy-900 text-white/30 border-gold-600/10' :
@@ -320,6 +400,44 @@ const ProductDetail = () => {
                           }`}
                         >
                           {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {galleryImages.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-[10px] uppercase tracking-widest font-bold text-gold-500">Product Images</h3>
+                  <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2">
+                    {galleryImages.map((image) => {
+                      const isSelected = currentDisplayImage === image.src;
+
+                      return (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => handleImageSelect(image)}
+                          aria-label={`View ${image.label}`}
+                          className={`relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden bg-white border-2 transition-all ${
+                            isSelected
+                              ? 'border-green-500 shadow-lg shadow-green-500/20'
+                              : 'border-gold-600/20 hover:border-gold-500'
+                          }`}
+                        >
+                          <img
+                            src={image.thumb || image.src}
+                            alt={image.label}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                          />
+                          {isSelected && (
+                            <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-[11px] font-bold text-white">
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                          )}
                         </button>
                       );
                     })}
