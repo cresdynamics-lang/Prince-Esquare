@@ -22,6 +22,13 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const menuItems = [
     {
       name: 'Polo T-shirts',
@@ -118,7 +125,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-500 ${scrolled ? 'py-4 glass shadow-2xl' : 'py-8 bg-transparent'}`}>
+    <nav className={`fixed w-full z-[80] transition-all duration-500 ${scrolled ? 'py-4 glass shadow-2xl' : 'py-8 bg-transparent'}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
         {/* Mobile Menu Button */}
         <button onClick={() => setIsOpen(!isOpen)} className="xl:hidden text-gold-400">
@@ -238,14 +245,14 @@ const Navbar = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 xl:hidden"
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[90] xl:hidden"
             />
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-[84%] max-w-sm z-40 xl:hidden bg-navy-950 border-r border-gold-500/10 p-8 pt-24 overflow-y-auto custom-scrollbar"
+              className="fixed inset-y-0 left-0 h-dvh w-[88%] max-w-sm z-[100] xl:hidden bg-navy-950 border-r border-gold-500/10 p-6 pt-24 overflow-y-auto overscroll-contain custom-scrollbar shadow-2xl"
             >
               <div className="flex flex-col space-y-4 pb-16">
                 {menuItems.map((item) => (

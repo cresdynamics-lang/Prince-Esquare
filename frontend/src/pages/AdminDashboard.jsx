@@ -128,8 +128,10 @@ const AdminDashboard = () => {
     }
   };
 
+  const isMobileMenuVisible = isMobileNavOpen;
+
   return (
-    <div className="flex h-screen bg-navy-950 text-gold-50 font-sans overflow-hidden">
+    <div className="flex h-dvh bg-navy-950 text-gold-50 font-sans overflow-hidden">
       {isMobileNavOpen && (
         <button
           type="button"
@@ -142,7 +144,7 @@ const AdminDashboard = () => {
       {/* Sidebar */}
       <aside 
         className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
+          isSidebarOpen ? 'w-72 lg:w-64' : 'w-72 lg:w-20'
         } fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 bg-navy-900/95 lg:bg-navy-900/50 border-r border-gold-500/10 transition-all duration-300 flex flex-col backdrop-blur-xl ${
           isMobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
@@ -220,7 +222,7 @@ const AdminDashboard = () => {
               onClick={toggleSidebar}
               className="p-2 text-gold-500/60 hover:text-gold-500 transition-colors bg-navy-800/50 rounded-lg border border-gold-500/10 shrink-0"
             >
-              {(isMobileNavOpen || isSidebarOpen) ? <X size={20} /> : <Menu size={20} />}
+              {(isMobileMenuVisible || (isSidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 1024)) ? <X size={20} /> : <Menu size={20} />}
             </button>
             <div className="hidden sm:block h-8 w-[1px] bg-gold-500/10 mx-1 sm:mx-2" />
             <div className="flex flex-col min-w-0">
@@ -234,7 +236,7 @@ const AdminDashboard = () => {
           <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             <div className="hidden md:flex items-center gap-2 bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl focus-within:border-gold-500/30 transition-all">
               <Search size={18} className="text-gold-500/40" />
-              <input 
+              <input
                 type="text" 
                 placeholder="Search anything..." 
                 className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/30 w-64"
@@ -261,6 +263,7 @@ const AdminDashboard = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
+              className="min-w-0"
             >
               {renderContent()}
             </motion.div>
@@ -473,13 +476,13 @@ const OrdersView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex gap-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
           {['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'].map((f) => (
-            <button 
+            <button
               key={f} 
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+              className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
                 filter === f 
                   ? 'bg-gold-600 text-navy-950 border-gold-600' 
                   : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
@@ -502,7 +505,8 @@ const OrdersView = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
           </div>
         ) : filteredOrders.length > 0 ? (
-          <table className="w-full text-left">
+          <AdminTable>
+          <table className="w-full min-w-[900px] text-left">
             <thead className="bg-navy-800/50">
               <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
                 <th className="px-6 py-4">Order ID</th>
@@ -548,6 +552,7 @@ const OrdersView = () => {
               ))}
             </tbody>
           </table>
+          </AdminTable>
         ) : (
           <div className="py-24 text-center text-gold-500/40 text-sm">
             No orders found matching this criteria.
@@ -1911,7 +1916,7 @@ const ProductsView = () => {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     {displaySizeOptions.map((size) => {
                       const row = formData.sizeRows.find((item) => item.size === size);
                       return (
@@ -1932,7 +1937,7 @@ const ProductsView = () => {
                           </label>
 
                           {row && (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 gap-2">
                               <div className="space-y-1">
                                 <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Stock</label>
                                 <input
@@ -1940,16 +1945,6 @@ const ProductsView = () => {
                                   min="0"
                                   value={row.stock}
                                   onChange={(e) => handleSizeChange(size, 'stock', e.target.value)}
-                                  className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price +</label>
-                                <input
-                                  type="number"
-                                  placeholder="0"
-                                  value={row.price_override}
-                                  onChange={(e) => handleSizeChange(size, 'price_override', e.target.value)}
                                   className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
                                 />
                               </div>
