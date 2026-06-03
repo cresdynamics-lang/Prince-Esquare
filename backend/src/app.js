@@ -54,6 +54,7 @@ app.use('/api/admin/customers', require('./routes/customerRoutes'));
 app.use('/api/admin/dashboard', require('./routes/analyticsRoutes'));
 app.use('/api/admin/settings', require('./routes/settingsRoutes'));
 app.use('/api/admin/subscribers', require('./controllers/newsletterController').adminGetSubscribers);
+app.use('/api/admin/inventory', require('./routes/adminInventoryRoutes'));
 
 // Root route
 app.get('/', (req, res) => {

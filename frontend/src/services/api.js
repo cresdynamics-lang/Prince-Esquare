@@ -159,4 +159,26 @@ export const adminUploadAPI = {
   }),
 };
 
+// ── ADMIN – INVENTORY ─────────────────────────────────────────────────
+export const adminInventoryAPI = {
+  // Shops
+  getShops: () => API.get('/admin/inventory/shops'),
+  createShop: (data) => API.post('/admin/inventory/shops', data),
+  updateShop: (id, data) => API.put(`/admin/inventory/shops/${id}`, data),
+  deleteShop: (id) => API.delete(`/admin/inventory/shops/${id}`),
+
+  // Stock movements
+  setOpeningStock: (data) => API.post('/admin/inventory/opening-stock', data),
+  recordSales: (data) => API.post('/admin/inventory/sales', data),
+  recordStockIn: (data) => API.post('/admin/inventory/stock-in', data),
+  recordStockOut: (data) => API.post('/admin/inventory/stock-out', data),
+  transfer: (data) => API.post('/admin/inventory/transfer', data),
+
+  // Reports
+  getSummary: (params) => API.get('/admin/inventory/summary', { params }),
+  getMovements: (params) => API.get('/admin/inventory/movements', { params }),
+  getCurrentStock: (params) => API.get('/admin/inventory/current-stock', { params }),
+  getTransfers: () => API.get('/admin/inventory/transfers'),
+};
+
 export default API;

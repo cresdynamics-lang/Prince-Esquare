@@ -7,8 +7,10 @@ import {
   ArrowUpRight, ArrowDownRight, MoreVertical, Plus, 
   Download, Filter, CheckCircle2, AlertCircle, Clock, 
   UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight,
-  Phone, Globe, Truck, CreditCard, CreditCard as CardIcon
+  Phone, Globe, Truck, CreditCard, CreditCard as CardIcon,
+  Warehouse
 } from 'lucide-react';
+import InventoryView from '../components/admin/InventoryView';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { 
@@ -620,6 +622,37 @@ const buildSeries = (orders, period) => {
 };
 
 const FinanceView = () => {
+  const [financeTab, setFinanceTab] = useState('finance');
+
+  return (
+    <div className="space-y-6">
+      {/* Finance sub-tabs */}
+      <div className="flex gap-2 border-b border-gold-500/10 pb-4">
+        {[
+          { id: 'finance', label: 'Finance Overview', icon: CardIcon },
+          { id: 'inventory', label: 'Inventory Management', icon: Warehouse },
+        ].map(t => (
+          <button key={t.id} onClick={() => setFinanceTab(t.id)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+              financeTab === t.id
+                ? 'bg-gold-600 text-navy-950 border-gold-600'
+                : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
+            }`}>
+            <t.icon size={14} /> {t.label}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div key={financeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+          {financeTab === 'inventory' ? <InventoryView /> : <FinanceOverview />}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const FinanceOverview = () => {
   const [period, setPeriod] = useState('daily');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
