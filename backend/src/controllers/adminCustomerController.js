@@ -6,7 +6,8 @@ exports.getCustomers = async (req, res, next) => {
     try {
         const result = await db.query(
             `SELECT 
-                u.id, u.name, u.email, u.avatar, u.role, u.is_verified, u.created_at,
+                u.id, u.name, u.email, u.phone, u.avatar, u.role,
+                u.is_verified, COALESCE(u.is_active, true) AS is_active, u.created_at,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE user_id = u.id AND status != 'cancelled') as total_spent
              FROM users u
              WHERE u.role = $1 
@@ -49,18 +50,24 @@ exports.getCustomerDetail = async (req, res, next) => {
 
 exports.updateCustomerStatus = async (req, res, next) => {
     const { id } = req.params;
-    const { is_verified } = req.body;
+    const { is_active } = req.body;
+    if (typeof is_active !== 'boolean') {
+        return formatResponse(res, 400, false, 'is_active must be a boolean');
+    }
     try {
         const result = await db.query(
-            'UPDATE users SET is_verified = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, is_verified',
-            [is_verified, id]
+            `UPDATE users
+             SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2
+             RETURNING id, name, email, role, COALESCE(is_active, true) AS is_active`,
+            [is_active, id]
         );
 
         if (result.rows.length === 0) {
-            return formatResponse(res, 404, false, 'Customer not found');
+            return formatResponse(res, 404, false, 'User not found');
         }
 
-        formatResponse(res, 200, true, 'Customer status updated', result.rows[0]);
+        formatResponse(res, 200, true, 'Account status updated', result.rows[0]);
     } catch (error) {
         next(error);
     }

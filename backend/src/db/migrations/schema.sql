@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS daily_stock_summaries (
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL,
     shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    date DATE NOT NULL UNIQUE,
+    date DATE NOT NULL,
     opening_stock INTEGER NOT NULL DEFAULT 0,
     sales INTEGER NOT NULL DEFAULT 0,
     stock_in INTEGER NOT NULL DEFAULT 0,

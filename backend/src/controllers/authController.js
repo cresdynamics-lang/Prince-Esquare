@@ -21,12 +21,14 @@ exports.register = async (req, res, next) => {
 
         // Create user
         const newUser = await db.query(
-            'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+            `INSERT INTO users (name, email, password, role, is_active)
+             VALUES ($1, $2, $3, $4, true)
+             RETURNING id, name, email, role, COALESCE(is_active, true) AS is_active`,
             [name, email, hashedPassword, 'customer']
         );
 
         const user = newUser.rows[0];
-        const token = signToken(user.id);
+        const token = signToken({ id: user.id, role: user.role, fullName: user.name, accountType: 'user' });
 
         formatResponse(res, 201, true, 'User registered successfully', {
             user,
@@ -51,7 +53,11 @@ exports.login = async (req, res, next) => {
             return formatResponse(res, 401, false, 'Invalid email or password');
         }
 
-        const token = signToken(user.id);
+        if (user.is_active === false) {
+            return formatResponse(res, 403, false, 'Your account has been suspended. Please contact support.');
+        }
+
+        const token = signToken({ id: user.id, role: user.role, fullName: user.name, accountType: 'user' });
 
         // Remove password from response
         delete user.password;
@@ -78,11 +84,16 @@ exports.adminLogin = async (req, res, next) => {
             return formatResponse(res, 401, false, 'Invalid credentials');
         }
 
-        const token = signToken(user.id);
+        const token = signToken({
+            id: user.id,
+            role: user.role,
+            fullName: user.name,
+            accountType: 'user',
+        });
         delete user.password;
 
         formatResponse(res, 200, true, 'Admin login successful', {
-            admin: user,
+            admin: { ...user, fullName: user.name },
             token
         });
     } catch (error) {

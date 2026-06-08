@@ -1,73 +1,13 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-
-const dummyCategories = [
-  {
-    title: 'The Shoe Atelier',
-    subtitle: 'Premium Italian Craftsmanship',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
-    span: 'md:col-span-1 md:row-span-2',
-    category: 'shoes',
-  },
-  {
-    title: 'Luxury Tracksuits',
-    subtitle: 'Prada & Zegna Collections',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'tracksuits',
-  },
-  {
-    title: 'Executive Shirts',
-    subtitle: 'The Presidential Series',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'shirts',
-  },
-  {
-    title: 'Tailored Essentials',
-    subtitle: 'Dockers & Smart Trousers',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.20 PM.jpeg',
-    span: 'md:col-span-2 md:row-span-1',
-    category: 'trousers',
-  },
-  {
-    title: 'The Polo Salon',
-    subtitle: 'Six Shades of Weekend Elegance',
-    image: '/polo light blue.jpeg',
-    span: 'md:col-span-2 md:row-span-1',
-    category: 'polo-t-shirts',
-    path: '/polo-t-shirts',
-  },
-  {
-    title: 'Outerwear Gallery',
-    subtitle: 'Layered Jackets & Half Jackets',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.33 PM.jpeg',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'jackets',
-  },
-  {
-    title: 'Leisure House',
-    subtitle: 'Relaxed Luxury for Off-Duty Hours',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'track-suits',
-  },
-  {
-    title: 'The Finishing Room',
-    subtitle: 'Belts, Ties & Final Details',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg',
-    span: 'md:col-span-2 md:row-span-1',
-    category: 'belts-ties',
-  },
-];
+import { CATEGORY_TILES } from '../data/homepageContent';
 
 const CategoryGrid = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Preload category images for smooth loading
-    dummyCategories.forEach((cat) => {
+    CATEGORY_TILES.forEach((cat) => {
       const img = new Image();
       img.src = cat.image;
     });
@@ -91,6 +31,7 @@ const CategoryGrid = () => {
           </motion.div>
           <motion.button
             whileHover={{ scale: 1.05 }}
+            type="button"
             onClick={() => navigate('/products')}
             className="text-gold-400 border-b border-gold-400/30 pb-2 uppercase text-[10px] tracking-[0.2em] font-bold hover:text-gold-200 hover:border-gold-200 transition-all"
           >
@@ -99,7 +40,7 @@ const CategoryGrid = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 auto-rows-[360px] md:auto-rows-[260px] gap-8">
-          {dummyCategories.map((cat, index) => (
+          {CATEGORY_TILES.map((cat, index) => (
             <motion.div
               key={cat.title}
               initial={{ opacity: 0, scale: 0.98 }}
@@ -109,12 +50,12 @@ const CategoryGrid = () => {
               className={`relative min-h-[360px] md:min-h-0 overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
               onClick={() => navigate(cat.path || `/products?category=${cat.category}`)}
             >
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center transition-transform duration-[1.5s] group-hover:scale-110"
                 style={{ backgroundImage: `url('${cat.image}')` }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-navy-950/95 via-navy-950/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-700" />
-              
+
               <div className="absolute bottom-10 left-10 right-10 transition-transform duration-700 transform group-hover:-translate-y-4">
                 <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold block mb-4 opacity-80">{cat.subtitle}</span>
                 <h3 className="text-3xl font-serif text-white uppercase tracking-wider mb-6 leading-tight">{cat.title}</h3>

@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
-const { protect } = require('../middleware/auth');
+const { protect, optionalAuth } = require('../middleware/auth');
+
+router.post('/guest', orderController.createGuestOrder);
+router.get('/checkout/:id', optionalAuth, orderController.getCheckoutOrder);
 
 router.use(protect);
 

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
@@ -28,14 +28,33 @@ const NoIndexPage = ({ title, children }) => (
 );
 
 function App() {
+  const [authHydrated, setAuthHydrated] = useState(
+    () => useAuthStore.persist?.hasHydrated?.() ?? true
+  );
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (useAuthStore.getState().isAuthenticated) {
-        useCartStore.getState().loadCart();
-      }
-    }, 0);
-    return () => clearTimeout(t);
+    const done = () => setAuthHydrated(true);
+    if (useAuthStore.persist?.hasHydrated?.()) {
+      setAuthHydrated(true);
+    } else {
+      const unsub = useAuthStore.persist?.onFinishHydration?.(done);
+      useAuthStore.persist?.rehydrate?.();
+      return unsub;
+    }
+    return undefined;
   }, []);
+
+  useEffect(() => {
+    if (!authHydrated) return;
+    const { isAuthenticated, isSeller, token } = useAuthStore.getState();
+    if (isAuthenticated && token && !isSeller) {
+      useCartStore.getState().loadCart();
+    }
+  }, [authHydrated]);
+
+  if (!authHydrated) {
+    return <div className="min-h-screen bg-navy-950" aria-busy="true" />;
+  }
 
   return (
     <Router>
@@ -56,7 +75,12 @@ function App() {
         <Route path="/payment/:orderId" element={<NoIndexPage title="Payment"><Payment /></NoIndexPage>} />
         <Route path="/profile" element={<NoIndexPage title="Profile"><Profile /></NoIndexPage>} />
 
-        {/* Admin Routes */}
+        {/* Legacy POS URLs → unified staff portal */}
+        <Route path="/pos/login" element={<Navigate to="/admin/login" replace />} />
+        <Route path="/pos" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/pos/shift-summary" element={<Navigate to="/admin/dashboard" replace />} />
+
+        {/* Staff portal — admin, staff & sellers */}
         <Route path="/admin/login" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
         <Route path="/admin/dashboard" element={<NoIndexPage title="Admin Dashboard"><AdminDashboard /></NoIndexPage>} />
         <Route path="/admin" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />

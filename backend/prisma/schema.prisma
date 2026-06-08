@@ -211,3 +211,187 @@ model wishlist {
 
   @@unique([user_id, product_id])
 }
+
+// ── POS & Inventory (prefixed tables: pos_*) ─────────────────────────────
+
+enum PosRole {
+  ADMIN
+  SELLER
+}
+
+enum PosMovementType {
+  STOCK_IN
+  STOCK_OUT
+  SALE_POS
+  SALE_ONLINE
+  VOID
+  ADJUSTMENT
+}
+
+enum PosChannel {
+  POS
+  ONLINE
+}
+
+enum PosPaymentMethod {
+  CASH
+  MPESA
+  ONLINE
+}
+
+model PosProfile {
+  id           String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  full_name    String          @db.VarChar(255)
+  email        String          @unique @db.VarChar(255)
+  password_hash String         @db.VarChar(255)
+  role         PosRole         @default(SELLER)
+  is_active    Boolean         @default(true)
+  created_at   DateTime        @default(now()) @db.Timestamp(6)
+  shifts       PosShift[]
+  sales        PosSale[]       @relation("SellerSales")
+  voided_sales PosSale[]       @relation("VoidedSales")
+  movements    PosStockMovement[]
+  audit_logs   PosAuditLog[]
+
+  @@map("pos_profiles")
+}
+
+model PosProduct {
+  id                  String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                String                 @db.VarChar(255)
+  sku                 String?                @unique @db.VarChar(100)
+  category            String?                @db.VarChar(100)
+  shop_price          Decimal                @db.Decimal(10, 2)
+  online_price        Decimal?               @db.Decimal(10, 2)
+  low_stock_threshold Int                    @default(5)
+  created_at          DateTime               @default(now()) @db.Timestamp(6)
+  variants            PosProductVariant[]
+  stock_level         PosStockLevel?
+  movements           PosStockMovement[]
+  snapshots           PosDailyStockSnapshot[]
+  sale_items          PosSaleItem[]
+
+  @@map("pos_products")
+}
+
+model PosProductVariant {
+  id          String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id  String             @db.Uuid
+  product     PosProduct         @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  size        String?            @db.VarChar(50)
+  color       String?            @db.VarChar(50)
+  sku_variant String?            @unique @db.VarChar(100)
+  created_at  DateTime           @default(now()) @db.Timestamp(6)
+  sale_items  PosSaleItem[]
+  movements   PosStockMovement[]
+
+  @@map("pos_product_variants")
+}
+
+model PosStockLevel {
+  id          String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id  String     @unique @db.Uuid
+  product     PosProduct @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  current_qty Int        @default(0)
+  updated_at  DateTime   @updatedAt @db.Timestamp(6)
+
+  @@map("pos_stock_levels")
+}
+
+model PosStockMovement {
+  id            String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id    String              @db.Uuid
+  product       PosProduct          @relation(fields: [product_id], references: [id])
+  variant_id    String?             @db.Uuid
+  variant       PosProductVariant?  @relation(fields: [variant_id], references: [id], onDelete: SetNull)
+  movement_type PosMovementType
+  qty           Int
+  date          DateTime            @default(now()) @db.Date
+  recorded_by   String?             @db.Uuid
+  recorder      PosProfile?         @relation(fields: [recorded_by], references: [id])
+  notes         String?
+  created_at    DateTime            @default(now()) @db.Timestamp(6)
+
+  @@map("pos_stock_movements")
+}
+
+model PosDailyStockSnapshot {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  product_id    String     @db.Uuid
+  product       PosProduct @relation(fields: [product_id], references: [id])
+  date          DateTime   @db.Date
+  opening_qty   Int        @default(0)
+  stock_in_qty  Int        @default(0)
+  stock_out_qty Int        @default(0)
+  sales_qty     Int        @default(0)
+  closing_qty   Int        @default(0)
+
+  @@unique([product_id, date])
+  @@map("pos_daily_stock_snapshots")
+}
+
+model PosShift {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  seller_id   String    @db.Uuid
+  seller      PosProfile @relation(fields: [seller_id], references: [id])
+  clock_in    DateTime  @default(now()) @db.Timestamp(6)
+  clock_out   DateTime? @db.Timestamp(6)
+  total_cash  Decimal   @default(0) @db.Decimal(10, 2)
+  total_mpesa Decimal   @default(0) @db.Decimal(10, 2)
+  total_sales Decimal   @default(0) @db.Decimal(10, 2)
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  sales       PosSale[]
+
+  @@map("pos_shifts")
+}
+
+model PosSale {
+  id              String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  receipt_number  String            @unique @db.VarChar(50)
+  shift_id        String?           @db.Uuid
+  shift           PosShift?         @relation(fields: [shift_id], references: [id])
+  seller_id       String?           @db.Uuid
+  seller          PosProfile?       @relation("SellerSales", fields: [seller_id], references: [id])
+  channel         PosChannel
+  payment_method  PosPaymentMethod
+  mpesa_ref       String?           @db.VarChar(50)
+  discount_amount Decimal           @default(0) @db.Decimal(10, 2)
+  total_amount    Decimal           @db.Decimal(10, 2)
+  is_voided       Boolean           @default(false)
+  void_reason     String?
+  voided_by       String?           @db.Uuid
+  voider          PosProfile?       @relation("VoidedSales", fields: [voided_by], references: [id])
+  voided_at       DateTime?         @db.Timestamp(6)
+  created_at      DateTime          @default(now()) @db.Timestamp(6)
+  items           PosSaleItem[]
+
+  @@map("pos_sales")
+}
+
+model PosSaleItem {
+  id         String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sale_id    String              @db.Uuid
+  sale       PosSale             @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+  product_id String              @db.Uuid
+  product    PosProduct          @relation(fields: [product_id], references: [id])
+  variant_id String?             @db.Uuid
+  variant    PosProductVariant?  @relation(fields: [variant_id], references: [id], onDelete: SetNull)
+  qty        Int
+  unit_price Decimal             @db.Decimal(10, 2)
+  subtotal   Decimal             @db.Decimal(10, 2)
+
+  @@map("pos_sale_items")
+}
+
+model PosAuditLog {
+  id           String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  action       String      @db.VarChar(100)
+  entity       String?     @db.VarChar(100)
+  entity_id    String?     @db.Uuid
+  performed_by String?     @db.Uuid
+  performer    PosProfile? @relation(fields: [performed_by], references: [id])
+  details      Json?
+  created_at   DateTime    @default(now()) @db.Timestamp(6)
+
+  @@map("pos_audit_logs")
+}

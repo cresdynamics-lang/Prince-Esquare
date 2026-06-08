@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Package, ShoppingBag, Tag, Award, Users, 
@@ -8,11 +8,16 @@ import {
   Download, Filter, CheckCircle2, AlertCircle, Clock, 
   UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight,
   Phone, Globe, Truck, CreditCard, CreditCard as CardIcon,
-  Warehouse
+  Warehouse,
+  Store
 } from 'lucide-react';
-import InventoryView from '../components/admin/InventoryView';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
+import PosInventoryHub from '../components/admin/pos/PosInventoryHub';
+import { AdminPosTerminalInfo, PosSalesView } from '../components/admin/pos/PosAdminViews';
+import PosTerminalView from '../components/pos/PosTerminalView';
+import ShiftSummaryView from '../components/pos/ShiftSummaryView';
+import { posAdminAPI } from '../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthStore, isStaffSession } from '../store/useAuthStore';
 import { 
   adminAnalyticsAPI, 
   adminOrderAPI, 
@@ -25,10 +30,27 @@ import {
   adminNewsletterAPI,
   adminReviewAPI,
   adminSettingsAPI,
-  adminUploadAPI
+  adminUploadAPI,
+  posAPI,
 } from '../services/api';
 import { useEffect } from 'react';
-import { getUploadUrl, getImageSrc, parseProductImages, toImageJson } from '../utils/cloudinary';
+import {
+  getUploadUrl,
+  getImageSrc,
+  parseProductImages,
+  toImageJson,
+  resolveDisplayImageUrl,
+  revokeBlobUrl,
+  isBlobUrl,
+} from '../utils/cloudinary';
+import { ensureSocket, disconnectSocket } from '../lib/socket';
+import {
+  newColorGroup,
+  newSizeRow,
+  flattenColorGroups,
+  buildColorGroupsFromVariants,
+  getSizeOptionsForCategory,
+} from '../utils/inventoryVariants';
 
 /** Scrollable table wrapper for mobile */
 const AdminTable = ({ children }) => (
@@ -36,31 +58,49 @@ const AdminTable = ({ children }) => (
 );
 
 const AdminDashboard = () => {
-  const [activeSection, setActiveSection] = useState('dashboard');
+  const location = useLocation();
+  const [activeSection, setActiveSection] = useState(() =>
+    useAuthStore.getState().isSeller ? 'pos-terminal' : 'dashboard'
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [shiftSummary, setShiftSummary] = useState(null);
   const navigate = useNavigate();
   const logout = useAuthStore(state => state.logout);
-  const { user, isAuthenticated, isAdmin } = useAuthStore();
+  const authState = useAuthStore();
+  const { user, isAuthenticated, isAdmin, isSeller } = authState;
+  const staffSession = isStaffSession(authState);
+  const [authReady, setAuthReady] = useState(
+    () => useAuthStore.persist?.hasHydrated?.() ?? true
+  );
 
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin) {
-      navigate('/admin/login');
+    const done = () => setAuthReady(true);
+    if (useAuthStore.persist?.hasHydrated?.()) {
+      setAuthReady(true);
+      return undefined;
     }
-  }, [isAuthenticated, isAdmin, navigate]);
+    const unsub = useAuthStore.persist?.onFinishHydration?.(done);
+    useAuthStore.persist?.rehydrate?.();
+    return unsub;
+  }, []);
 
-  if (!isAuthenticated || !isAdmin) return null;
+  useEffect(() => {
+    if (!authReady) return;
+    if (!staffSession) {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [authReady, staffSession, navigate]);
 
-  const handleLogout = async () => {
-    try {
-      // Optional: call backend logout
-      // await adminAuthAPI.logout(); 
-    } catch (e) {}
-    logout();
-    navigate('/admin/login');
-  };
+  useEffect(() => {
+    if (location.state?.shiftSummary) {
+      setShiftSummary(location.state.shiftSummary);
+      setActiveSection('pos-terminal');
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
-  const allSidebarItems = [
+  const allSidebarItems = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
@@ -69,50 +109,125 @@ const AdminDashboard = () => {
     { id: 'coupons', label: 'Coupons', icon: Ticket, section: 'Marketing' },
     { id: 'banners', label: 'Banners', icon: ImageIcon, section: 'Marketing' },
     { id: 'newsletter', label: 'Newsletter', icon: Mail, section: 'Marketing' },
-    { id: 'finance', label: 'Finance', icon: CardIcon, section: 'Finance' },
     { id: 'reviews', label: 'Reviews', icon: Star, section: 'Finance', badge: '5' },
-    { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
-  ];
+    { id: 'pos-inventory', label: 'POS & Inventory', icon: Warehouse, section: 'POS & Inventory' },
+    { id: 'pos-terminal', label: 'POS Terminal', icon: Store, section: 'POS & Inventory' },
+    { id: 'settings', label: 'Store Settings', icon: Settings, section: 'System' },
+  ], []);
 
-  const sidebarItems = allSidebarItems.filter(item => {
-    if (user?.role === 'admin') return true;
-    if (user?.role === 'staff') {
-      const perms = Array.isArray(user.permissions) ? user.permissions : [];
-      return perms.includes(item.id);
-    }
-    return false;
-  });
+  const sellerSidebarItems = useMemo(() => [
+    { id: 'pos-terminal', label: 'POS Terminal', icon: Store, section: 'Shop' },
+    { id: 'pos-sales', label: 'POS Sales', icon: Package, section: 'Shop' },
+    { id: 'orders', label: 'Online Orders', icon: ShoppingBag, section: 'Shop' },
+  ], []);
 
-  // Redirect to first available section if current activeSection is not permitted
+  const sidebarItems = useMemo(() => {
+    const staffHasPosAccess = (perms) =>
+      perms.includes('pos-inventory') ||
+      perms.includes('finance') ||
+      perms.includes('inventory') ||
+      perms.some((p) => p.startsWith('pos-'));
+
+    const items = isSeller ? sellerSidebarItems : allSidebarItems;
+    return items.filter((item) => {
+      if (isSeller) return true;
+      if (user?.role === 'admin') return true;
+      if (user?.role === 'staff') {
+        const perms = Array.isArray(user.permissions) ? user.permissions : [];
+        if (item.id === 'pos-inventory' || item.id === 'pos-terminal') return staffHasPosAccess(perms);
+        return perms.includes(item.id);
+      }
+      return false;
+    });
+  }, [isSeller, user, allSidebarItems, sellerSidebarItems]);
+
+  useEffect(() => {
+    if (!authReady || !staffSession) return undefined;
+    ensureSocket();
+    return undefined;
+  }, [authReady, staffSession]);
+
   useEffect(() => {
     if (user?.role === 'staff' && sidebarItems.length > 0) {
-      if (!sidebarItems.find(i => i.id === activeSection)) {
+      if (!sidebarItems.find((i) => i.id === activeSection)) {
         setActiveSection(sidebarItems[0].id);
       }
     }
   }, [user, sidebarItems, activeSection]);
 
+  if (!authReady || !staffSession) return null;
+
+  const handleLogout = async () => {
+    try {
+      // Optional: call backend logout
+      // await adminAuthAPI.logout(); 
+    } catch (e) {}
+    disconnectSocket();
+    logout();
+    navigate('/admin/login');
+  };
+
+  const staffHasPosAccess = (perms) =>
+    perms.includes('pos-inventory') ||
+    perms.includes('finance') ||
+    perms.includes('inventory') ||
+    perms.some((p) => p.startsWith('pos-'));
+
+  const navSections = [...new Set(sidebarItems.map((item) => item.section))];
+
   const renderContent = () => {
     // Basic protection inside renderContent as well
     if (user?.role === 'staff') {
       const perms = Array.isArray(user.permissions) ? user.permissions : [];
-      if (!perms.includes(activeSection)) {
+      const allowed =
+        perms.includes(activeSection) ||
+        ((activeSection === 'pos-inventory' || activeSection === 'pos-terminal') && staffHasPosAccess(perms));
+      if (!allowed) {
         return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
       }
     }
 
     switch (activeSection) {
-      case 'dashboard': return <DashboardView />;
-      case 'orders': return <OrdersView />;
+      case 'dashboard':
+        if (isSeller) return null;
+        return <DashboardView onOpenPos={() => setActiveSection('pos-inventory')} />;
+      case 'orders': return <OrdersView readOnly={isSeller} />;
+      case 'pos-sales': return <PosSalesView channel="POS" readOnly={isSeller} />;
       case 'products': return <ProductsView />;
       case 'customers': return <CustomersView />;
       case 'admins': return <AdminsView />;
       case 'coupons': return <CouponsView />;
       case 'banners': return <BannersView />;
       case 'newsletter': return <NewsletterView />;
-      case 'finance': return <FinanceView />;
+      case 'finance': return <PosInventoryHub initialTab="finance" />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
+      case 'pos-inventory': return <PosInventoryHub />;
+      case 'pos-terminal':
+        if (shiftSummary) {
+          return (
+            <ShiftSummaryView
+              embedded
+              summary={shiftSummary}
+              onDone={() => {
+                setShiftSummary(null);
+                logout();
+                navigate('/admin/login');
+              }}
+            />
+          );
+        }
+        if (isSeller) {
+          return <PosTerminalView embedded onClockOut={(summary) => setShiftSummary(summary)} />;
+        }
+        return (
+          <AdminPosTerminalInfo
+            onOpenInventory={(tab) => {
+              setActiveSection('pos-inventory');
+              if (tab) sessionStorage.setItem('pos-hub-tab', tab);
+            }}
+          />
+        );
       default: return <DashboardView />;
     }
   };
@@ -167,7 +282,7 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
-          {['Overview', 'Store', 'People', 'Marketing', 'Finance', 'System'].map((section) => (
+          {navSections.map((section) => (
             <div key={section} className="mb-6">
               {isSidebarOpen && (
                 <h3 className="px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-500/40 mb-2">
@@ -228,9 +343,12 @@ const AdminDashboard = () => {
             </button>
             <div className="hidden sm:block h-8 w-[1px] bg-gold-500/10 mx-1 sm:mx-2" />
             <div className="flex flex-col min-w-0">
-              <span className="text-[9px] sm:text-[10px] font-bold text-gold-500/40 uppercase tracking-widest truncate">Admin / Overview</span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-gold-500/40 uppercase tracking-widest truncate">
+                {isSeller ? 'Seller Portal' : 'Admin / Overview'}
+              </span>
               <h2 className="text-base sm:text-xl font-serif font-bold text-gold-100 capitalize truncate">
-                {activeSection.replace('-', ' ')}
+                {sidebarItems.find((i) => i.id === activeSection)?.label
+                  || (activeSection === 'pos-inventory' ? 'POS & Inventory' : activeSection.replace(/-/g, ' '))}
               </h2>
             </div>
           </div>
@@ -278,27 +396,24 @@ const AdminDashboard = () => {
 
 // --- Sub-views ---
 
-const DashboardView = () => {
+const DashboardView = ({ onOpenPos }) => {
   const [stats, setStats] = useState(null);
-  const [topProducts, setTopProducts] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
   const [salesData, setSalesData] = useState([]);
+  const [posOverview, setPosOverview] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [statsRes, topRes, lowStockRes, chartRes] = await Promise.all([
+        const [statsRes, chartRes, posRes] = await Promise.all([
           adminAnalyticsAPI.getStats(),
-          adminAnalyticsAPI.getTopProducts(),
-          adminAnalyticsAPI.getLowStock(),
-          adminAnalyticsAPI.getSalesChart()
+          adminAnalyticsAPI.getSalesChart(),
+          posAdminAPI.getOverview().catch(() => null),
         ]);
-        
+
         setStats(statsRes.data.data);
-        setTopProducts(topRes.data.data);
-        setLowStock(lowStockRes.data.data);
         setSalesData(chartRes.data.data);
+        if (posRes?.data?.data) setPosOverview(posRes.data.data);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -318,9 +433,9 @@ const DashboardView = () => {
   }
 
   const statCards = [
-    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard },
+    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard, detail: stats?.posRevenue != null ? `POS KSh ${Math.round(stats.posRevenue).toLocaleString()} + online` : null },
     { label: 'Total Profit', value: `KSh ${stats?.profit?.toLocaleString()}`, icon: Tag },
-    { label: 'Total Orders', value: stats?.orders || 0, icon: Package },
+    { label: 'Total Sales', value: stats?.orders || 0, icon: Package, detail: stats?.posSales != null ? `${stats.posSales} POS · ${stats.onlineOrders} online` : null },
     { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock },
   ];
 
@@ -350,101 +465,55 @@ const DashboardView = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Sales Chart Placeholder */}
-        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-           <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-            <h3 className="font-serif font-bold text-lg text-gold-100">Monthly Sales</h3>
-            <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Current Year</div>
-          </div>
-          <div className="p-8 h-64 flex items-end justify-between gap-2">
-             {salesData.length > 0 ? salesData.map((d, i) => (
-               <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                 <div className="relative w-full flex justify-center">
-                    <motion.div 
-                      initial={{ height: 0 }}
-                      animate={{ height: `${(d.total / Math.max(...salesData.map(s => s.total || 1))) * 100}%` }}
-                      className="w-8 bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-lg group-hover:from-gold-500 group-hover:to-gold-300 transition-all shadow-lg shadow-gold-600/10"
-                    />
-                    <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gold-600 text-navy-950 text-[10px] font-bold px-2 py-1 rounded pointer-events-none">
-                      KSh {parseInt(d.total).toLocaleString()}
-                    </div>
-                 </div>
-                 <span className="text-[10px] font-bold text-gold-500/30 uppercase tracking-widest">{d.label}</span>
-               </div>
-             )) : (
-               <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs uppercase tracking-widest">No sales data yet</div>
-             )}
-          </div>
-        </div>
-
-        {/* Top Products */}
-        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-          <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-            <h3 className="font-serif font-bold text-lg text-gold-100">Top Products</h3>
-            <button className="text-xs font-bold text-gold-500 hover:text-gold-400 transition-colors uppercase tracking-widest">Analytics</button>
-          </div>
-          <div className="p-6 space-y-6">
-            {topProducts.length > 0 ? topProducts.map((product, i) => (
-              <div key={i} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gold-200">{product.name}</span>
-                  <span className="text-gold-500/60 font-bold">{product.sales} units sold</span>
-                </div>
-                <div className="h-2 bg-navy-800 rounded-full overflow-hidden border border-gold-500/5">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(product.sales / (topProducts[0]?.sales || 1)) * 100}%` }}
-                    className="h-full bg-gradient-to-r from-gold-600 to-gold-400 rounded-full"
-                  />
-                </div>
-              </div>
-            )) : (
-              <div className="text-center py-12 text-gold-500/40 text-sm">No sales data yet</div>
+      {posOverview && (
+        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="font-serif font-bold text-lg text-gold-100">Shop POS & Inventory</h3>
+            {onOpenPos && (
+              <button type="button" onClick={onOpenPos} className="text-[10px] font-black uppercase tracking-widest bg-gold-600 text-navy-950 px-4 py-2 rounded-lg">
+                Open POS & Inventory
+              </button>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Low Stock Alerts */}
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertCircle size={20} className="text-red-400" />
-            <h3 className="font-serif font-bold text-lg text-gold-100">Low Stock Alerts</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              ['Today (shop)', `KSh ${Number(posOverview.kpis?.todayRevenue || 0).toLocaleString()}`],
+              ['This week', `KSh ${Number(posOverview.kpis?.weekRevenue || 0).toLocaleString()}`],
+              ['Active sellers', posOverview.kpis?.activeSellers ?? 0],
+              ['Low stock items', posOverview.lowStockItems?.length ?? 0],
+            ].map(([label, value]) => (
+              <div key={label} className="bg-navy-950/50 border border-gold-500/10 rounded-xl p-4">
+                <p className="text-[10px] text-gold-500/40 uppercase tracking-widest">{label}</p>
+                <p className="text-xl font-bold text-gold-300 mt-1">{value}</p>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em] border-b border-gold-500/10">
-                <th className="px-6 py-4">Product</th>
-                <th className="px-6 py-4">Stock</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {lowStock.length > 0 ? lowStock.map((item, i) => (
-                <tr key={i} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-gold-100">{item.name}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs font-bold ${item.stock === 0 ? 'text-red-500 bg-red-500/10' : 'text-red-400 bg-red-400/10'} px-2 py-1 rounded-lg`}>
-                      {item.stock} units left
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-gold-500 hover:text-gold-400 p-2 bg-navy-800/50 rounded-lg border border-gold-500/10 transition-all">
-                      <Plus size={16} />
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="3" className="px-6 py-12 text-center text-gold-500/40 text-sm">All products are well-stocked</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      )}
+
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+        <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
+          <h3 className="font-serif font-bold text-lg text-gold-100">Monthly Sales</h3>
+          <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Current Year</div>
+        </div>
+        <div className="p-8 h-64 flex items-end justify-between gap-2">
+          {salesData.length > 0 ? salesData.map((d, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+              <div className="relative w-full flex justify-center">
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${(d.total / Math.max(...salesData.map(s => s.total || 1))) * 100}%` }}
+                  className="w-8 bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-lg group-hover:from-gold-500 group-hover:to-gold-300 transition-all shadow-lg shadow-gold-600/10"
+                />
+                <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gold-600 text-navy-950 text-[10px] font-bold px-2 py-1 rounded pointer-events-none">
+                  KSh {parseInt(d.total).toLocaleString()}
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-gold-500/30 uppercase tracking-widest">{d.label}</span>
+            </div>
+          )) : (
+            <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs uppercase tracking-widest">No sales data yet</div>
+          )}
         </div>
       </div>
     </div>
@@ -452,41 +521,177 @@ const DashboardView = () => {
 };
 
 
-const OrdersView = () => {
+const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+const PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'refunded'];
+
+const parseOrderAddress = (value) => {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return value;
+};
+
+const OrdersView = ({ readOnly = false }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filter, setFilter] = useState('All');
+  const [detailOrder, setDetailOrder] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [editOrder, setEditOrder] = useState(null);
+  const [editStatus, setEditStatus] = useState('pending');
+  const [editPaymentStatus, setEditPaymentStatus] = useState('pending');
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await adminOrderAPI.getAll();
+      setOrders(Array.isArray(res.data.data) ? res.data.data : []);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError(err.response?.data?.message || 'Could not load orders. Try again.');
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      try {
-        const res = await adminOrderAPI.getAll();
-        setOrders(res.data.data);
-      } catch (error) {
-        console.error('Error fetching orders:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchOrders();
   }, []);
 
-  const filteredOrders = filter === 'All' 
-    ? orders 
-    : orders.filter(o => o.status.toLowerCase() === filter.toLowerCase());
+  const filteredOrders = filter === 'All'
+    ? orders
+    : orders.filter((o) => o.status.toLowerCase() === filter.toLowerCase());
+
+  const openOrderDetail = async (orderId) => {
+    setDetailOrder(null);
+    setDetailLoading(true);
+    setActionError('');
+    try {
+      const res = await adminOrderAPI.getOne(orderId);
+      setDetailOrder(res.data?.data || null);
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not load order details.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const openOrderEdit = (order) => {
+    setEditOrder(order);
+    setEditStatus(order.status || 'pending');
+    setEditPaymentStatus(order.payment_status || 'pending');
+    setActionError('');
+  };
+
+  const handleSaveOrder = async () => {
+    if (!editOrder) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      const statusChanged = editStatus !== editOrder.status;
+      const paymentChanged = editPaymentStatus !== editOrder.payment_status;
+
+      if (statusChanged) {
+        await adminOrderAPI.updateStatus(editOrder.id, editStatus);
+      }
+      if (paymentChanged) {
+        await adminOrderAPI.updatePayment(editOrder.id, editPaymentStatus);
+      }
+
+      setEditOrder(null);
+      await fetchOrders();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not update order.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExportOrders = async () => {
+    try {
+      const res = await adminOrderAPI.exportCsv();
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Export failed');
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!editOrder || !window.confirm('Cancel this order? Stock will be restored if already paid.')) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      await adminOrderAPI.cancel(editOrder.id);
+      setEditOrder(null);
+      await fetchOrders();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not cancel order.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRefundOrder = async () => {
+    if (!editOrder || !window.confirm('Refund this paid order and restore stock?')) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      await adminOrderAPI.refund(editOrder.id);
+      setEditOrder(null);
+      await fetchOrders();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not refund order.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setDetailOrder(null);
+    setDetailLoading(false);
+    setActionError('');
+  };
+
+  const closeEdit = () => {
+    setEditOrder(null);
+    setActionError('');
+  };
+
+  const detailAddress = parseOrderAddress(detailOrder?.shipping_address);
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm py-3 px-4 rounded-xl">
+          {error}
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
         <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-          {['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'].map((f) => (
+          {['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].map((f) => (
             <button
-              key={f} 
+              key={f}
+              type="button"
               onClick={() => setFilter(f)}
               className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                filter === f 
-                  ? 'bg-gold-600 text-navy-950 border-gold-600' 
+                filter === f
+                  ? 'bg-gold-600 text-navy-950 border-gold-600'
                   : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
               }`}
             >
@@ -495,9 +700,22 @@ const OrdersView = () => {
           ))}
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all">
-            <Download size={16} /> Export
+          <button
+            type="button"
+            onClick={handleExportOrders}
+            className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all"
+          >
+            <Download size={16} /> Export CSV
           </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => fetchOrders()}
+              className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all"
+            >
+              Refresh
+            </button>
+          )}
         </div>
       </div>
 
@@ -533,8 +751,8 @@ const OrdersView = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
-                      o.status === 'pending' ? 'bg-gold-500/10 text-gold-500' : 
-                      o.status === 'delivered' ? 'bg-green-400/10 text-green-400' : 
+                      o.status === 'pending' ? 'bg-gold-500/10 text-gold-500' :
+                      o.status === 'delivered' ? 'bg-green-400/10 text-green-400' :
                       o.status === 'cancelled' ? 'bg-red-400/10 text-red-400' :
                       'bg-blue-400/10 text-blue-400'
                     }`}>
@@ -546,8 +764,24 @@ const OrdersView = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="View Details"><Eye size={16} /></button>
-                      <button className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="Edit Order"><Edit size={16} /></button>
+                      <button
+                        type="button"
+                        onClick={() => openOrderDetail(o.id)}
+                        className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => openOrderEdit(o)}
+                          className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"
+                          title="Edit Order"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -561,6 +795,199 @@ const OrdersView = () => {
           </div>
         )}
       </div>
+
+      {(detailLoading || detailOrder || actionError) && !editOrder && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-serif text-gold-100">Order Details</h3>
+                {detailOrder && (
+                  <p className="text-gold-500/50 text-xs mt-1 uppercase tracking-widest">
+                    #{detailOrder.id.substring(0, 8).toUpperCase()}
+                  </p>
+                )}
+              </div>
+              <button type="button" onClick={closeDetail} className="text-gold-500/40 hover:text-gold-500">
+                <X size={20} />
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div className="py-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto" />
+              </div>
+            ) : actionError && !detailOrder ? (
+              <p className="text-red-400 text-sm">{actionError}</p>
+            ) : detailOrder ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Customer</p>
+                    <p className="text-gold-100">{detailOrder.customer_name}</p>
+                    <p className="text-gold-500/60 text-xs">{detailOrder.customer_email}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Placed</p>
+                    <p className="text-gold-100">{new Date(detailOrder.created_at).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Status</p>
+                    <p className="text-gold-100 uppercase text-xs font-bold">{detailOrder.status}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Payment</p>
+                    <p className="text-gold-100 text-xs">
+                      {detailOrder.payment_method} · {detailOrder.payment_status}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-navy-950/60 border border-gold-500/10 rounded-xl p-4 text-sm">
+                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-2">Shipping</p>
+                  <p className="text-gold-100">
+                    {[detailAddress.first_name, detailAddress.last_name].filter(Boolean).join(' ')}
+                  </p>
+                  <p className="text-gold-500/70 text-xs mt-1">{detailAddress.line1}</p>
+                  <p className="text-gold-500/70 text-xs">{detailAddress.city}, {detailAddress.country || 'Kenya'}</p>
+                  <p className="text-gold-500/70 text-xs mt-1">{detailAddress.phone}</p>
+                  <p className="text-gold-500/70 text-xs">{detailAddress.email}</p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-3">Items</p>
+                  <div className="space-y-2">
+                    {(detailOrder.items || []).map((item) => (
+                      <div key={item.id} className="flex justify-between gap-4 bg-navy-950/60 border border-gold-500/5 rounded-xl px-4 py-3 text-sm">
+                        <div>
+                          <p className="text-gold-100">{item.name}</p>
+                          <p className="text-gold-500/50 text-xs">
+                            Qty {item.quantity}
+                            {item.size_label ? ` · Size ${item.size_label}` : ''}
+                            {(item.variant_sku || item.product_sku) ? ` · SKU ${item.variant_sku || item.product_sku}` : ''}
+                          </p>
+                        </div>
+                        <p className="text-gold-400 shrink-0">
+                          KSh {(parseFloat(item.price) * item.quantity).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-between border-t border-gold-500/10 pt-4 text-sm font-bold">
+                  <span className="text-gold-500/60">Total</span>
+                  <span className="text-gold-400">KSh {parseFloat(detailOrder.total_amount).toLocaleString()}</span>
+                </div>
+
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeDetail();
+                      openOrderEdit(detailOrder);
+                    }}
+                    className="w-full py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500"
+                  >
+                    Edit Order
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {editOrder && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-md w-full">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-serif text-gold-100">Edit Order</h3>
+                <p className="text-gold-500/50 text-xs mt-1 uppercase tracking-widest">
+                  #{editOrder.id.substring(0, 8).toUpperCase()} · {editOrder.customer_name}
+                </p>
+              </div>
+              <button type="button" onClick={closeEdit} className="text-gold-500/40 hover:text-gold-500">
+                <X size={20} />
+              </button>
+            </div>
+
+            {actionError && (
+              <p className="text-red-400 text-sm mb-4">{actionError}</p>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-gold-500/40 font-bold">Order Status</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 text-sm outline-none focus:border-gold-500"
+                >
+                  {ORDER_STATUSES.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-gold-500/40 font-bold">Payment Status</label>
+                <select
+                  value={editPaymentStatus}
+                  onChange={(e) => setEditPaymentStatus(e.target.value)}
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 text-sm outline-none focus:border-gold-500"
+                >
+                  {PAYMENT_STATUSES.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!readOnly && editOrder.status !== 'cancelled' && editOrder.status !== 'delivered' && (
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                disabled={saving}
+                className="w-full mt-4 py-3 rounded-xl border border-red-500/30 text-red-400 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/10 disabled:opacity-50"
+              >
+                Cancel Order
+              </button>
+            )}
+
+            {!readOnly && editOrder.payment_status === 'paid' && (
+              <button
+                type="button"
+                onClick={handleRefundOrder}
+                disabled={saving}
+                className="w-full mt-2 py-3 rounded-xl border border-amber-500/30 text-amber-400 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                Refund Order
+              </button>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="flex-1 py-3 rounded-xl border border-gold-500/20 text-gold-500/60 text-[10px] font-bold uppercase tracking-widest"
+              >
+                Close
+              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={handleSaveOrder}
+                  disabled={saving}
+                  className="flex-1 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -587,77 +1014,66 @@ const getPeriodLabel = (period) => {
   return 'This month';
 };
 
-const buildSeries = (orders, period) => {
-  const buckets = new Map();
-  const now = new Date();
-  const size = period === 'daily' ? 7 : period === 'weekly' ? 8 : 6;
+const isPaidOnlineOrder = (order) =>
+  order.status !== 'cancelled' && order.payment_status === 'paid';
 
-  for (let i = size - 1; i >= 0; i -= 1) {
-    const d = new Date(now);
-    if (period === 'daily') d.setDate(now.getDate() - i);
-    if (period === 'weekly') d.setDate(now.getDate() - i * 7);
-    if (period === 'monthly') d.setMonth(now.getMonth() - i);
+const isActivePosSale = (sale) => !sale.is_voided;
 
-    const label = period === 'daily'
-      ? d.toLocaleDateString(undefined, { weekday: 'short' })
-      : period === 'weekly'
-        ? `W${Math.ceil(d.getDate() / 7)} ${d.toLocaleDateString(undefined, { month: 'short' })}`
-        : d.toLocaleDateString(undefined, { month: 'short' });
-    buckets.set(label, 0);
+const isInFinancePeriod = (createdAt, periodStart) => new Date(createdAt) >= periodStart;
+
+/** Revenue chart — same window as KPI cards (today / last 7 days / this month). */
+const buildFinanceChart = (onlineOrders, posSales, period) => {
+  const entries = [
+    ...onlineOrders.map((o) => ({ created_at: o.created_at, total_amount: o.total_amount })),
+    ...posSales.map((s) => ({ created_at: s.created_at, total_amount: s.total_amount })),
+  ];
+
+  if (period === 'daily') {
+    const total = entries.reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+    return [{ label: 'Today', total }];
   }
 
-  orders.forEach((order) => {
-    const d = new Date(order.created_at);
-    const label = period === 'daily'
-      ? d.toLocaleDateString(undefined, { weekday: 'short' })
-      : period === 'weekly'
-        ? `W${Math.ceil(d.getDate() / 7)} ${d.toLocaleDateString(undefined, { month: 'short' })}`
-        : d.toLocaleDateString(undefined, { month: 'short' });
-    if (buckets.has(label)) {
-      buckets.set(label, buckets.get(label) + Number(order.total_amount || 0));
+  if (period === 'weekly') {
+    const buckets = new Map();
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      buckets.set(d.toLocaleDateString(undefined, { weekday: 'short' }), 0);
+    }
+    entries.forEach((e) => {
+      const label = new Date(e.created_at).toLocaleDateString(undefined, { weekday: 'short' });
+      if (buckets.has(label)) {
+        buckets.set(label, buckets.get(label) + Number(e.total_amount || 0));
+      }
+    });
+    return Array.from(buckets, ([label, total]) => ({ label, total }));
+  }
+
+  const buckets = new Map();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  for (let d = new Date(monthStart); d <= now; d.setDate(d.getDate() + 1)) {
+    buckets.set(String(d.getDate()), 0);
+  }
+  entries.forEach((e) => {
+    const d = new Date(e.created_at);
+    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+      const label = String(d.getDate());
+      if (buckets.has(label)) {
+        buckets.set(label, buckets.get(label) + Number(e.total_amount || 0));
+      }
     }
   });
-
   return Array.from(buckets, ([label, total]) => ({ label, total }));
 };
 
-const FinanceView = () => {
-  const [financeTab, setFinanceTab] = useState('finance');
-
-  return (
-    <div className="space-y-6">
-      {/* Finance sub-tabs */}
-      <div className="flex gap-2 border-b border-gold-500/10 pb-4">
-        {[
-          { id: 'finance', label: 'Finance Overview', icon: CardIcon },
-          { id: 'inventory', label: 'Inventory Management', icon: Warehouse },
-        ].map(t => (
-          <button key={t.id} onClick={() => setFinanceTab(t.id)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-              financeTab === t.id
-                ? 'bg-gold-600 text-navy-950 border-gold-600'
-                : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
-            }`}>
-            <t.icon size={14} /> {t.label}
-          </button>
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div key={financeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-          {financeTab === 'inventory' ? <InventoryView /> : <FinanceOverview />}
-        </motion.div>
-      </AnimatePresence>
-    </div>
-  );
-};
-
-const FinanceOverview = () => {
+export const FinanceOverview = () => {
   const [period, setPeriod] = useState('daily');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [orderDetails, setOrderDetails] = useState([]);
   const [stats, setStats] = useState({ revenue: 0, profit: 0, orders: 0 });
+  const [posSales, setPosSales] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [stockDrafts, setStockDrafts] = useState({});
   const [stockModalProduct, setStockModalProduct] = useState(null);
@@ -676,18 +1092,19 @@ const FinanceOverview = () => {
   const fetchFinance = async () => {
     setLoading(true);
     try {
-      const [statsRes, topRes, orderRes, productRes] = await Promise.all([
+      const [statsRes, topRes, orderRes, productRes, posRes] = await Promise.all([
         adminAnalyticsAPI.getStats().catch(() => ({ data: { data: {} } })),
         adminAnalyticsAPI.getTopProducts().catch(() => ({ data: { data: [] } })),
         adminOrderAPI.getAll().catch(() => ({ data: { data: [] } })),
         adminProductAPI.getAll().catch(() => ({ data: { data: [] } })),
+        posAPI.listSales({ limit: 500 }).catch(() => ({ data: { data: { sales: [] } } })),
       ]);
 
       const fetchedOrders = orderRes.data.data || [];
       const fetchedProducts = productRes.data.data || [];
-      const recentOrders = fetchedOrders.slice(0, 60);
+      const paidOrders = fetchedOrders.filter(isPaidOnlineOrder);
       const details = await Promise.all(
-        recentOrders.map((order) =>
+        paidOrders.slice(0, 200).map((order) =>
           adminOrderAPI.getOne(order.id)
             .then((res) => res.data.data)
             .catch(() => ({ ...order, items: [] }))
@@ -699,6 +1116,7 @@ const FinanceOverview = () => {
       setOrders(fetchedOrders);
       setProducts(fetchedProducts);
       setOrderDetails(details);
+      setPosSales(posRes.data?.data?.sales || []);
       const drafts = {};
       fetchedProducts.forEach((product) => {
         drafts[stockKey(product)] = product.stock_quantity ?? 0;
@@ -718,43 +1136,66 @@ const FinanceOverview = () => {
     fetchFinance();
   }, []);
 
-  const periodOrders = orders.filter((order) => {
-    const createdAt = new Date(order.created_at);
-    return createdAt >= getPeriodStart(period) && order.status !== 'cancelled';
-  });
+  const periodStart = getPeriodStart(period);
+  const periodOrders = orders.filter(
+    (order) => isPaidOnlineOrder(order) && isInFinancePeriod(order.created_at, periodStart)
+  );
+  const periodPosSales = posSales.filter(
+    (sale) => isActivePosSale(sale) && isInFinancePeriod(sale.created_at, periodStart)
+  );
 
   const productCost = new Map(products.map((p) => [p.id, Number(p.cost_price || 0)]));
   const productMeta = new Map(products.map((p) => [p.id, p]));
   const periodOrderIds = new Set(periodOrders.map((order) => order.id));
   const soldMap = new Map();
 
+  const addSoldLine = (productId, name, unitPrice, quantity) => {
+    const revenue = unitPrice * quantity;
+    const storedCost = productId ? productCost.get(productId) : null;
+    const unitCost = storedCost > 0 ? storedCost : unitPrice * 0.65;
+    const profit = revenue - unitCost * quantity;
+    const key = productId || name;
+    const existing = soldMap.get(key) || {
+      id: productId || key,
+      name: name || 'Product',
+      quantity: 0,
+      revenue: 0,
+      profit: 0,
+    };
+    existing.quantity += quantity;
+    existing.revenue += revenue;
+    existing.profit += profit;
+    soldMap.set(key, existing);
+  };
+
   orderDetails
     .filter((order) => periodOrderIds.has(order.id))
     .forEach((order) => {
       (order.items || []).forEach((item) => {
-        const productId = item.product_id;
-        const unitPrice = Number(item.price || 0);
-        const quantity = Number(item.quantity || 0);
-        const revenue = unitPrice * quantity;
-        const unitCost = productCost.get(productId) || unitPrice * 0.65;
-        const profit = revenue - unitCost * quantity;
-        const existing = soldMap.get(productId) || {
-          id: productId,
-          name: item.name || productMeta.get(productId)?.name || 'Product',
-          quantity: 0,
-          revenue: 0,
-          profit: 0,
-        };
-
-        existing.quantity += quantity;
-        existing.revenue += revenue;
-        existing.profit += profit;
-        soldMap.set(productId, existing);
+        addSoldLine(
+          item.product_id,
+          item.name || productMeta.get(item.product_id)?.name,
+          Number(item.price || 0),
+          Number(item.quantity || 0)
+        );
       });
     });
 
+  periodPosSales.forEach((sale) => {
+    (sale.items || []).forEach((item) => {
+      addSoldLine(
+        item.ecommerce_product_id || null,
+        item.line_name || item.product?.name || item.product_name,
+        Number(item.unit_price || 0),
+        Number(item.qty || 0)
+      );
+    });
+  });
+
   const soldProducts = Array.from(soldMap.values()).sort((a, b) => b.quantity - a.quantity);
-  const periodRevenue = periodOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+  const onlineRevenue = periodOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+  const posRevenue = periodPosSales.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0);
+  const periodRevenue = onlineRevenue + posRevenue;
   const periodProfit = soldProducts.length
     ? soldProducts.reduce((sum, item) => sum + item.profit, 0)
     : periodRevenue * 0.35;
@@ -787,14 +1228,14 @@ const FinanceOverview = () => {
       size: variant.size || 'Standard',
       color: variant.color || null,
       stock: Number(variant.stock ?? variant.stock_quantity ?? 0),
-      stockId: variant.stock_id || null,
+      stockId: variant.sku || variant.stock_id || null,
     }));
   });
 
   const inventoryValue = products.reduce((sum, p) => sum + Number(p.price || 0) * getProductStockTotal(p), 0);
   const totalStock = products.reduce((sum, p) => sum + getProductStockTotal(p), 0);
   const lowStockRows = inventoryRows.filter((row) => row.stock <= 5).sort((a, b) => a.stock - b.stock);
-  const chartData = buildSeries(orders.filter((order) => order.status !== 'cancelled'), period);
+  const chartData = buildFinanceChart(periodOrders, periodPosSales, period);
   const maxChart = Math.max(...chartData.map((item) => item.total), 1);
 
   const handleStockSave = async (product) => {
@@ -805,7 +1246,8 @@ const FinanceOverview = () => {
         ...variant,
         stock: Number(stockDrafts[stockKey(product, variant)]) || 0,
         price_override: variant.price_override ?? variant.price_modifier ?? 0,
-        stock_id: variant.stock_id || null,
+        sku: variant.sku || variant.stock_id || null,
+        stock_id: variant.sku || variant.stock_id || null,
       }));
       const nextProductStock = variants.length
         ? nextVariants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0)
@@ -839,8 +1281,8 @@ const FinanceOverview = () => {
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Money, stock, and movement</span>
-          <h3 className="text-3xl font-serif font-bold text-gold-100 mt-2">Finance Control Room</h3>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Shop + online — one view</span>
+          <h3 className="text-3xl font-serif font-bold text-gold-100 mt-2">Sales & Finance</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           {['daily', 'weekly', 'monthly'].map((p) => (
@@ -860,9 +1302,11 @@ const FinanceOverview = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {[
-          { label: `${getPeriodLabel(period)} Revenue`, value: formatMoney(periodRevenue), detail: `${periodOrders.length} orders`, icon: CreditCard },
+          { label: `${getPeriodLabel(period)} Revenue`, value: formatMoney(periodRevenue), detail: `${periodOrders.length} online · ${periodPosSales.length} POS`, icon: CreditCard },
+          { label: 'POS Revenue', value: formatMoney(posRevenue), detail: `${periodPosSales.length} in-store sales`, icon: Store },
+          { label: 'Online Revenue', value: formatMoney(onlineRevenue), detail: `${periodOrders.length} website orders`, icon: Globe },
           { label: `${getPeriodLabel(period)} Profit`, value: formatMoney(periodProfit), detail: 'Uses cost price when available', icon: ArrowUpRight },
           { label: 'Inventory Value', value: formatMoney(inventoryValue), detail: `${totalStock.toLocaleString()} pieces in stock`, icon: Package },
           { label: 'Low Stock Alerts', value: lowStockRows.length, detail: 'Sizes at 5 units or less', icon: AlertCircle, action: () => setIsLowStockOpen(true) },
@@ -962,7 +1406,7 @@ const FinanceOverview = () => {
         <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
           <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
             <h4 className="font-serif font-bold text-xl text-gold-100">Stock Manager</h4>
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">{totalStock.toLocaleString()} total pieces</span>
+            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">Website stock · {totalStock.toLocaleString()} pieces</span>
           </div>
           <div className="max-h-[520px] overflow-y-auto custom-scrollbar divide-y divide-gold-500/5">
             {products.slice(0, 18).map((product) => (
@@ -976,7 +1420,7 @@ const FinanceOverview = () => {
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-14 h-14 rounded-xl overflow-hidden bg-navy-950 border border-gold-500/10 shrink-0">
                       {product.thumbnail ? (
-                        <img src={product.thumbnail} alt={product.name} className="w-full h-full object-cover" />
+                        <img src={resolveDisplayImageUrl(product.thumbnail)} alt={product.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gold-500/30">
                           <Package size={20} />
@@ -1007,7 +1451,7 @@ const FinanceOverview = () => {
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-20 h-20 rounded-2xl overflow-hidden bg-navy-950 border border-gold-500/10 shrink-0">
                   {stockModalProduct.thumbnail ? (
-                    <img src={stockModalProduct.thumbnail} alt={stockModalProduct.name} className="w-full h-full object-cover" />
+                    <img src={resolveDisplayImageUrl(stockModalProduct.thumbnail)} alt={stockModalProduct.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gold-500/30">
                       <Package size={24} />
@@ -1034,7 +1478,7 @@ const FinanceOverview = () => {
                       Size {variant.size || 'Standard'}{variant.color ? ` - ${variant.color}` : ''}
                     </p>
                     <p className="text-[9px] uppercase tracking-widest text-gold-500/30 mt-1">
-                      Stock ID: {variant.stock_id || 'Not set'}
+                      SKU: {variant.sku || variant.stock_id || 'Not set'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1123,7 +1567,9 @@ const FinanceOverview = () => {
                 >
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-14 h-14 rounded-xl overflow-hidden bg-navy-950 border border-gold-500/10 shrink-0">
-                      {row.product.thumbnail && <img src={row.product.thumbnail} alt={row.product.name} className="w-full h-full object-cover" />}
+                      {resolveDisplayImageUrl(row.product.thumbnail) && (
+                        <img src={resolveDisplayImageUrl(row.product.thumbnail)} alt={row.product.name} className="w-full h-full object-cover" />
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gold-100 uppercase">{row.name}</p>
@@ -1141,10 +1587,6 @@ const FinanceOverview = () => {
           </div>
         </div>
       )}
-
-      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/30">
-        Finance data is loaded through the live admin orders, order-detail, product, and analytics APIs. Stock updates are saved back to the product API by size.
-      </p>
     </div>
   );
 };
@@ -1156,46 +1598,9 @@ const toStockIdPart = (value) => String(value || '')
   .replace(/[^A-Z0-9]+/g, '-')
   .replace(/^-|-$/g, '');
 
-const buildStockId = (productName) => {
+const buildProductSku = (productName) => {
   const productPart = toStockIdPart(productName) || 'PRODUCT';
-  return `${productPart}-STOCK`;
-};
-
-const buildSizeRows = (flatVariants) => {
-  return (flatVariants || [])
-    .filter((variant) => variant.size)
-    .map((variant) => ({
-      _key: Math.random().toString(36).slice(2),
-      id: variant.id,
-      size: String(variant.size || '').toUpperCase(),
-      stock: variant.stock ?? variant.stock_quantity ?? 0,
-      price_override: variant.price_override ?? variant.price_modifier ?? '',
-    }));
-};
-
-const flattenSizeRows = (sizeRows, stockId, imageUrl) => {
-  return (sizeRows || [])
-    .filter((row) => row.size?.trim())
-    .map((row) => ({
-      id: row.id,
-      color: null,
-      size: String(row.size).trim().toUpperCase(),
-      stock: parseInt(row.stock, 10) || 0,
-      price_override: row.price_override === '' || row.price_override == null ? 0 : parseFloat(row.price_override) || 0,
-      image_url: imageUrl || null,
-      stock_id: stockId?.trim() || null,
-    }));
-};
-
-const getSizeOptionsForCategory = (categoryName = '') => {
-  const name = categoryName.toLowerCase();
-  if (name.includes('shoe') || name.includes('loafer') || name.includes('boot') || name.includes('sandal')) {
-    return ['39', '40', '41', '42', '43', '44', '45', '46'];
-  }
-  if (name.includes('trouser') || name.includes('chino') || name.includes('jeans') || name.includes('khaki') || name.includes('gurkha')) {
-    return ['28', '30', '32', '34', '36', '38', '40', '42', '44'];
-  }
-  return ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'];
+  return productPart;
 };
 
 const ProductsView = () => {
@@ -1205,15 +1610,22 @@ const ProductsView = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [customSize, setCustomSize] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
     description: '',
     price: '',
     discount_price: '',
+    pos_sell_price: '',
+    inventory_opening_qty: '',
     show_offer: false,
-    stock_id: '',
+    sku: '',
     parent_category_id: '',
     category_id: '',
     stock_quantity: 0,
@@ -1221,7 +1633,7 @@ const ProductsView = () => {
     is_active: true,
     thumbnail: '',
     images: [], // This will store the final URLs for saving
-    sizeRows: [],
+    color_groups: [newColorGroup('Original')],
     thumbnailFile: null,
     thumbnailPreview: '',
     gallery: [] // Combined state: { id, preview, url, isUploading }
@@ -1255,23 +1667,35 @@ const ProductsView = () => {
     });
   };
 
-  const removeThumbnail = () => {
-    setFormData({ ...formData, thumbnail: '', thumbnailPreview: '' });
+  const revokeFormBlobPreviews = (data) => {
+    revokeBlobUrl(data.thumbnailPreview);
+    (data.gallery || []).forEach((item) => revokeBlobUrl(item.preview));
   };
 
-  const [uploading, setUploading] = useState(false);
+  const closeProductModal = () => {
+    revokeFormBlobPreviews(formData);
+    setIsModalOpen(false);
+  };
+
+  const removeThumbnail = () => {
+    revokeBlobUrl(formData.thumbnailPreview);
+    setFormData({ ...formData, thumbnail: '', thumbnailPreview: '' });
+  };
 
   const handleThumbnailChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setUploading(true);
       const localPreview = URL.createObjectURL(file);
-      setFormData(prev => ({
-        ...prev,
-        thumbnailPreview: localPreview,
-        thumbnail: localPreview
-      }));
-      
+      setFormData((prev) => {
+        revokeBlobUrl(prev.thumbnailPreview);
+        return {
+          ...prev,
+          thumbnailPreview: localPreview,
+          thumbnail: prev.thumbnail && !isBlobUrl(prev.thumbnail) ? prev.thumbnail : '',
+        };
+      });
+
       const uploadData = new FormData();
       uploadData.append('images', file);
       try {
@@ -1279,15 +1703,18 @@ const ProductsView = () => {
         if (res.data.success) {
           const uploaded = res.data.data[0];
           const finalUrl = getUploadUrl(uploaded);
-          setFormData(prev => ({ 
-            ...prev, 
-            thumbnail: finalUrl,
-            thumbnailPreview: getImageSrc(uploaded) || finalUrl 
-          }));
+          setFormData((prev) => {
+            revokeBlobUrl(prev.thumbnailPreview);
+            return {
+              ...prev,
+              thumbnail: finalUrl,
+              thumbnailPreview: getImageSrc(uploaded) || finalUrl,
+            };
+          });
         }
       } catch (error) {
         console.error('Thumbnail upload failed:', error);
-        alert('Image upload failed. Please try again.');
+        alert('Image could not be uploaded to the server. You can still save the product — add the image later or configure Cloudinary.');
       } finally {
         setUploading(false);
       }
@@ -1327,6 +1754,7 @@ const ProductsView = () => {
                 if (item.isUploading && urlIdx < uploadedUrls.length) {
                     const uploaded = uploadedUrls[urlIdx++];
                     const url = getUploadUrl(uploaded);
+                    revokeBlobUrl(item.preview);
                     return { ...item, url, urlJson: toImageJson(uploaded), preview: getImageSrc(uploaded) || url, isUploading: false };
                 }
                 return item;
@@ -1340,53 +1768,97 @@ const ProductsView = () => {
       }
     } catch (error) {
       console.error('Gallery upload failed:', error);
-      alert('One or more gallery images failed to upload.');
-      // Remove the failed ones
-      setFormData(prev => ({
+      alert('Gallery images could not be uploaded. You can still save the product without them.');
+      setFormData((prev) => {
+        prev.gallery.forEach((item) => {
+          if (item.isUploading) revokeBlobUrl(item.preview);
+        });
+        return {
           ...prev,
-          gallery: prev.gallery.filter(i => !i.isUploading)
-      }));
+          gallery: prev.gallery.filter((i) => !i.isUploading),
+        };
+      });
     } finally {
       setUploading(false);
     }
   };
 
-  const handleToggleSize = (size) => {
-    const exists = formData.sizeRows.some((row) => row.size === size);
-    const nextRows = exists
-      ? formData.sizeRows.filter((row) => row.size !== size)
-      : [...formData.sizeRows, { _key: Math.random().toString(36).slice(2), id: undefined, size, stock: 0, price_override: '' }];
-    setFormData({
-      ...formData,
-      sizeRows: nextRows,
-      stock_quantity: nextRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0),
-    });
-  };
+  const totalVariantStock = (groups) =>
+    (groups || []).reduce(
+      (sum, group) => sum + (group.sizes || []).reduce((s, row) => s + (parseInt(row.stock, 10) || 0), 0),
+      0
+    );
 
-  const handleAddCustomSize = () => {
-    const nextSize = customSize.trim().toUpperCase();
+  const addSizeToGroup = (groupKey, size) => {
+    const nextSize = String(size || '').trim().toUpperCase();
     if (!nextSize) return;
-    if (!formData.sizeRows.some((row) => row.size === nextSize)) {
-      const nextRows = [
-        ...formData.sizeRows,
-        { _key: Math.random().toString(36).slice(2), id: undefined, size: nextSize, stock: 0, price_override: '' },
-      ];
-      setFormData({
-        ...formData,
-        sizeRows: nextRows,
-        stock_quantity: nextRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0),
+    setFormData((prev) => {
+      const color_groups = prev.color_groups.map((group) => {
+        if (group._key !== groupKey) return group;
+        if (group.sizes.some((row) => row.size === nextSize)) return group;
+        return { ...group, sizes: [...group.sizes, newSizeRow(nextSize)] };
       });
-    }
+      return { ...prev, color_groups, stock_quantity: totalVariantStock(color_groups) };
+    });
     setCustomSize('');
   };
 
-  const handleSizeChange = (size, field, value) => {
-    const nextRows = formData.sizeRows.map((row) => row.size === size ? { ...row, [field]: value } : row);
-    setFormData({
-      ...formData,
-      sizeRows: nextRows,
-      stock_quantity: field === 'stock' ? nextRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0) : formData.stock_quantity,
+  const updateSizeInGroup = (groupKey, sizeKey, field, value) => {
+    setFormData((prev) => {
+      const color_groups = prev.color_groups.map((group) => {
+        if (group._key !== groupKey) return group;
+        return {
+          ...group,
+          sizes: group.sizes.map((row) => (row._key === sizeKey ? { ...row, [field]: value } : row)),
+        };
+      });
+      return {
+        ...prev,
+        color_groups,
+        stock_quantity: field === 'stock' ? totalVariantStock(color_groups) : prev.stock_quantity,
+      };
     });
+  };
+
+  const removeSizeFromGroup = (groupKey, sizeKey) => {
+    setFormData((prev) => {
+      const color_groups = prev.color_groups.map((group) => {
+        if (group._key !== groupKey) return group;
+        return { ...group, sizes: group.sizes.filter((row) => row._key !== sizeKey) };
+      });
+      return { ...prev, color_groups, stock_quantity: totalVariantStock(color_groups) };
+    });
+  };
+
+  const handleColorImage = async (groupKey, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const localPreview = URL.createObjectURL(file);
+    setFormData((prev) => ({
+      ...prev,
+      color_groups: prev.color_groups.map((group) =>
+        group._key === groupKey ? { ...group, imagePreview: localPreview } : group
+      ),
+    }));
+    const uploadData = new FormData();
+    uploadData.append('images', file);
+    try {
+      const res = await adminUploadAPI.upload(uploadData);
+      if (res.data.success) {
+        const uploaded = res.data.data[0];
+        const url = getUploadUrl(uploaded);
+        setFormData((prev) => ({
+          ...prev,
+          color_groups: prev.color_groups.map((group) => {
+            if (group._key !== groupKey) return group;
+            revokeBlobUrl(group.imagePreview);
+            return { ...group, image_url: url, imagePreview: getImageSrc(uploaded) || url };
+          }),
+        }));
+      }
+    } catch {
+      alert('Color image upload failed.');
+    }
   };
 
   const fetchData = async () => {
@@ -1414,7 +1886,22 @@ const ProductsView = () => {
   const selectedCategory = categories.find((category) => category.id === formData.category_id);
   const subCategories = formData.parent_category_id ? categories.filter((category) => category.parent_id === formData.parent_category_id) : [];
   const sizeOptions = getSizeOptionsForCategory(selectedCategory?.name || selectedParentCategory?.name || '');
-  const displaySizeOptions = [...new Set([...sizeOptions, ...formData.sizeRows.map((row) => row.size)])];
+
+  const filteredProducts = products.filter((p) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q && !(
+      p.name?.toLowerCase().includes(q) ||
+      p.sku?.toLowerCase().includes(q) ||
+      p.slug?.toLowerCase().includes(q)
+    )) return false;
+    if (categoryFilter && p.category_id !== categoryFilter) return false;
+    const stock = Number(p.stock_quantity ?? 0);
+    if (stockFilter === 'in_stock' && stock <= 0) return false;
+    if (stockFilter === 'out_of_stock' && stock > 0) return false;
+    if (statusFilter === 'active' && !p.is_active) return false;
+    if (statusFilter === 'inactive' && p.is_active) return false;
+    return true;
+  });
 
   const handleCategorySelect = (category) => {
     setFormData({
@@ -1430,7 +1917,7 @@ const ProductsView = () => {
     setFormData({
       ...formData,
       category_id: category.id,
-      sizeRows: [],
+      color_groups: [newColorGroup('Original')],
       stock_quantity: 0,
     });
   };
@@ -1438,8 +1925,8 @@ const ProductsView = () => {
   const handleOpenModal = (product = null) => {
     const productCategory = categories.find((category) => category.id === product?.category_id);
     const parentCategoryId = productCategory?.parent_id || productCategory?.id || '';
-    const productSizeRows = buildSizeRows(Array.isArray(product?.variants) ? product.variants : []);
-    const productStockId = product?.variants?.find((variant) => variant.stock_id)?.stock_id || buildStockId(product?.name);
+    const productColorGroups = buildColorGroupsFromVariants(Array.isArray(product?.variants) ? product.variants : []);
+    const productSku = product?.sku || product?.variants?.find((variant) => variant.sku || variant.stock_id)?.sku || product?.variants?.find((variant) => variant.stock_id)?.stock_id || buildProductSku(product?.name);
 
     if (product) {
       setCurrentProduct(product);
@@ -1450,17 +1937,18 @@ const ProductsView = () => {
         description: product.description || '',
         price: product.price || '',
         discount_price: product.discount_price || '',
+        pos_sell_price: product.pos_sell_price || '',
         show_offer: Boolean(product.discount_price),
-        stock_id: productStockId,
+        sku: productSku,
         parent_category_id: parentCategoryId,
         category_id: product.category_id || '',
-        stock_quantity: productSizeRows.length ? productSizeRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0) : product.stock_quantity || 0,
+        stock_quantity: totalVariantStock(productColorGroups) || product.stock_quantity || 0,
         is_featured: product.is_featured || false,
         is_active: product.is_active ?? true,
-        thumbnail: product.thumbnail || '',
+        thumbnail: resolveDisplayImageUrl(product.thumbnail) || '',
         images: Array.isArray(product.images) ? product.images : [],
-        sizeRows: productSizeRows,
-        thumbnailPreview: product.thumbnail || '',
+        color_groups: productColorGroups,
+        thumbnailPreview: resolveDisplayImageUrl(product.thumbnail) || '',
         gallery: parseProductImages(product.images).map((img) => ({
           id: Math.random().toString(36).substring(7),
           preview: getImageSrc(img),
@@ -1478,8 +1966,9 @@ const ProductsView = () => {
         description: '',
         price: '',
         discount_price: '',
+        pos_sell_price: '',
         show_offer: false,
-        stock_id: '',
+        sku: '',
         parent_category_id: '',
         category_id: '',
         stock_quantity: 0,
@@ -1487,7 +1976,7 @@ const ProductsView = () => {
         is_active: true,
         thumbnail: '',
         images: [],
-        sizeRows: [],
+        color_groups: [newColorGroup('Original')],
         thumbnailPreview: '',
         gallery: []
       });
@@ -1515,9 +2004,9 @@ const ProductsView = () => {
     setSubmitting(true);
     try {
       const payload = { ...formData };
-      payload.variants = flattenSizeRows(formData.sizeRows, formData.stock_id || buildStockId(formData.name), formData.thumbnail);
-      payload.stock_quantity = formData.sizeRows.length
-        ? formData.sizeRows.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0)
+      payload.variants = flattenColorGroups(formData.color_groups);
+      payload.stock_quantity = payload.variants.length
+        ? payload.variants.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0)
         : parseInt(formData.stock_quantity, 10) || 0;
       payload.brand_id = null;
 
@@ -1528,19 +2017,29 @@ const ProductsView = () => {
       delete payload.thumbnailFile;
       delete payload.galleryFiles;
       delete payload.galleryPreviews;
-      delete payload.sizeRows;
-      delete payload.stock_id;
+      delete payload.color_groups;
       delete payload.parent_category_id;
       delete payload.show_offer;
       delete payload.cost_price;
+      if (typeof payload.thumbnail === 'string' && payload.thumbnail.startsWith('blob:')) {
+        payload.thumbnail = '';
+      }
+      payload.images = (payload.images || []).filter((img) => {
+        const url = typeof img === 'string' ? img : img?.url;
+        return url && !String(url).startsWith('blob:');
+      });
       payload.discount_price = formData.show_offer ? formData.discount_price || null : null;
+      payload.pos_sell_price = formData.pos_sell_price ? Number(formData.pos_sell_price) : null;
+      payload.inventory_opening_qty = formData.inventory_opening_qty
+        ? Number(formData.inventory_opening_qty)
+        : null;
 
       if (currentProduct) {
         await adminProductAPI.update(currentProduct.id, payload);
       } else {
         await adminProductAPI.create(payload);
       }
-      setIsModalOpen(false);
+      closeProductModal();
       fetchData();
     } catch (error) {
       console.error('Error saving product:', error);
@@ -1553,7 +2052,9 @@ const ProductsView = () => {
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">Inventory ({products.length})</h3>
+        <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">
+          Products ({filteredProducts.length}{filteredProducts.length !== products.length ? ` of ${products.length}` : ''})
+        </h3>
         <button 
           type="button"
           onClick={() => handleOpenModal()}
@@ -1563,17 +2064,59 @@ const ProductsView = () => {
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-3 p-4 bg-navy-900/40 border border-gold-500/10 rounded-2xl">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gold-500/40" size={14} />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search name, SKU, slug…"
+            className="w-full pl-9 pr-3 py-2.5 bg-navy-950 border border-gold-500/20 rounded-xl text-white text-sm outline-none focus:border-gold-500/40"
+          />
+        </div>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded-xl px-3 py-2.5 text-white text-sm min-w-[160px]"
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <select
+          value={stockFilter}
+          onChange={(e) => setStockFilter(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded-xl px-3 py-2.5 text-white text-sm"
+        >
+          <option value="all">All stock</option>
+          <option value="in_stock">In stock</option>
+          <option value="out_of_stock">Out of stock</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded-xl px-3 py-2.5 text-white text-sm"
+        >
+          <option value="all">All status</option>
+          <option value="active">Published</option>
+          <option value="inactive">Unpublished</option>
+        </select>
+      </div>
+
       <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm text-gold-100">
         {loading ? (
           <div className="py-24 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
           </div>
-        ) : products.length > 0 ? (
+        ) : filteredProducts.length > 0 ? (
           <AdminTable>
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-navy-800/50">
               <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
                 <th className="px-6 py-4">Product Details</th>
+                <th className="px-6 py-4">SKU</th>
                 <th className="px-6 py-4">Category</th>
                 <th className="px-6 py-4">Price</th>
                 <th className="px-6 py-4">Stock</th>
@@ -1582,13 +2125,15 @@ const ProductsView = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gold-500/5">
-              {products.map((p) => (
+              {filteredProducts.map((p) => {
+                const variantColors = [...new Set((p.variants || []).map((v) => v.color).filter(Boolean))];
+                return (
                 <tr key={p.id} className="hover:bg-navy-800/30 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-navy-800 rounded-xl border border-gold-500/10 overflow-hidden flex items-center justify-center">
-                        {p.thumbnail ? (
-                          <img src={p.thumbnail} alt={p.name} className="w-full h-full object-cover" />
+                        {resolveDisplayImageUrl(p.thumbnail) ? (
+                          <img src={resolveDisplayImageUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-cover" />
                         ) : (
                           <ShoppingBag size={24} className="text-gold-500/40" />
                         )}
@@ -1599,12 +2144,18 @@ const ProductsView = () => {
                       </div>
                     </div>
                   </td>
+                  <td className="px-6 py-4 font-mono text-[10px] text-gold-500/70 uppercase">{p.sku || '—'}</td>
                   <td className="px-6 py-4 text-[10px] font-bold text-gold-500/60 uppercase">{p.category_name || 'Uncategorized'}</td>
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.price).toLocaleString()}</td>
                   <td className="px-6 py-4">
                     <div className={`text-[10px] font-black uppercase ${p.stock_quantity === 0 ? 'text-red-400' : p.stock_quantity < 10 ? 'text-gold-500' : 'text-green-400'}`}>
                       {p.stock_quantity === 0 ? 'Out of Stock' : `${p.stock_quantity} units`}
                     </div>
+                    {variantColors.length > 0 && (
+                      <p className="text-[9px] text-gold-500/40 mt-1 uppercase tracking-wider">
+                        {variantColors.length} color{variantColors.length !== 1 ? 's' : ''}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${p.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'}`}>
@@ -1628,13 +2179,14 @@ const ProductsView = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
           </AdminTable>
         ) : (
           <div className="py-24 text-center text-gold-500/40 text-sm uppercase tracking-widest">
-            No products found in inventory.
+            No products match your filters.
           </div>
         )}
       </div>
@@ -1651,7 +2203,7 @@ const ProductsView = () => {
               <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">
                 {currentProduct ? 'Edit Product' : 'Add New Product'}
               </h4>
-              <button onClick={() => setIsModalOpen(false)} className="text-gold-500/40 hover:text-gold-500">
+              <button type="button" onClick={closeProductModal} className="text-gold-500/40 hover:text-gold-500">
                 <X size={24} />
               </button>
             </div>
@@ -1673,7 +2225,7 @@ const ProductsView = () => {
                           ...formData,
                           name: val,
                           slug: val.toLowerCase().replace(/ /g, '-'),
-                          stock_id: formData.stock_id ? formData.stock_id : buildStockId(val),
+                          sku: formData.sku ? formData.sku : buildProductSku(val),
                         });
                       }}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
@@ -1691,9 +2243,9 @@ const ProductsView = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Price (KSh)</label>
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Website Price (KSh)</label>
                     <input 
                       type="number" 
                       required
@@ -1703,7 +2255,31 @@ const ProductsView = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Total Stock</label>
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">POS / Shop Price (KSh)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Same as website if empty"
+                      value={formData.pos_sell_price}
+                      onChange={(e) => setFormData({ ...formData, pos_sell_price: e.target.value })}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                    />
+                    <p className="text-[9px] text-gold-500/35">In-store price for this product — not the category bucket average.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Shop inventory qty</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Auto-add to POS inventory"
+                      value={formData.inventory_opening_qty}
+                      onChange={(e) => setFormData({ ...formData, inventory_opening_qty: e.target.value })}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                    />
+                    <p className="text-[9px] text-gold-500/35">Opening qty when creating — links this product to shop inventory.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Website Stock</label>
                     <input 
                       type="number" 
                       required
@@ -1903,90 +2479,156 @@ const ProductsView = () => {
                 </div>
               </div>
 
-              {/* Variants Section — grouped by color */}
+              {/* Variants — colors & sizes */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
                   <div>
-                    <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Stock By Size</h5>
-                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">Tick available sizes and enter how many pieces are in stock for each size.</p>
+                    <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Colors & Sizes</h5>
+                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">Add each color, then set website stock per size. Zero stock hides that option from customers.</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({
+                      ...prev,
+                      color_groups: [...prev.color_groups, newColorGroup('')],
+                    }))}
+                    className="flex items-center gap-1 text-[10px] text-gold-400 hover:text-gold-300 font-black uppercase tracking-widest"
+                  >
+                    <Plus size={14} /> Add color
+                  </button>
                 </div>
 
                 <div className="bg-navy-950/50 border border-gold-500/15 rounded-2xl p-6 space-y-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Stock ID</label>
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Base SKU</label>
                     <input
                       type="text"
                       required
-                      placeholder="E.G. SHIRT-BLUE-001"
-                      value={formData.stock_id}
-                      onChange={(e) => setFormData({ ...formData, stock_id: e.target.value.toUpperCase() })}
-                      className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
+                      placeholder="E.G. CLARKS-TAN-WINGTIP"
+                      value={formData.sku}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                      className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase font-mono"
                     />
-                    <p className="text-[8px] text-gold-500/30 uppercase tracking-wider">This ID is shared by every selected size for this product.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-                    <input
-                      type="text"
-                      value={customSize}
-                      onChange={(e) => setCustomSize(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddCustomSize();
-                        }
-                      }}
-                      placeholder="ADD SIZE: 40, 50, XXL"
-                      className="w-full bg-navy-900 border border-gold-500/5 rounded-xl py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddCustomSize}
-                      className="px-5 py-3 rounded-xl border border-gold-500/20 text-gold-500 text-[10px] font-black uppercase tracking-widest hover:border-gold-500/50"
-                    >
-                      Add Size
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                    {displaySizeOptions.map((size) => {
-                      const row = formData.sizeRows.find((item) => item.size === size);
-                      return (
-                        <div
-                          key={size}
-                          className={`rounded-xl border p-3 space-y-3 transition-all ${
-                            row ? 'border-gold-500 bg-gold-600/10' : 'border-gold-500/10 bg-navy-900/50'
-                          }`}
-                        >
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(row)}
-                              onChange={() => handleToggleSize(size)}
-                              className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
-                            />
-                            <span className="text-[11px] font-black uppercase tracking-widest text-gold-100">{size}</span>
-                          </label>
-
-                          {row && (
-                            <div className="grid grid-cols-1 gap-2">
-                              <div className="space-y-1">
-                                <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Stock</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={row.stock}
-                                  onChange={(e) => handleSizeChange(size, 'stock', e.target.value)}
-                                  className="w-full bg-navy-950 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
-                                />
-                              </div>
-                            </div>
-                          )}
+                  {formData.color_groups.map((group) => (
+                    <div key={group._key} className="border border-gold-500/15 rounded-xl p-4 space-y-4 bg-navy-900/40">
+                      <div className="flex flex-wrap gap-3 items-start">
+                        <div className="flex-1 min-w-[160px] space-y-1">
+                          <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Color name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Black, Navy, Tan"
+                            value={group.color}
+                            onChange={(e) => setFormData((prev) => ({
+                              ...prev,
+                              color_groups: prev.color_groups.map((g) =>
+                                g._key === group._key ? { ...g, color: e.target.value } : g
+                              ),
+                            }))}
+                            className="w-full bg-navy-950 border border-gold-500/10 rounded-lg py-2.5 px-3 text-gold-100 text-sm outline-none focus:border-gold-500/30"
+                          />
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Color image</label>
+                          <div className="flex items-center gap-2">
+                            {group.imagePreview && (
+                              <img src={group.imagePreview} alt="" className="w-12 h-12 object-cover rounded border border-gold-500/20" />
+                            )}
+                            <label className="px-3 py-2 border border-gold-500/20 rounded-lg text-[10px] text-gold-500/70 cursor-pointer hover:border-gold-500/40">
+                              Upload
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleColorImage(group._key, e)} />
+                            </label>
+                          </div>
+                        </div>
+                        {formData.color_groups.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({
+                              ...prev,
+                              color_groups: prev.color_groups.filter((g) => g._key !== group._key),
+                            }))}
+                            className="text-red-400/70 hover:text-red-400 p-2 mt-5"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Sizes for this color</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sizeOptions.map((sz) => (
+                            <button
+                              key={sz}
+                              type="button"
+                              onClick={() => addSizeToGroup(group._key, sz)}
+                              className="px-2.5 py-1 text-[10px] border border-gold-500/25 text-gold-400 rounded hover:bg-gold-500/10"
+                            >
+                              {sz}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <input
+                            type="text"
+                            value={customSize}
+                            onChange={(e) => setCustomSize(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addSizeToGroup(group._key, customSize);
+                              }
+                            }}
+                            placeholder="Custom size"
+                            className="max-w-[120px] bg-navy-950 border border-gold-500/10 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addSizeToGroup(group._key, customSize)}
+                            className="px-3 py-2 text-[10px] border border-gold-500/30 text-gold-400 rounded-lg"
+                          >
+                            Add size
+                          </button>
+                        </div>
+                      </div>
+
+                      {group.sizes.length > 0 && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="text-gold-500/40">
+                              <tr>
+                                <th className="text-left p-2">Size</th>
+                                <th className="p-2">Web stock</th>
+                                <th className="p-2 w-10" />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.sizes.map((row) => (
+                                <tr key={row._key} className="border-t border-gold-500/10">
+                                  <td className="p-2 font-bold text-gold-100">{row.size}</td>
+                                  <td className="p-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={row.stock}
+                                      onChange={(e) => updateSizeInGroup(group._key, row._key, 'stock', e.target.value)}
+                                      className="w-20 bg-navy-950 border border-gold-500/10 rounded px-2 py-1 text-gold-100 text-center"
+                                    />
+                                  </td>
+                                  <td className="p-2 text-right">
+                                    <button type="button" onClick={() => removeSizeFromGroup(group._key, row._key)} className="text-red-400/60 hover:text-red-400">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -2016,7 +2658,7 @@ const ProductsView = () => {
                 <div className="flex gap-4 w-full md:w-auto">
                   <button 
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeProductModal}
                     className="px-8 py-4 bg-navy-800 text-gold-500/60 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-navy-700 hover:text-gold-500 transition-all border border-gold-500/10"
                   >
                     Cancel
@@ -2667,19 +3309,19 @@ const CustomersView = () => {
                   <td className="px-6 py-4 text-xs text-gold-500/60">{new Date(c.created_at).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}</td>
                   <td className="px-6 py-4">
                     <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-[0.1em] ${
-                      c.is_active ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
+                      c.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
                     }`}>
-                      {c.is_active ? 'Active' : 'Suspended'}
+                      {c.is_active !== false ? 'Active' : 'Suspended'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       <button 
-                        onClick={() => handleToggleStatus(c.id, c.is_active)}
-                        className={`p-2 rounded-lg transition-all ${c.is_active ? 'text-red-400/40 hover:text-red-400 hover:bg-red-400/5' : 'text-green-400/40 hover:text-green-400 hover:bg-green-400/5'}`}
-                        title={c.is_active ? 'Suspend Account' : 'Activate Account'}
+                        onClick={() => handleToggleStatus(c.id, c.is_active !== false)}
+                        className={`p-2 rounded-lg transition-all ${c.is_active !== false ? 'text-red-400/40 hover:text-red-400 hover:bg-red-400/5' : 'text-green-400/40 hover:text-green-400 hover:bg-green-400/5'}`}
+                        title={c.is_active !== false ? 'Suspend Account' : 'Activate Account'}
                       >
-                        {c.is_active ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                        {c.is_active !== false ? <UserMinus size={16} /> : <UserPlus size={16} />}
                       </button>
                       <button className="p-2 text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="View History"><Eye size={16} /></button>
                     </div>

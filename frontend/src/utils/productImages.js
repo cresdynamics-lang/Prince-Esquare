@@ -1,7 +1,7 @@
 // High-quality premium images for Prince Esquire
 // Sourced from local assets in public folder
 
-import { getImageSrc, optimizeCloudinaryUrl, isCloudinaryUrl } from './cloudinary';
+import { getImageSrc, optimizeCloudinaryUrl, isCloudinaryUrl, isBlobUrl } from './cloudinary';
 
 const LOCAL_IMAGES = [
   '/polo black.jpeg',
@@ -90,7 +90,12 @@ export const getPremiumImage = (product) => {
     getImageSrc(product.image_url) ||
     product.thumbnail ||
     product.image_url;
-  if (customImage && !customImage.includes('placeholder') && !customImage.includes('unsplash')) {
+  if (
+    customImage &&
+    !isBlobUrl(customImage) &&
+    !customImage.includes('placeholder') &&
+    !customImage.includes('unsplash')
+  ) {
     return isCloudinaryUrl(customImage)
       ? optimizeCloudinaryUrl(customImage, { width: 800 })
       : customImage;
@@ -123,7 +128,7 @@ const preloadedImages = new Set();
 export const preloadProductImages = (urls = []) => {
   if (typeof window === 'undefined') return;
 
-  urls.filter(Boolean).forEach((url) => {
+  urls.filter((url) => url && !isBlobUrl(url)).forEach((url) => {
     if (preloadedImages.has(url)) return;
     preloadedImages.add(url);
 

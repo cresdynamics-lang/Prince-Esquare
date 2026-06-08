@@ -7,10 +7,8 @@ import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import { useCartStore } from '../store/useCartStore';
 import { getPremiumImage, preloadProductImages } from '../utils/productImages';
-import { getDummyProducts } from '../utils/dummyData';
 import { catalogueAPI, productAPI, adminCategoryAPI } from '../services/api';
 import { buildBreadcrumbSchema, categoryFallbackIntro, routeSeo } from '../seo/seoData';
-
 const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
 
 const CATEGORY_DATA = [
@@ -92,8 +90,10 @@ const Products = ({ categoryOverride = null }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
   const [addedProductId, setAddedProductId] = useState(null);
-  
+  const [fetchError, setFetchError] = useState('');
+
   const isDedicatedCategoryPage = Boolean(categoryOverride);
   const currentCategory = categoryOverride || searchParams.get('category') || 'All';
   const currentSub = searchParams.get('sub') || 'All';
@@ -101,6 +101,7 @@ const Products = ({ categoryOverride = null }) => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setFetchError('');
       const params = {};
       if (currentCategory !== 'All') params.category = currentCategory;
       if (currentSub !== 'All') params.sub = currentSub;
@@ -134,10 +135,11 @@ const Products = ({ categoryOverride = null }) => {
             name: p.name,
             sub: allCats.filter(c => c.parent_id === p.id).map(c => c.name)
           })));
-          setProducts(fetchedProducts.length ? fetchedProducts : getDummyProducts(currentCategory, currentSub));
+          setProducts(fetchedProducts);
         } catch (fallbackError) {
           console.error('Fallback product fetch failed:', fallbackError);
-          setProducts(getDummyProducts(currentCategory, currentSub));
+          setFetchError('Could not load products. Please check your connection and try again.');
+          setProducts([]);
         }
       } finally {
         setLoading(false);
@@ -206,7 +208,10 @@ const Products = ({ categoryOverride = null }) => {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (product.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesSearch;
+    if (!matchesSearch) return false;
+    if (stockFilter === 'in_stock' && product.out_of_stock) return false;
+    if (stockFilter === 'out_of_stock' && !product.out_of_stock) return false;
+    return true;
   });
 
   return (
@@ -301,27 +306,44 @@ const Products = ({ categoryOverride = null }) => {
               </div>
             </div>
 
-            <div className="relative w-full md:w-80 group">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-600/30 group-focus-within:text-gold-500 transition-colors"
-                size={16}
-              />
-              <input
-                type="text"
-                placeholder="Search collection..."
-                className="w-full pl-12 pr-4 py-4 bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                className="bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white px-4 py-4 outline-none focus:border-gold-600"
+              >
+                <option value="all">All availability</option>
+                <option value="in_stock">In stock only</option>
+                <option value="out_of_stock">Out of stock</option>
+              </select>
+              <div className="relative w-full md:w-80 group">
+                <Search
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-600/30 group-focus-within:text-gold-500 transition-colors"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  placeholder="Search collection..."
+                  className="w-full pl-12 pr-4 py-4 bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           </div>
+
+          {fetchError && (
+            <p className="text-center text-red-400/80 text-sm py-8">{fetchError}</p>
+          )}
 
           {loading ? (
             <p className="text-center text-gold-600/50 text-[10px] uppercase tracking-widest py-24">Loading collection…</p>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-10 gap-y-12 sm:gap-y-20">
               <AnimatePresence mode="popLayout">
-                {filteredProducts.map((product) => (
+                {filteredProducts.map((product) => {
+                  const outOfStock = product.out_of_stock === true;
+                  return (
                   <motion.div
                     key={product.id}
                     layout
@@ -337,17 +359,23 @@ const Products = ({ categoryOverride = null }) => {
                           alt={product.name}
                           loading="eager"
                           decoding="async"
-                          className="w-full h-full object-contain p-3 bg-white transition-transform duration-700 group-hover:scale-105"
+                          className={`w-full h-full object-contain p-3 bg-white transition-transform duration-700 group-hover:scale-105 ${outOfStock ? 'opacity-50' : ''}`}
                         />
+                        {outOfStock && (
+                          <span className="absolute top-3 left-3 bg-red-600/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-1">
+                            Out of Stock
+                          </span>
+                        )}
                         <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 px-4">
                           <button 
                             onClick={(e) => {
                               e.preventDefault();
-                              handleQuickAdd(product);
+                              if (!outOfStock) handleQuickAdd(product);
                             }}
-                            className="bg-white text-navy-950 px-5 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500"
+                            disabled={outOfStock}
+                            className="bg-white text-navy-950 px-5 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 disabled:opacity-40"
                           >
-                            {addedProductId === product.id ? 'Added' : 'Add to Cart'}
+                            {outOfStock ? 'Unavailable' : addedProductId === product.id ? 'Added' : 'Add to Cart'}
                           </button>
                           <button
                             onClick={(e) => {
@@ -369,7 +397,7 @@ const Products = ({ categoryOverride = null }) => {
                       </div>
                     </Link>
                   </motion.div>
-                ))}
+                );})}
               </AnimatePresence>
             </div>
           )}

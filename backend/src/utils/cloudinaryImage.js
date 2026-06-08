@@ -84,12 +84,33 @@ const applyProductImageOptimization = (product) => {
     : thumbnail;
   product.images = normalizeImagesArray(product.images);
   if (product.variants && Array.isArray(product.variants)) {
-    product.variants = product.variants.map((v) => ({
-      ...v,
-      image_url_optimized: v.image_url
-        ? optimizeCloudinaryUrl(v.image_url, { width: 800 })
-        : v.image_url,
-    }));
+    product.variants = product.variants.map((v) => {
+      let angleImages = v.angle_images;
+      if (typeof angleImages === 'string') {
+        try {
+          angleImages = JSON.parse(angleImages);
+        } catch {
+          angleImages = [];
+        }
+      }
+      return {
+        ...v,
+        image_url_optimized: v.image_url
+          ? optimizeCloudinaryUrl(v.image_url, { width: 800 })
+          : v.image_url,
+        angle_images: Array.isArray(angleImages)
+          ? angleImages.map((img) => {
+              const url = img.url || img;
+              return {
+                ...img,
+                url,
+                optimized: optimizeCloudinaryUrl(url, { width: 800 }),
+                thumbnail: optimizeCloudinaryUrl(url, { width: 400 }),
+              };
+            })
+          : [],
+      };
+    });
   }
   return product;
 };

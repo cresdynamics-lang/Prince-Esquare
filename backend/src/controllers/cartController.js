@@ -1,6 +1,14 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeVariantId = (value) => {
+    if (!value) return null;
+    const id = String(value).trim();
+    return UUID_RE.test(id) ? id : null;
+};
+
 // @desc    Get user's cart
 // @route   GET /api/cart
 exports.getCart = async (req, res, next) => {
@@ -31,7 +39,7 @@ exports.addItem = async (req, res, next) => {
         const { product_id, variant_id, quantity, size_label } = req.body;
         const qty = Math.max(1, parseInt(quantity, 10) || 1);
         const size = size_label != null && size_label !== '' ? String(size_label) : null;
-        const vid = variant_id || null;
+        const vid = normalizeVariantId(variant_id);
 
         const existing = await db.query(
             'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 ' +

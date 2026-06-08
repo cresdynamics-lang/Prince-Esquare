@@ -151,7 +151,7 @@ export const buildProductSchema = (product, image, price) => ({
   name: product.name,
   image: image ? [image.startsWith('http') ? image : `${SITE_URL}${image}`] : [DEFAULT_IMAGE],
   description: product.description || `Luxury ${product.name} from Prince Esquire Kenya.`,
-  sku: String(product.id || product.slug || product.name),
+  sku: String(product.sku || product.slug || product.name),
   brand: {
     '@type': 'Brand',
     name: product.brand_name || product.brand || SITE_NAME,

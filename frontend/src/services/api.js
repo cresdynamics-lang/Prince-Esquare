@@ -1,19 +1,69 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 30000,
 });
 
-// Inject JWT from persisted Zustand store on every request
+const requestId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `fe-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+};
+
+const CUSTOMER_ONLY_PREFIXES = ['/cart', '/orders', '/checkout', '/profile', '/wishlist'];
+
+const isCustomerApiRoute = (url = '') =>
+  CUSTOMER_ONLY_PREFIXES.some((prefix) => url.startsWith(prefix));
+
 API.interceptors.request.use((config) => {
-  try {
-    const authStorage = JSON.parse(localStorage.getItem('prince-esquire-auth'));
-    const token = authStorage?.state?.token;
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    // eslint-disable-next-line no-unused-vars
-  } catch (_) { /* empty */ }
+  config.headers['X-Request-Id'] = config.headers['X-Request-Id'] || requestId();
+  const { token, isSeller, user } = useAuthStore.getState();
+  const isStaffToken = isSeller || user?.accountType === 'pos';
+  const skipStaffToken = isStaffToken && isCustomerApiRoute(config.url || '');
+
+  if (token && !skipStaffToken) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    try {
+      const authStorage = JSON.parse(localStorage.getItem('prince-esquire-auth'));
+      const stored = authStorage?.state?.token;
+      if (stored) config.headers.Authorization = `Bearer ${stored}`;
+      // eslint-disable-next-line no-unused-vars
+    } catch (_) { /* empty */ }
+  }
+  if (import.meta.env.DEV && import.meta.env.VITE_LOG_API_REQUESTS === 'true') {
+    // eslint-disable-next-line no-console
+    console.debug(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+  }
   return config;
 });
+
+API.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error.response?.status;
+    // 401 = session expired; 403 = role mismatch (e.g. seller hitting admin-only API) — don't kick sellers out
+    if (status === 401 && typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const hadToken = Boolean(useAuthStore.getState().token);
+      // Only redirect when an existing session expired — not during login attempts
+      if (path.startsWith('/admin') && path !== '/admin/login' && hadToken) {
+        useAuthStore.getState().logout();
+        window.location.href = '/admin/login';
+      }
+    }
+    if (status === 429 && typeof window !== 'undefined') {
+      const retryAfter = error.response?.headers?.['retry-after'];
+      const msg = retryAfter
+        ? `Too many requests. Try again in ${retryAfter} seconds.`
+        : 'Too many requests. Please wait a moment and try again.';
+      error.rateLimited = true;
+      error.userMessage = msg;
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 export const authAPI = {
@@ -47,6 +97,8 @@ export const cartAPI = {
 
 export const orderAPI = {
   create: (body) => API.post('/orders', body),
+  createGuest: (body) => API.post('/orders/guest', body),
+  getCheckout: (id, email) => API.get(`/orders/checkout/${id}`, { params: email ? { email } : {} }),
   getMyOrders: () => API.get('/orders/my-orders'),
   getOne: (id) => API.get(`/orders/${id}`),
 };
@@ -73,8 +125,10 @@ export const adminAnalyticsAPI = {
 export const adminOrderAPI = {
   getAll: (params) => API.get('/admin/orders', { params }),
   getOne: (id) => API.get(`/admin/orders/${id}`),
+  exportCsv: () => API.get('/admin/orders/export', { responseType: 'blob' }),
   updateStatus: (id, status) => API.patch(`/admin/orders/${id}/status`, { status }),
-  updatePayment: (id, status) => API.patch(`/admin/orders/${id}/payment`, { status }),
+  updatePayment: (id, payment_status) => API.patch(`/admin/orders/${id}/payment`, { payment_status }),
+  cancel: (id) => API.patch(`/admin/orders/${id}/cancel`),
   refund: (id) => API.post(`/admin/orders/${id}/refund`),
 };
 
@@ -179,6 +233,129 @@ export const adminInventoryAPI = {
   getMovements: (params) => API.get('/admin/inventory/movements', { params }),
   getCurrentStock: (params) => API.get('/admin/inventory/current-stock', { params }),
   getTransfers: () => API.get('/admin/inventory/transfers'),
+};
+
+// ── POS AUTH ──────────────────────────────────────────────────────────
+export const posAuthAPI = {
+  login: (data) => API.post('/auth/pos/login', data),
+};
+
+// ── POS TERMINAL ──────────────────────────────────────────────────────
+export const posAPI = {
+  searchProducts: (params = {}) => {
+    const p = typeof params === 'string' ? { search: params } : params;
+    return API.get('/pos/products', { params: p });
+  },
+  createSale: (body) => API.post('/pos/sale', body),
+  listSales: (params) => API.get('/pos/sales', { params }),
+  voidSale: (id, body) => API.patch(`/pos/sales/${id}/void`, body),
+  clockIn: () => API.post('/shifts/clock-in'),
+  clockOut: () => API.post('/shifts/clock-out'),
+  getCurrentShift: () => API.get('/shifts/my/current'),
+  getShiftSummary: () => API.get('/shifts/my/summary'),
+};
+
+export const inventoryAPI = {
+  stockIn: (body) => API.post('/inventory/stock-in', body),
+  stockOut: (body) => API.post('/inventory/stock-out', body),
+  receiveAtStore: (body) => API.post('/inventory/store-receive', body),
+  closeDay: () => API.post('/inventory/close-day'),
+  dailySheet: (date) => API.get('/inventory/daily-sheet', { params: { date } }),
+  movements: (params) => API.get('/inventory/movements', { params }),
+  stockLevels: (params) => API.get('/inventory/stock-levels', { params }),
+  categoryPieces: (params) => API.get('/inventory/category-pieces', { params }),
+  categorySummary: () => API.get('/inventory/category-summary'),
+  stockTake: (body) => API.post('/inventory/stock-take', body),
+  updateThreshold: (id, body) => API.patch(`/inventory/products/${id}/threshold`, body),
+  publishToWebsite: (id, body) => API.post(`/inventory/products/${id}/publish`, body),
+  unpublishFromWebsite: (id) => API.post(`/inventory/products/${id}/unpublish`),
+  createItem: (body) => API.post('/inventory/products', body),
+  getProductDetail: (id) => API.get(`/inventory/products/${id}`),
+  saveProductDetails: (id, body) => API.put(`/inventory/products/${id}/details`, body),
+  syncFromWebsite: (id) => API.post(`/inventory/products/${id}/sync-website`),
+  seedDemo: () => API.post('/inventory/seed-demo'),
+  syncAlignment: () => API.post('/inventory/sync-alignment'),
+  downloadCatalogTemplate: () =>
+    API.get('/inventory/template', { params: { type: 'catalog' }, responseType: 'blob' }),
+  exportProductCatalog: (category) =>
+    API.get('/inventory/export-catalog', { params: category ? { category } : {}, responseType: 'blob' }),
+  importExcel: (file, { date, mode = 'full' } = {}) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (date) form.append('date', date);
+    if (mode) form.append('mode', mode);
+    return API.post('/inventory/import-excel', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  exportStock: (date) =>
+    API.get('/inventory/export-stock', { params: { date }, responseType: 'blob' }),
+  exportVariantStock: (category) =>
+    API.get('/inventory/export-variant-stock', { params: category ? { category } : {}, responseType: 'blob' }),
+  importVariantStock: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return API.post('/inventory/import-variant-stock', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  variantStockSummary: (params) => API.get('/inventory/variant-stock-summary', { params }),
+  downloadVariantTemplate: () =>
+    API.get('/inventory/template', { params: { type: 'variants' }, responseType: 'blob' }),
+  downloadTemplate: () => API.get('/inventory/template', { responseType: 'blob' }),
+};
+
+export const shiftsAPI = {
+  list: (params) => API.get('/shifts', { params }),
+  getOne: (id) => API.get(`/shifts/${id}`),
+};
+
+export const sellersAPI = {
+  list: () => API.get('/sellers'),
+  create: (body) => API.post('/sellers', body),
+  toggle: (id) => API.patch(`/sellers/${id}/toggle`),
+  sales: (id, params) => API.get(`/sellers/${id}/sales`, { params }),
+};
+
+export const reportsAPI = {
+  dailySales: (params) => API.get('/reports/daily-sales', { params, responseType: 'blob' }),
+  stockReport: (params) => API.get('/reports/stock-report', { params, responseType: 'blob' }),
+  stockMovements: (params) => API.get('/reports/stock-movements', { params, responseType: 'blob' }),
+  shiftReport: (params) => API.get('/reports/shift-report', { params, responseType: 'blob' }),
+  lowStock: (params) => API.get('/reports/low-stock', { params, responseType: 'blob' }),
+  endOfDay: (params) => API.get('/reports/end-of-day', { params, responseType: 'blob' }),
+};
+
+/** Download Excel report with auth token */
+export const downloadReport = async (fetcher, filename, params = {}) => {
+  const res = await fetcher(params);
+  const blob = new Blob([res.data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+export const posSettingsAPI = {
+  get: () => API.get('/settings'),
+  getTerminal: () => API.get('/settings/terminal'),
+  update: (body) => API.patch('/settings', body),
+};
+
+export const posAdminAPI = {
+  getOverview: () => API.get('/pos-admin/overview'),
+  auditLog: (params) => API.get('/pos-admin/audit-log', { params }),
+};
+
+export const onlineSaleAPI = {
+  record: (body) =>
+    API.post('/pos/online-sale', body, {
+      headers: { 'x-internal-key': import.meta.env.VITE_INTERNAL_KEY },
+    }),
 };
 
 export default API;

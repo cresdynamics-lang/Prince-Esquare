@@ -149,7 +149,7 @@ const Cart = () => {
                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </motion.button>
                   <p className="text-[9px] text-gold-600/30 text-center uppercase tracking-[0.3em] font-bold">
-                    Guest Checkout Available
+                    Guest checkout available — sign in optional
                   </p>
                 </div>
               </div>

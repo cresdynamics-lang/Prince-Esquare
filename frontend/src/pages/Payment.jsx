@@ -6,21 +6,36 @@ import Footer from '../components/Footer';
 import { useAuthStore } from '../store/useAuthStore';
 import { orderAPI, paymentAPI } from '../services/api';
 
+const isCustomerSession = () => {
+  const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
+  return isAuthenticated && token && !isSeller && user?.accountType !== 'pos';
+};
+
 const Payment = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
   const [order, setOrder] = useState(null);
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
+  const [devMode, setDevMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await orderAPI.getOne(orderId);
+        const checkoutEmail = sessionStorage.getItem('checkout-email') || '';
+        let res;
+        if (isCustomerSession()) {
+          res = await orderAPI.getOne(orderId);
+        } else {
+          if (!checkoutEmail) {
+            if (!cancelled) navigate('/checkout');
+            return;
+          }
+          res = await orderAPI.getCheckout(orderId, checkoutEmail);
+        }
         if (cancelled) return;
         if (res.data?.success) setOrder(res.data.data);
         else navigate('/cart');
@@ -35,19 +50,24 @@ const Payment = () => {
 
   const total = order ? parseFloat(order.total_amount) : 0;
   const method = order?.payment_method || 'mpesa';
+  const checkoutEmail = sessionStorage.getItem('checkout-email') || '';
+
+  const payPayload = () => ({
+    amount: Math.round(total),
+    phoneNumber: phone.replace(/\D/g, '') || '254700000000',
+    order_id: orderId,
+    email: checkoutEmail,
+  });
 
   const payMpesa = async (e) => {
     e.preventDefault();
     setErr('');
     setBusy(true);
     try {
-      const digits = phone.replace(/\D/g, '');
-      await paymentAPI.stkPush({
-        amount: Math.round(total),
-        phoneNumber: digits || '254700000000',
-        order_id: orderId,
-      });
+      const res = await paymentAPI.stkPush(payPayload());
+      setDevMode(Boolean(res.data?.data?.devMode));
       setDone(true);
+      sessionStorage.removeItem('checkout-email');
     } catch (er) {
       setErr(er.response?.data?.message || 'Payment request failed');
     } finally {
@@ -58,12 +78,10 @@ const Payment = () => {
   const payCardDemo = async () => {
     setBusy(true);
     try {
-      await paymentAPI.stkPush({
-        amount: Math.round(total),
-        phoneNumber: '254000000000',
-        order_id: orderId,
-      });
+      const res = await paymentAPI.stkPush(payPayload());
+      setDevMode(Boolean(res.data?.data?.devMode));
       setDone(true);
+      sessionStorage.removeItem('checkout-email');
     } catch (er) {
       setErr(er.response?.data?.message || 'Could not confirm payment');
     } finally {
@@ -86,6 +104,9 @@ const Payment = () => {
           <div className="border border-gold-500/20 p-10 text-center space-y-6">
             <p className="text-white font-serif text-2xl">Thank you</p>
             <p className="text-navy-300 text-sm">Your payment has been recorded for order #{String(order.id).slice(0, 8)}.</p>
+            {devMode && (
+              <p className="text-amber-400/80 text-xs">Development payment mode — configure MPESA_* in production .env for live M-Pesa.</p>
+            )}
             <Link to="/products" className="inline-block bg-gold-600 text-navy-950 px-8 py-4 text-[10px] font-bold uppercase tracking-widest">
               Continue shopping
             </Link>
@@ -125,7 +146,7 @@ const Payment = () => {
             ) : (
               <div className="space-y-6 text-center">
                 <CreditCard className="mx-auto text-gold-500" size={40} />
-                <p className="text-navy-300 text-sm">Card processing is not connected. Confirm this demo payment to mark the order paid.</p>
+                <p className="text-navy-300 text-sm">Card processing is not connected. Confirm payment to complete your order.</p>
                 <button
                   type="button"
                   disabled={busy}

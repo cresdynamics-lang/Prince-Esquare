@@ -6,11 +6,20 @@ import Footer from '../components/Footer';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCartStore } from '../store/useCartStore';
 import { orderAPI } from '../services/api';
+import { toCartVariantId } from '../utils/ids';
+
+const isCustomerSession = () => {
+  const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
+  return isAuthenticated && token && !isSeller && user?.accountType !== 'pos';
+};
 
 const Checkout = () => {
   const { isAuthenticated, user } = useAuthStore();
-  const { items, getCheckoutTotals, loadCart } = useCartStore();
+  const items = useCartStore((state) => state.items);
+  const getCheckoutTotals = useCartStore((state) => state.getCheckoutTotals);
+  const prepareForCheckout = useCartStore((state) => state.prepareForCheckout);
   const navigate = useNavigate();
+  const [cartReady, setCartReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,19 +32,47 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('mpesa');
 
   useEffect(() => {
-    if (isAuthenticated) loadCart();
-  }, [isAuthenticated, loadCart]);
+    let cancelled = false;
+    (async () => {
+      await prepareForCheckout();
+      if (!cancelled) setCartReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [prepareForCheckout, isAuthenticated]);
 
-  // Guest checkout enabled - no authentication required
+  if (!cartReady) {
+    return (
+      <div className="bg-navy-950 min-h-screen flex items-center justify-center text-gold-500 text-[10px] uppercase tracking-widest">
+        Preparing checkout…
+      </div>
+    );
+  }
+
   if (items.length === 0) return <Navigate to="/cart" />;
 
   const totals = getCheckoutTotals();
+
+  const customerLoggedIn = isCustomerSession();
+  const lineItems = (list) =>
+    list
+      .filter((it) => String(it.productId).length >= 32)
+      .map((it) => ({
+        product_id: it.productId,
+        variant_id: toCartVariantId(it.variantId),
+        quantity: it.quantity,
+        size_label: it.sizeLabel || null,
+      }));
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
     try {
+      const syncedItems = customerLoggedIn ? await prepareForCheckout() : items;
+      if (!syncedItems.length) {
+        throw new Error('Your bag is empty. Add items before checking out.');
+      }
+
       const shipping_address = {
         first_name: firstName,
         last_name: lastName,
@@ -45,14 +82,22 @@ const Checkout = () => {
         city,
         country: 'Kenya',
       };
-      const res = await orderAPI.create({
+
+      const payload = {
         shipping_address,
         billing_address: shipping_address,
         payment_method: paymentMethod,
-      });
+        items: lineItems(syncedItems),
+      };
+
+      const res = customerLoggedIn
+        ? await orderAPI.create(payload)
+        : await orderAPI.createGuest(payload);
+
       if (!res.data?.success) throw new Error(res.data?.message || 'Order failed');
       const order = res.data.data;
-      await loadCart();
+      sessionStorage.setItem('checkout-email', shipping_address.email);
+      useCartStore.getState().clearLocalItems();
       navigate(`/payment/${order.id}`);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Could not place order');
@@ -76,6 +121,17 @@ const Checkout = () => {
 
           {error && (
             <div className="mb-8 bg-red-500/10 border border-red-500/30 text-red-400 text-sm py-3 px-4 text-center">{error}</div>
+          )}
+
+          {!customerLoggedIn ? (
+            <div className="mb-8 bg-navy-900/50 border border-gold-500/20 text-gold-400/90 text-sm py-4 px-6 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <span>Checking out as guest — no account needed.</span>
+              <Link to="/login?redirect=/checkout" className="text-gold-500 text-[10px] font-bold uppercase tracking-widest hover:text-gold-300 shrink-0">
+                Sign in instead
+              </Link>
+            </div>
+          ) : (
+            <p className="mb-8 text-gold-500/50 text-[10px] uppercase tracking-widest">Signed in as {user?.email}</p>
           )}
 
           <form onSubmit={handlePlaceOrder}>

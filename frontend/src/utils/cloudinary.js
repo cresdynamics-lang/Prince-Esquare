@@ -7,6 +7,26 @@ export const CLOUDINARY_PRESET = 'PRINCE-eSQUIIRE';
 export const isCloudinaryUrl = (url) =>
   typeof url === 'string' && url.includes('res.cloudinary.com');
 
+export const isBlobUrl = (url) =>
+  typeof url === 'string' && url.startsWith('blob:');
+
+/** Safe src for <img> — blob URLs expire after navigation/reload and must not be persisted. */
+export const resolveDisplayImageUrl = (url) => {
+  if (!url || isBlobUrl(url)) return '';
+  if (typeof url === 'object') return getImageSrc(url);
+  return url;
+};
+
+export const revokeBlobUrl = (url) => {
+  if (isBlobUrl(url)) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
+  }
+};
+
 /**
  * @param {string|{ url?: string, optimized?: string, thumbnail?: string }} image
  */

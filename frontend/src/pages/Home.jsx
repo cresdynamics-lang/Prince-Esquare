@@ -20,9 +20,11 @@ const Home = () => {
       
       <main>
         <HeroSlider />
-        
+
+        <ProductShowcase />
+
         {/* Quote Section */}
-        <section className="py-40 bg-navy-950 text-center relative overflow-hidden">
+        <section className="py-16 md:py-20 bg-navy-950 text-center relative overflow-hidden border-t border-gold-600/10">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-24 bg-gradient-to-b from-gold-500/50 to-transparent" />
           <div className="container mx-auto px-6 max-w-4xl">
             <motion.div
@@ -42,8 +44,6 @@ const Home = () => {
             </motion.div>
           </div>
         </section>
-
-        <ProductShowcase />
 
         <CategoryGrid />
 

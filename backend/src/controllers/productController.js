@@ -1,20 +1,65 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const { applyProductImageOptimization } = require('../utils/cloudinaryImage');
 const db = require('../config/db');
+const { getPosStockForProductIds } = require('../services/productPosLink');
+const { attachVariantAvailability } = require('../utils/productAvailability');
+const { generateProductSku, generateVariantSku } = require('../utils/sku');
+const { isAdminRole, isSellerRole } = require('../utils/posHelpers');
 
-const toStockIdPart = (value) => String(value || '')
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+const isStaffUser = (user) => user && (isAdminRole(user) || isSellerRole(user));
 
-const getVariantStockId = (productKey, variant) => {
-    const provided = toStockIdPart(variant.stock_id);
-    if (provided) return provided;
+const stripPosStockFields = (item) => {
+    if (!item || typeof item !== 'object') return item;
+    const {
+        pos_stock_qty,
+        pos_in_stock,
+        pos_product_name,
+        pos_stock_product_id,
+        ...rest
+    } = item;
+    return rest;
+};
 
-    const productPart = toStockIdPart(productKey) || 'PRODUCT';
-    const colorPart = toStockIdPart(variant.color) || 'DEFAULT';
-    return `${productPart}-${colorPart}`;
+const forAudience = (data, req) => {
+    if (isStaffUser(req.user)) return data;
+    return Array.isArray(data) ? data.map(stripPosStockFields) : stripPosStockFields(data);
+};
+
+const attachPosStock = async (products, { forStaff = false } = {}) => {
+    const list = Array.isArray(products) ? products : [products];
+    const ids = list.map((p) => p.id).filter(Boolean);
+    const stockMap = await getPosStockForProductIds(ids);
+    const withPos = list.map((p) => {
+        const pos = stockMap[p.id];
+        const posQty = pos?.qty;
+        const usePos = pos?.posProductId != null;
+        return {
+            ...p,
+            pos_stock_product_id: pos?.posProductId || p.pos_stock_product_id,
+            pos_stock_qty: usePos ? posQty : null,
+            pos_in_stock: usePos ? posQty > 0 : null,
+            pos_product_name: pos?.posProductName || null,
+        };
+    });
+    const enriched = await attachVariantAvailability(withPos, { includePosStock: forStaff });
+    return Array.isArray(products) ? enriched : enriched[0];
+};
+
+const mapVariantRow = (v, productSku) => {
+    const sku = generateVariantSku(productSku, v);
+    return {
+        id: v.id,
+        name: v.name,
+        value: v.value,
+        stock: v.stock_quantity,
+        price_modifier: v.price_modifier,
+        image_url: v.image_url,
+        angle_images: v.angle_images,
+        color: v.color,
+        size: v.size,
+        sku,
+        stock_id: sku,
+    };
 };
 
 // @desc    Get all products (with filtering, sorting, pagination)
@@ -89,7 +134,9 @@ exports.getProducts = async (req, res, next) => {
         const countResult = await db.query(countQuery);
         const total = parseInt(countResult.rows[0].count);
 
-        const products = result.rows.map((p) => applyProductImageOptimization(p));
+        let products = result.rows.map((p) => applyProductImageOptimization(p));
+        products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+        products = forAudience(products, req);
         formatResponse(res, 200, true, 'Products fetched successfully', {
             products,
             pagination: {
@@ -136,19 +183,13 @@ exports.getProductBySlug = async (req, res, next) => {
 
         // Fetch variants
         const variantsResult = await db.query('SELECT * FROM product_variants WHERE product_id = $1', [product.id]);
-        product.variants = variantsResult.rows.map(v => ({
-            id: v.id,
-            name: v.name,
-            value: v.value,
-            stock: v.stock_quantity,
-            price_modifier: v.price_modifier,
-            image_url: v.image_url,
-            color: v.color,
-            size: v.size,
-            stock_id: v.stock_id
-        }));
+        product.variants = variantsResult.rows.map((v) => mapVariantRow(v, product.sku || product.slug || product.name));
 
-        formatResponse(res, 200, true, 'Product details fetched', applyProductImageOptimization(product));
+        const enriched = await attachPosStock(
+            applyProductImageOptimization(product),
+            { forStaff: isStaffUser(req.user) }
+        );
+        formatResponse(res, 200, true, 'Product details fetched', forAudience(enriched, req));
     } catch (error) {
         next(error);
     }
@@ -158,12 +199,13 @@ exports.getProductBySlug = async (req, res, next) => {
 // @route   POST /api/admin/products
 exports.createProduct = async (req, res, next) => {
     try {
-        const { name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images, variants } = req.body;
-        
+        const { name, slug, description, price, discount_price, pos_sell_price, inventory_opening_qty, category_id, brand_id, stock_quantity, is_featured, thumbnail, images, variants, sku } = req.body;
+        const productSku = generateProductSku({ name, slug, sku });
+
         const result = await db.query(
-            'INSERT INTO products (name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images) ' +
-            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-            [name, slug, description || null, price || 0, discount_price || null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, thumbnail || null, JSON.stringify(images || [])]
+            'INSERT INTO products (name, slug, sku, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images) ' +
+            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price || null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, thumbnail || null, JSON.stringify(images || [])]
         );
 
         const productId = result.rows[0].id;
@@ -172,12 +214,30 @@ exports.createProduct = async (req, res, next) => {
         if (variants && Array.isArray(variants)) {
             for (const v of variants) {
                 const value = `${v.size || ''} / ${v.color || ''}`;
-                const stockId = getVariantStockId(slug || name, v);
+                const variantSku = generateVariantSku(productSku, v);
                 await db.query(
-                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, stockId]
+                    'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, sku, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku]
                 );
             }
+        }
+
+        const { ensurePosForEcommerceProduct } = require('../services/inventoryChannel');
+        const posRow = await ensurePosForEcommerceProduct(result.rows[0]);
+        const openingQty = parseInt(inventory_opening_qty, 10);
+        if (posRow?.id && openingQty > 0) {
+          const { importCatalogRows } = require('../services/productCatalogImport');
+          await importCatalogRows(
+            [{
+              name: result.rows[0].name,
+              sku: posRow.sku || productSku,
+              category: posRow.category || 'General',
+              shopPrice: parseFloat(pos_sell_price || discount_price || price || 0),
+              openingQty,
+              websiteSku: productSku,
+            }],
+            { performedBy: req.user?.id || null }
+          );
         }
 
         formatResponse(res, 201, true, 'Product created successfully', result.rows[0]);
@@ -191,12 +251,13 @@ exports.createProduct = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, slug, description, price, discount_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants } = req.body;
+        const { name, slug, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, sku } = req.body;
+        const productSku = generateProductSku({ name, slug, sku });
 
         const result = await db.query(
-            'UPDATE products SET name = $1, slug = $2, description = $3, price = $4, discount_price = $5, category_id = $6, brand_id = $7, ' +
-            'stock_quantity = $8, is_featured = $9, is_active = $10, thumbnail = $11, images = $12 WHERE id = $13 RETURNING *',
-            [name, slug, description || null, price || 0, discount_price || null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, is_active !== undefined ? is_active : true, thumbnail || null, JSON.stringify(images || []), id]
+            'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, price = $5, discount_price = $6, pos_sell_price = $7, category_id = $8, brand_id = $9, ' +
+            'stock_quantity = $10, is_featured = $11, is_active = $12, thumbnail = $13, images = $14 WHERE id = $15 RETURNING *',
+            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price ?? null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, is_active !== undefined ? is_active : true, thumbnail || null, JSON.stringify(images || []), id]
         );
 
         if (result.rows.length === 0) {
@@ -216,16 +277,16 @@ exports.updateProduct = async (req, res, next) => {
             // Insert or update
             for (const v of variants) {
                 const value = `${v.size || ''} / ${v.color || ''}`;
-                const stockId = getVariantStockId(slug || name, v);
+                const variantSku = generateVariantSku(productSku, v);
                 if (v.id) {
                     await db.query(
-                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4, image_url = $5, color = $6, size = $7, stock_id = $8 WHERE id = $9',
-                        ['Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, stockId, v.id]
+                        'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4, image_url = $5, color = $6, size = $7, sku = $8, stock_id = $9 WHERE id = $10',
+                        ['Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku, v.id]
                     );
                 } else {
                     await db.query(
-                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                        [id, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, stockId]
+                        'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, sku, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                        [id, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku]
                     );
                 }
             }
@@ -282,8 +343,16 @@ exports.getRelatedProducts = async (req, res, next) => {
 
 exports.adminGetProducts = async (req, res, next) => {
     try {
+        const { search } = req.query;
+        const params = [];
+        let where = '';
+        if (search && String(search).trim()) {
+            params.push(`%${String(search).trim()}%`);
+            where = ` WHERE (p.name ILIKE $1 OR p.sku ILIKE $1 OR p.slug ILIKE $1) `;
+        }
         const result = await db.query(
-            'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.created_at DESC'
+            `SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.created_at DESC`,
+            params
         );
         const products = result.rows;
 
@@ -296,6 +365,7 @@ exports.adminGetProducts = async (req, res, next) => {
             const variantsByProduct = {};
             for (const v of variantsResult.rows) {
                 if (!variantsByProduct[v.product_id]) variantsByProduct[v.product_id] = [];
+                const variantSku = v.sku || v.stock_id || null;
                 variantsByProduct[v.product_id].push({
                     id: v.id,
                     color: v.color,
@@ -303,7 +373,8 @@ exports.adminGetProducts = async (req, res, next) => {
                     stock: v.stock_quantity,
                     price_override: v.price_modifier,
                     image_url: v.image_url,
-                    stock_id: v.stock_id,
+                    sku: variantSku,
+                    stock_id: variantSku,
                 });
             }
             for (const p of products) {

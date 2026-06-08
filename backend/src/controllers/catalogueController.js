@@ -1,5 +1,6 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
+const { attachVariantAvailability } = require('../utils/productAvailability');
 
 const CACHE_TTL_MS = 30 * 1000;
 let catalogueCache = null;
@@ -34,7 +35,8 @@ exports.getCatalogue = async (req, res, next) => {
                                 'stock', v.stock_quantity,
                                 'price_override', v.price_modifier,
                                 'image_url', v.image_url,
-                                'stock_id', v.stock_id
+                                'sku', COALESCE(v.sku, v.stock_id),
+                                'stock_id', COALESCE(v.sku, v.stock_id)
                             )
                             ORDER BY v.color, v.size
                         ) FILTER (WHERE v.id IS NOT NULL),
@@ -53,13 +55,15 @@ exports.getCatalogue = async (req, res, next) => {
             db.query('SELECT * FROM brands ORDER BY name ASC'),
         ]);
 
-        const products = productsResult.rows.map((product) => ({
+        let products = productsResult.rows.map((product) => ({
             ...product,
             image_url: toImageUrl(product),
         }));
 
+        products = await attachVariantAvailability(products);
+
         const ads = products
-            .filter((product) => product.is_featured || Number(product.stock_quantity || 0) > 0)
+            .filter((product) => product.is_featured || product.online_in_stock)
             .slice(0, 12)
             .map((product) => ({
                 id: product.id,
