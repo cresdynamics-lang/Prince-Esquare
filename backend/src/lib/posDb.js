@@ -53,7 +53,7 @@ const enrichStockRows = async (rows) => {
   }
 
   let physicalMap = null;
-  if (webIds.length) {
+  if (webIds.length && rows.length <= 150) {
     const { fetchPhysicalAggregates } = require('../services/variantStockReport');
     physicalMap = await fetchPhysicalAggregates('');
   }

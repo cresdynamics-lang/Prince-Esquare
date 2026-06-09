@@ -1,7 +1,5 @@
 /**
  * Import full-sync.json onto live DB (UPSERT — does not drop tables).
- * Run AFTER: npm run db:migrate
- *
  * Usage: node scripts/import-all-sync.js
  */
 require('dotenv').config();
@@ -10,6 +8,7 @@ const path = require('path');
 const db = require('../src/config/db');
 
 const filePath = path.join(__dirname, '..', 'data', 'full-sync.json');
+const BATCH = 75;
 
 const TABLE_ORDER = [
   'categories',
@@ -53,19 +52,28 @@ const CONFLICT_KEY = {
   pos_sale_items: 'id',
 };
 
-async function getColumns(table) {
+const columnCache = new Map();
+
+async function getColumnMeta(table) {
+  if (columnCache.has(table)) return columnCache.get(table);
   const r = await db.query(
-    `SELECT column_name FROM information_schema.columns
+    `SELECT column_name, data_type, udt_name
+     FROM information_schema.columns
      WHERE table_schema = 'public' AND table_name = $1
      ORDER BY ordinal_position`,
     [table]
   );
-  return new Set(r.rows.map((x) => x.column_name));
+  const names = new Set(r.rows.map((x) => x.column_name));
+  const jsonb = new Set(r.rows.filter((x) => x.udt_name === 'jsonb').map((x) => x.column_name));
+  const meta = { names, jsonb };
+  columnCache.set(table, meta);
+  return meta;
 }
 
-function serialize(val) {
+function serialize(val, isJsonb) {
   if (val === null || val === undefined) return null;
   if (val instanceof Date) return val.toISOString();
+  if (isJsonb && typeof val === 'object') return JSON.stringify(val);
   if (typeof val === 'object') return JSON.stringify(val);
   return val;
 }
@@ -73,74 +81,135 @@ function serialize(val) {
 async function upsertRows(table, rows) {
   if (!rows?.length) {
     console.log(`  ${table}: 0 rows (skip)`);
-    return 0;
+    return { ok: 0, err: 0 };
   }
 
-  const targetCols = await getColumns(table);
+  const { names: targetCols, jsonb: jsonbCols } = await getColumnMeta(table);
   const conflict = CONFLICT_KEY[table] || 'id';
-  let count = 0;
+  let ok = 0;
+  let err = 0;
 
-  for (const row of rows) {
-    const keys = Object.keys(row).filter((k) => targetCols.has(k));
-    if (!keys.length) continue;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const chunk = rows.slice(i, i + BATCH);
+    for (const row of chunk) {
+      const keys = Object.keys(row).filter((k) => targetCols.has(k));
+      if (!keys.length) continue;
 
-    const values = keys.map((k) => serialize(row[k]));
-    const placeholders = keys.map((_, i) => `$${i + 1}`);
-    const updates = keys
-      .filter((k) => k !== conflict)
-      .map((k) => `${k} = EXCLUDED.${k}`)
-      .join(', ');
+      const values = keys.map((k) => serialize(row[k], jsonbCols.has(k)));
+      const placeholders = keys.map((k, idx) =>
+        jsonbCols.has(k) ? `$${idx + 1}::jsonb` : `$${idx + 1}`
+      );
+      const updates = keys
+        .filter((k) => k !== conflict)
+        .map((k) => `${k} = EXCLUDED.${k}`)
+        .join(', ');
 
-    const sql = updates
-      ? `INSERT INTO ${table} (${keys.join(', ')})
-         VALUES (${placeholders.join(', ')})
-         ON CONFLICT (${conflict}) DO UPDATE SET ${updates}`
-      : `INSERT INTO ${table} (${keys.join(', ')})
-         VALUES (${placeholders.join(', ')})
-         ON CONFLICT (${conflict}) DO NOTHING`;
+      const sql = updates
+        ? `INSERT INTO ${table} (${keys.join(', ')})
+           VALUES (${placeholders.join(', ')})
+           ON CONFLICT (${conflict}) DO UPDATE SET ${updates}`
+        : `INSERT INTO ${table} (${keys.join(', ')})
+           VALUES (${placeholders.join(', ')})
+           ON CONFLICT (${conflict}) DO NOTHING`;
 
-    await db.query(sql, values);
-    count += 1;
+      try {
+        await db.query(sql, values);
+        ok += 1;
+      } catch (e) {
+        err += 1;
+        if (err <= 3) {
+          console.error(`  ${table} row error:`, e.message);
+        }
+      }
+    }
+    if (rows.length > BATCH) {
+      process.stdout.write(`\r  ${table}: ${Math.min(i + BATCH, rows.length)}/${rows.length}`);
+    }
   }
+  if (rows.length > BATCH) process.stdout.write('\n');
+  console.log(`  ${table}: ${ok} ok, ${err} errors`);
+  return { ok, err };
+}
 
-  console.log(`  ${table}: ${count} rows upserted`);
-  return count;
+async function countTable(table) {
+  const r = await db.query(`SELECT COUNT(*)::int AS c FROM ${table}`);
+  return r.rows[0].c;
+}
+
+async function printCounts(label) {
+  const tables = ['products', 'product_variants', 'pos_products', 'pos_stock_levels'];
+  const parts = [];
+  for (const t of tables) {
+    try {
+      parts.push(`${t}=${await countTable(t)}`);
+    } catch {
+      parts.push(`${t}=?`);
+    }
+  }
+  console.log(`${label}: ${parts.join(', ')}`);
 }
 
 async function main() {
   if (!fs.existsSync(filePath)) {
-    console.error('Missing', filePath);
-    console.error('Export on your PC: node scripts/export-all-sync.js');
-    console.error('Upload to this path via WinSCP/FileZilla.');
+    console.error('\n❌ MISSING FILE:', filePath);
+    console.error('\nOn your PC run:  cd backend && npm run sync:export');
+    console.error('Upload full-sync.json to server with WinSCP:');
+    console.error('  Local:  backend/data/full-sync.json');
+    console.error('  Server: /var/www/Prince-Esquare/backend/data/full-sync.json\n');
     process.exit(1);
   }
 
+  const stat = fs.statSync(filePath);
+  console.log(`Bundle: ${filePath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+
   const bundle = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  console.log('Import bundle from', bundle.exported_at || 'unknown');
-  console.log('Running migrations first…');
+  console.log('Exported:', bundle.exported_at || 'unknown');
+
+  console.log('\nBefore import:');
+  await printCounts('');
+
+  console.log('\nRunning migrations…');
   const { execSync } = require('child_process');
   execSync('node src/db/migrate.js', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
 
-  console.log('\nImporting (upsert — existing live rows updated, not deleted)…');
-  await db.query('BEGIN');
-  try {
-    await db.query("SET session_replication_role = 'replica'");
-    for (const table of TABLE_ORDER) {
-      await upsertRows(table, bundle.tables?.[table] || []);
-    }
-    await db.query("SET session_replication_role = 'origin'");
-    await db.query('COMMIT');
-  } catch (err) {
-    await db.query('ROLLBACK');
-    throw err;
+  console.log('\nImporting…');
+  let totalErr = 0;
+  for (const table of TABLE_ORDER) {
+    const { err } = await upsertRows(table, bundle.tables?.[table] || []);
+    totalErr += err;
+  }
+
+  console.log('\nAfter import:');
+  await printCounts('');
+
+  const peCat = await db.query(
+    `SELECT COUNT(*)::int AS c FROM pos_products WHERE sku LIKE 'PE-CAT-%'`
+  );
+  const linked = await db.query(
+    `SELECT COUNT(*)::int AS c FROM products WHERE pos_stock_product_id IS NOT NULL`
+  );
+  const inStock = await db.query(
+    `SELECT COUNT(*)::int AS c FROM pos_stock_levels WHERE current_qty > 0`
+  );
+  console.log(
+    `PE-CAT pieces: ${peCat.rows[0].c}, linked website products: ${linked.rows[0].c}, shop qty>0: ${inStock.rows[0].c}`
+  );
+
+  if (totalErr > 0) {
+    console.warn(`\n⚠ ${totalErr} row errors — check messages above.`);
   }
 
   console.log('\nRe-linking website ↔ POS…');
   const { autoLinkAllProducts } = require('../src/services/productPosLink');
   const link = await autoLinkAllProducts();
-  console.log(`Linked ${link.linked} products, reconciled ${link.reconciled}`);
+  console.log(`Linked ${link.linked}, reconciled ${link.reconciled}`);
 
-  console.log('\nImport complete.');
+  if (peCat.rows[0].c === 0) {
+    console.error('\n❌ No PE-CAT inventory on server. Import did not load pos_products.');
+    process.exit(1);
+  }
+
+  console.log('\n✅ Import complete. Restart API: pm2 restart all');
   process.exit(0);
 }
 

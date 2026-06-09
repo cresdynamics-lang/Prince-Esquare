@@ -26,7 +26,8 @@
     "angles:manifest": "node scripts/generate-angle-manifest.js",
     "angles:apply": "node scripts/apply-angle-images.js",
     "sync:export": "node scripts/export-all-sync.js",
-    "sync:import": "node scripts/import-all-sync.js"
+    "sync:import": "node scripts/import-all-sync.js",
+    "sync:check": "node scripts/check-sync-status.js"
   },
   "keywords": [],
   "author": "",
