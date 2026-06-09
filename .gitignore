@@ -25,6 +25,10 @@ dist/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+# DB sync bundles (upload to server manually)
+backend/data/full-sync.json
+backend/data/products-export.json
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

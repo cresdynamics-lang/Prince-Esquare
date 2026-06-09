@@ -24,7 +24,9 @@
     "smoke": "node scripts/smoke-test.js",
     "verify:cloudinary": "node scripts/verify-cloudinary.js",
     "angles:manifest": "node scripts/generate-angle-manifest.js",
-    "angles:apply": "node scripts/apply-angle-images.js"
+    "angles:apply": "node scripts/apply-angle-images.js",
+    "sync:export": "node scripts/export-all-sync.js",
+    "sync:import": "node scripts/import-all-sync.js"
   },
   "keywords": [],
   "author": "",

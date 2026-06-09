@@ -78,9 +78,10 @@ fi
 echo ""
 echo "=== Frontend ==="
 cd "$FRONTEND"
-npm ci
+# NODE_ENV=production skips devDependencies; Vite build needs them.
+npm ci --include=dev 2>/dev/null || NODE_ENV=development npm install
 if [ "$SKIP_BUILD" != "1" ]; then
-  npm run build
+  NODE_ENV=production npm run build
 fi
 
 echo ""
