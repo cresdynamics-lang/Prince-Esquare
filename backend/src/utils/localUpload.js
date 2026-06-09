@@ -10,13 +10,7 @@ const ensureUploadDir = () => {
   }
 };
 
-const isCloudinaryConfigured = () =>
-  Boolean(
-    process.env.CLOUDINARY_URL ||
-      (process.env.CLOUDINARY_CLOUD_NAME &&
-        process.env.CLOUDINARY_API_KEY &&
-        process.env.CLOUDINARY_API_SECRET)
-  );
+const { isCloudinaryConfigured, allowLocalStorage } = require('../lib/mediaStorage');
 
 const publicBaseUrl = () =>
   process.env.API_PUBLIC_URL ||
@@ -24,6 +18,11 @@ const publicBaseUrl = () =>
   `http://localhost:${process.env.PORT || 8000}`;
 
 const uploadToLocal = (buffer, mimetype = 'image/jpeg') => {
+  if (!allowLocalStorage()) {
+    throw new Error(
+      'Local image storage is disabled in production. Configure Cloudinary before uploading images.'
+    );
+  }
   ensureUploadDir();
   const ext = (mimetype.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
   const name = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
@@ -44,5 +43,6 @@ const uploadToLocal = (buffer, mimetype = 'image/jpeg') => {
 module.exports = {
   UPLOAD_DIR,
   isCloudinaryConfigured,
+  allowLocalStorage,
   uploadToLocal,
 };

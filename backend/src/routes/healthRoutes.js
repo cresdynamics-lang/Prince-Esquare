@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { getMediaStorageStatus } = require('../lib/mediaStorage');
 
 router.get('/data', async (_req, res) => {
   try {
@@ -12,6 +13,7 @@ router.get('/data', async (_req, res) => {
       db.query('SELECT COUNT(*)::int AS c FROM products WHERE pos_stock_product_id IS NOT NULL'),
     ]);
 
+    const media = getMediaStorageStatus();
     res.json({
       success: true,
       data: {
@@ -21,6 +23,7 @@ router.get('/data', async (_req, res) => {
         posProducts: posProducts.rows[0].c,
         linkedProducts: links.rows[0].c,
         autoBootstrap: process.env.AUTO_BOOTSTRAP === 'true',
+        mediaStorage: media,
         mpesaConfigured: Boolean(
           process.env.MPESA_CONSUMER_KEY &&
           process.env.MPESA_CONSUMER_SECRET &&

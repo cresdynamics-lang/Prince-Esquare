@@ -10,6 +10,36 @@ const needsSizeSelection = (product) =>
   ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts', 'polo-t-shirts']
     .includes((product.category_name || '').toLowerCase());
 
+const HOMEPAGE_PRODUCT_LIMIT = 8;
+
+/** One product per category first, then fill up to limit for variety. */
+const pickFeaturedByCategory = (products, limit = HOMEPAGE_PRODUCT_LIMIT) => {
+  const byCategory = new Map();
+  for (const product of products) {
+    const cat = product.category_name || product.parent_category_name || 'Collection';
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat).push(product);
+  }
+
+  const picked = [];
+  const buckets = [...byCategory.values()];
+
+  for (let round = 0; picked.length < limit; round += 1) {
+    let added = false;
+    for (const group of buckets) {
+      if (picked.length >= limit) break;
+      const product = group[round];
+      if (product) {
+        picked.push(product);
+        added = true;
+      }
+    }
+    if (!added) break;
+  }
+
+  return picked;
+};
+
 const ProductShowcase = () => {
   const navigate = useNavigate();
   const addToCart = useCartStore((state) => state.addToCart);
@@ -25,7 +55,7 @@ const ProductShowcase = () => {
         const catalogue = response.data.data || {};
         preloadProductImages(catalogue.image_urls || []);
         const inStock = (catalogue.products || []).filter((p) => !p.out_of_stock);
-        setProducts(inStock);
+        setProducts(pickFeaturedByCategory(inStock));
       } catch (error) {
         console.error('ProductShowcase: catalogue unavailable', error);
         setProducts([]);
@@ -89,6 +119,7 @@ const ProductShowcase = () => {
             No products in stock right now.
           </p>
         ) : (
+          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-10 sm:gap-y-12">
             {products.map((product, index) => (
               <motion.article
@@ -138,6 +169,15 @@ const ProductShowcase = () => {
               </motion.article>
             ))}
           </div>
+          <div className="mt-12 md:mt-16 flex justify-center">
+            <Link
+              to="/products"
+              className="inline-flex items-center gap-3 border border-gold-500/50 text-gold-500 px-10 py-4 text-[10px] font-bold uppercase tracking-[0.35em] hover:bg-gold-500 hover:text-navy-950 transition-all"
+            >
+              View Products <ArrowRight size={14} />
+            </Link>
+          </div>
+          </>
         )}
       </div>
     </section>

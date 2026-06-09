@@ -25,6 +25,8 @@ Get-ChildItem $assetsDir -Filter "*-front.png" | ForEach-Object {
     }
 }
 
-$manifestPath = "C:\Users\Spine\Prince-Esquare\backend\scripts\angle-images-manifest.json"
-$manifest | ConvertTo-Json -Depth 3 | Set-Content $manifestPath -Encoding UTF8
-Write-Host "Manifest written with $($manifest.Count) products"
+Write-Host "Organized $($manifest.Count) products with front/side/back PNGs"
+Push-Location "C:\Users\Spine\Prince-Esquare\backend"
+npm run angles:manifest
+Pop-Location
+Write-Host "Run 'npm run angles:apply' to update the database."

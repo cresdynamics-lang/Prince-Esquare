@@ -1,7 +1,7 @@
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
 const { UPLOAD_PRESET, UPLOAD_FOLDER } = require('./cloudinaryImage');
-const { isCloudinaryConfigured, uploadToLocal } = require('./localUpload');
+const { isCloudinaryConfigured, allowLocalStorage, uploadToLocal } = require('./localUpload');
 
 const uploadStreamToCloudinary = (buffer, folder = UPLOAD_FOLDER) =>
   new Promise((resolve, reject) => {
@@ -24,11 +24,15 @@ const uploadStreamToCloudinary = (buffer, folder = UPLOAD_FOLDER) =>
  */
 const uploadToCloudinary = async (buffer, folder = UPLOAD_FOLDER, mimetype = 'image/jpeg') => {
   if (!isCloudinaryConfigured()) {
+    if (!allowLocalStorage()) {
+      throw new Error('Cloudinary is not configured. Set CLOUDINARY_URL in production.');
+    }
     return uploadToLocal(buffer, mimetype);
   }
   try {
     return await uploadStreamToCloudinary(buffer, folder);
   } catch (error) {
+    if (!allowLocalStorage()) throw error;
     console.warn('Cloudinary upload failed, using local storage:', error.message || error);
     return uploadToLocal(buffer, mimetype);
   }

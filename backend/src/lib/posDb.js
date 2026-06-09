@@ -94,6 +94,31 @@ const enrichStockRows = async (rows) => {
   });
 };
 
+/** Lightweight low-stock list for dashboard overview (no variant enrichment). */
+const getLowStockSummary = async ({ limit = 25 } = {}) => {
+  const r = await db.query(
+    `SELECT p.id, p.name, p.sku, p.category, p.low_stock_threshold,
+            COALESCE(s.current_qty, 0)::int AS current_qty
+     FROM pos_products p
+     LEFT JOIN pos_stock_levels s ON s.product_id = p.id
+     WHERE p.sku LIKE 'PE-CAT-%'
+       AND COALESCE(s.current_qty, 0) <= p.low_stock_threshold
+     ORDER BY COALESCE(s.current_qty, 0) ASC, p.name ASC
+     LIMIT $1`,
+    [limit]
+  );
+  return r.rows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    category: p.category,
+    currentQty: p.current_qty,
+    low_stock_threshold: p.low_stock_threshold,
+    isLow: true,
+    isOut: p.current_qty === 0,
+  }));
+};
+
 const getStockLevels = async ({ category = null } = {}) => {
   const params = [];
   let where = `WHERE p.sku LIKE 'PE-CAT-%'`;
@@ -1304,6 +1329,7 @@ const listSellers = async () => {
 };
 
 module.exports = {
+  getLowStockSummary,
   getStockLevels,
   getCategorySummary,
   getCategoryPieces,

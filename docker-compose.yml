@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: prince_esquare
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: prince_esquare
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/prince_esquare
+      JWT_SECRET: change-me-in-production
+      FRONTEND_URL: http://localhost:5173
+      CORS_ORIGIN: http://localhost:5173
+      STORAGE_ALLOW_LOCAL: "true"
+      REQUIRE_CLOUDINARY: "false"
+      AUTO_BOOTSTRAP: "true"
+      TRUST_PROXY: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/src/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:

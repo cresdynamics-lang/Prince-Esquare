@@ -8,14 +8,22 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const db = require('../src/config/db');
 
 const manifestPath = path.join(__dirname, 'angle-images-manifest.json');
 
 async function main() {
   if (!fs.existsSync(manifestPath)) {
-    console.error('Missing angle-images-manifest.json');
-    process.exit(1);
+    console.log('angle-images-manifest.json not found — generating from catalog...');
+    execSync('node scripts/generate-angle-manifest.js', {
+      cwd: path.join(__dirname, '..'),
+      stdio: 'inherit',
+    });
+    if (!fs.existsSync(manifestPath)) {
+      console.error('Could not generate angle-images-manifest.json');
+      process.exit(1);
+    }
   }
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));

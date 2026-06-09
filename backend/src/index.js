@@ -34,9 +34,16 @@ io.on('connection', (socket) => {
 
 const { runStartupBootstrap } = require('./lib/startupBootstrap');
 const { startStockDayScheduler, stopStockDayScheduler } = require('./services/stockDayScheduler');
+const { validateMediaStorageOnStartup } = require('./lib/mediaStorage');
 
 const start = async () => {
   await verifyDatabase();
+  const mediaStatus = validateMediaStorageOnStartup();
+  if (mediaStatus.warning) {
+    logger.warn({ msg: mediaStatus.warning, provider: mediaStatus.provider });
+  } else {
+    logger.info({ msg: 'Media storage ready', provider: mediaStatus.provider });
+  }
   await runStartupBootstrap();
   await startStockDayScheduler();
   httpServer.listen(PORT, () => {

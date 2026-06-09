@@ -65,11 +65,15 @@ app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT 
 app.get('/api/health', async (_req, res) => {
   try {
     await db.query('SELECT 1');
+    const { getMediaStorageStatus } = require('./lib/mediaStorage');
+    const media = getMediaStorageStatus();
     res.json({
       success: true,
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      mediaStorage: media.provider,
+      productionReady: media.productionReady,
     });
   } catch (err) {
     res.status(503).json({

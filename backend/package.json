@@ -21,7 +21,10 @@
     "export:products": "node scripts/export-products-json.js",
     "import:products": "node scripts/import-products-json.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "smoke": "node scripts/smoke-test.js"
+    "smoke": "node scripts/smoke-test.js",
+    "verify:cloudinary": "node scripts/verify-cloudinary.js",
+    "angles:manifest": "node scripts/generate-angle-manifest.js",
+    "angles:apply": "node scripts/apply-angle-images.js"
   },
   "keywords": [],
   "author": "",
