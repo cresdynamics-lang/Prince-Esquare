@@ -1,7 +1,15 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { formatResponse } = require('../utils/responseFormatter');
 
 const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
+
+const clientIp = (req) => {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) return String(fwd).split(',')[0].trim();
+  return ipKeyGenerator(req.ip || 'unknown');
+};
+
+const shouldSkipRateLimit = (req) => process.env.RATE_LIMIT_DISABLED === 'true';
 
 const handler = (req, res) => {
   formatResponse(res, 429, false, 'Too many requests. Please try again later.', {
@@ -18,7 +26,9 @@ const createLimiter = (max, message) =>
     legacyHeaders: false,
     handler,
     message,
-    skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true',
+    keyGenerator: clientIp,
+    skip: shouldSkipRateLimit,
+    validate: { trustProxy: false },
   });
 
 const globalLimiter = createLimiter(
@@ -32,7 +42,9 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler,
+  keyGenerator: clientIp,
   skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true',
+  validate: { trustProxy: false },
 });
 
 const paymentLimiter = rateLimit({
@@ -42,6 +54,7 @@ const paymentLimiter = rateLimit({
   legacyHeaders: false,
   handler,
   skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true',
+  validate: { trustProxy: false },
 });
 
 const uploadLimiter = rateLimit({
@@ -51,6 +64,7 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
   handler,
   skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true',
+  validate: { trustProxy: false },
 });
 
 const searchLimiter = rateLimit({
@@ -60,6 +74,7 @@ const searchLimiter = rateLimit({
   legacyHeaders: false,
   handler,
   skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true',
+  validate: { trustProxy: false },
 });
 
 const strictLimiter = rateLimit({
@@ -69,6 +84,7 @@ const strictLimiter = rateLimit({
   legacyHeaders: false,
   handler,
   skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true',
+  validate: { trustProxy: false },
 });
 
 module.exports = {

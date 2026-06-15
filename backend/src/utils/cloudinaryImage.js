@@ -8,18 +8,29 @@ const UPLOAD_FOLDER = process.env.CLOUDINARY_FOLDER || 'PRINCE-eSQUIIRE';
 const isCloudinaryUrl = (url) =>
   typeof url === 'string' && url.includes('res.cloudinary.com');
 
+const stripCloudinaryTransforms = (pathAfterUpload) => {
+  const segments = pathAfterUpload.split('/');
+  while (segments.length > 0 && segments[0] && !/^v\d+/.test(segments[0]) && segments[0].includes('_')) {
+    segments.shift();
+  }
+  return segments.join('/');
+};
+
 /**
  * Build an optimized delivery URL (f_auto, q_auto, WebP when supported).
  */
 const optimizeCloudinaryUrl = (url, { width = 800, height, crop = 'limit' } = {}) => {
   if (!url || !isCloudinaryUrl(url)) return url;
 
-  const parts = url.split('/upload/');
-  if (parts.length !== 2) return url;
+  const marker = '/upload/';
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;
 
+  const base = url.slice(0, idx + marker.length);
+  const assetPath = stripCloudinaryTransforms(url.slice(idx + marker.length));
   const transforms = [`f_auto`, `q_auto`, `w_${width}`, `c_${crop}`];
   if (height) transforms.push(`h_${height}`);
-  return `${parts[0]}/upload/${transforms.join(',')}/${parts[1]}`;
+  return `${base}${transforms.join(',')}/${assetPath}`;
 };
 
 /**
@@ -27,10 +38,12 @@ const optimizeCloudinaryUrl = (url, { width = 800, height, crop = 'limit' } = {}
  */
 const formatUploadResult = (result) => {
   const url = result.secure_url || result.url;
+  const eager = Array.isArray(result.eager) ? result.eager : [];
+  const eagerUrl = (width) => eager.find((e) => e.width === width)?.secure_url;
   return {
     url,
-    optimized: optimizeCloudinaryUrl(url, { width: 1200 }),
-    thumbnail: optimizeCloudinaryUrl(url, { width: 400 }),
+    optimized: eagerUrl(800) || optimizeCloudinaryUrl(url, { width: 800 }),
+    thumbnail: eagerUrl(400) || optimizeCloudinaryUrl(url, { width: 400 }),
     public_id: result.public_id,
     width: result.width,
     height: result.height,

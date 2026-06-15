@@ -134,19 +134,21 @@ const CATEGORY_FEATURES = {
   ],
 };
 
-const detectCategoryKey = (categoryName = '') => {
-  const n = categoryName.toLowerCase();
-  if (n.includes('shoe') || n.includes('sneaker') || n.includes('footwear')) return 'shoe';
+const detectCategoryKey = (categoryName = '', parentCategoryName = '') => {
+  const n = `${categoryName} ${parentCategoryName}`.toLowerCase();
+  if (n.includes('shoe') || n.includes('sneaker') || n.includes('footwear') || n.includes('loafer') || n.includes('boot')) return 'shoe';
   if (n.includes('suit')) return 'suit';
-  if (n.includes('shirt')) return 'shirt';
-  if (n.includes('trouser') || n.includes('pant')) return 'trouser';
+  if (n.includes('shirt') || n.includes('polo')) return 'shirt';
+  if (n.includes('trouser') || n.includes('pant') || n.includes('chino') || n.includes('khaki')) return 'trouser';
   return 'default';
 };
 
 const isBriefDescription = (raw, parsed) => {
   const text = String(raw || '').trim();
   if (!text) return true;
-  if (text.length < 320) return true;
+  if (parsed.features.length >= 3) return false;
+  if (text.length >= 280 && parsed.intro.length >= 1 && parsed.features.length >= 2) return false;
+  if (text.length < 200) return true;
   if (parsed.intro.length <= 1 && parsed.features.length < 2) return true;
   return false;
 };
@@ -155,7 +157,7 @@ const isBriefDescription = (raw, parsed) => {
  * Expand thin admin descriptions into Strada-style rich PDP copy.
  * Preserves full custom descriptions when they are already detailed.
  */
-export const buildRichDescription = (product, variantMeta = {}) => {
+export const buildRichDescription = (product, variantMeta = {}, parentCategoryName = '') => {
   const raw = String(product?.description || '').trim();
   const parsed = parseDescriptionSections(raw);
   const colors = (variantMeta.colors || []).map((c) => c.color).filter(Boolean);
@@ -163,7 +165,10 @@ export const buildRichDescription = (product, variantMeta = {}) => {
     (variantMeta.variants || []).map((v) => v.size),
     variantMeta.isShoe
   );
-  const categoryKey = detectCategoryKey(product?.category_name);
+  const categoryKey = detectCategoryKey(
+    product?.category_name,
+    parentCategoryName || product?.parent_category_name
+  );
   const brand = product?.brand_name || 'Prince Esquire';
   const name = product?.name || 'This piece';
 

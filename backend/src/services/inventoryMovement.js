@@ -43,11 +43,17 @@ const readLevels = async (client, productId) => {
   };
 };
 
-/** After any shop/store change: refresh daily sheet + push live updates to admin/POS. */
+/** After any shop/store change: refresh daily sheet + push live updates + mirror website stock. */
 const afterInventoryChange = async (productId, levels = {}) => {
   await refreshDailySnapshot(productId);
   if (levels.shopQty != null) emitStockUpdated(productId, levels.shopQty);
   if (levels.storeQty != null) emitStoreStockUpdated(productId, levels.storeQty);
+  try {
+    const { syncWebsiteStockForPosProduct } = require('./inventoryWarehouseSync');
+    await syncWebsiteStockForPosProduct(productId);
+  } catch (e) {
+    console.error('Website stock sync warning:', e.message);
+  }
 };
 
 const logAudit = async (client, action, productId, details, performedBy = null) => {
@@ -278,6 +284,56 @@ const setStoreQty = async (productId, qty, { client: extClient } = {}) => {
   return r.rows[0].current_qty;
 };
 
+const applyStoreStockTake = async (productId, physicalStoreQty, { recordedBy } = {}) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await ensureStoreStockRow(client, productId);
+    const before = await readLevels(client, productId);
+    const target = Math.max(0, parseInt(physicalStoreQty, 10) || 0);
+    const variance = target - before.storeQty;
+    if (variance === 0) {
+      await client.query('COMMIT');
+      return { variance: 0, ...before };
+    }
+
+    const storeR = await client.query(
+      `UPDATE pos_store_stock_levels SET current_qty = $1, updated_at = NOW()
+       WHERE product_id = $2 RETURNING current_qty`,
+      [target, productId]
+    );
+
+    await client.query(
+      `INSERT INTO pos_stock_movements (product_id, movement_type, qty, notes, recorded_by)
+       VALUES ($1, 'ADJUSTMENT', $2, $3, $4)`,
+      [
+        productId,
+        Math.abs(variance),
+        `Store stock take: ${before.storeQty} -> ${target}`,
+        recordedBy || null,
+      ]
+    );
+
+    await logAudit(
+      client,
+      'STORE_STOCK_TAKE',
+      productId,
+      { systemQty: before.storeQty, physicalQty: target, variance },
+      recordedBy
+    );
+
+    await client.query('COMMIT');
+    const levels = { shopQty: before.shopQty, storeQty: storeR.rows[0].current_qty };
+    await afterInventoryChange(productId, levels);
+    return { variance, ...levels };
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+};
+
 const applyStockTake = async (productId, physicalShopQty, { recordedBy } = {}) => {
   const client = await db.pool.connect();
   try {
@@ -341,4 +397,5 @@ module.exports = {
   setShopQty,
   setStoreQty,
   applyStockTake,
+  applyStoreStockTake,
 };

@@ -239,6 +239,140 @@ const syncLegacyBucketsFromPeCatalog = async (client = db) => {
   return { updated };
 };
 
+const applyWebsiteStockRow = async (client, row) => {
+  const posSku = String(row.pos_sku || '');
+  let shopQty = Math.max(0, row.shop_qty);
+  if (posSku.includes('-W-')) shopQty = 0;
+
+  const varR = await client.query(
+    `SELECT id FROM product_variants WHERE product_id = $1 ORDER BY id`,
+    [row.web_id]
+  );
+  const variants = varR.rows;
+  const isLegacyBucket = posSku.startsWith('POS-');
+
+  if (!variants.length) {
+    await client.query(
+      `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
+      [shopQty, row.web_id]
+    );
+    return 1;
+  }
+
+  if (isLegacyBucket) {
+    const perVariant = shopQty > 0
+      ? Math.max(1, Math.floor(shopQty / variants.length))
+      : 0;
+    for (const v of variants) {
+      await client.query(
+        `UPDATE product_variants SET stock_quantity = $1 WHERE id = $2`,
+        [perVariant, v.id]
+      );
+    }
+    await client.query(
+      `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
+      [shopQty, row.web_id]
+    );
+  } else {
+    const qty = shopQty;
+    await client.query(
+      `UPDATE product_variants SET stock_quantity = $1 WHERE product_id = $2`,
+      [qty, row.web_id]
+    );
+    const sumR = await client.query(
+      `SELECT COALESCE(SUM(stock_quantity), 0)::int AS total
+       FROM product_variants WHERE product_id = $1`,
+      [row.web_id]
+    );
+    await client.query(
+      `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
+      [sumR.rows[0]?.total ?? qty, row.web_id]
+    );
+  }
+  return 1;
+};
+
+const webRowsForPosProduct = async (client, productId) => {
+  const r = await client.query(
+    `SELECT DISTINCT ON (p.id)
+            pp.id AS pos_id,
+            pp.sku AS pos_sku,
+            p.id AS web_id,
+            COALESCE(sl.current_qty, 0)::int AS shop_qty
+     FROM pos_products pp
+     JOIN products p ON p.id = pp.ecommerce_product_id OR p.pos_stock_product_id = pp.id
+     LEFT JOIN pos_stock_levels sl ON sl.product_id = pp.id
+     WHERE pp.id = $1
+     ORDER BY p.id, (pp.sku LIKE 'PE-CAT-%') DESC`,
+    [productId]
+  );
+  return r.rows;
+};
+
+const webRowsForLegacySku = async (client, legacySku) => {
+  const r = await client.query(
+    `SELECT DISTINCT ON (p.id)
+            pp.id AS pos_id,
+            pp.sku AS pos_sku,
+            p.id AS web_id,
+            COALESCE(sl.current_qty, 0)::int AS shop_qty
+     FROM pos_products pp
+     JOIN products p ON p.id = pp.ecommerce_product_id OR p.pos_stock_product_id = pp.id
+     LEFT JOIN pos_stock_levels sl ON sl.product_id = pp.id
+     WHERE pp.sku = $1
+     ORDER BY p.id`,
+    [legacySku]
+  );
+  return r.rows;
+};
+
+/** Recompute one legacy POS-* bucket from PE-CAT shop totals for a category. */
+const syncLegacyBucketForCategory = async (client, categoryName) => {
+  const legacySku = Object.entries(LEGACY_SKU_TO_CATEGORY).find(([, v]) => v === categoryName)?.[0];
+  if (!legacySku) return null;
+
+  const shopR = await client.query(
+    `SELECT COALESCE(SUM(sl.current_qty), 0)::int AS shop
+     FROM pos_products pp
+     LEFT JOIN pos_stock_levels sl ON sl.product_id = pp.id
+     WHERE pp.category = $1
+       AND pp.sku LIKE 'PE-CAT-%' AND pp.sku NOT LIKE '%-W-%'`,
+    [categoryName]
+  );
+  const shopTotal = shopR.rows[0]?.shop ?? 0;
+
+  const legacyR = await client.query(`SELECT id FROM pos_products WHERE sku = $1`, [legacySku]);
+  if (!legacyR.rows.length) return null;
+
+  await setShopQty(legacyR.rows[0].id, shopTotal, { client });
+  return legacySku;
+};
+
+/** Sync website stock for products linked to one POS piece (and its category legacy bucket). */
+const syncWebsiteStockForPosProduct = async (productId) => {
+  const pieceR = await db.query(`SELECT sku, category FROM pos_products WHERE id = $1`, [productId]);
+  const piece = pieceR.rows[0];
+  if (!piece) return { updated: 0 };
+
+  let updated = 0;
+  const directRows = await webRowsForPosProduct(db, productId);
+  for (const row of directRows) {
+    updated += await applyWebsiteStockRow(db, row);
+  }
+
+  if (String(piece.sku || '').startsWith('PE-CAT-') && piece.category) {
+    const legacySku = await syncLegacyBucketForCategory(db, piece.category);
+    if (legacySku) {
+      const legacyRows = await webRowsForLegacySku(db, legacySku);
+      for (const row of legacyRows) {
+        updated += await applyWebsiteStockRow(db, row);
+      }
+    }
+  }
+
+  return { updated };
+};
+
 /** Sync published website stock from linked POS shop floor qty. */
 const syncWebsiteStockFromPosShop = async (client = db) => {
   const r = await client.query(`
@@ -255,63 +389,16 @@ const syncWebsiteStockFromPosShop = async (client = db) => {
 
   let updated = 0;
   for (const row of r.rows) {
-    const posSku = String(row.pos_sku || '');
-    let shopQty = Math.max(0, row.shop_qty);
-    if (posSku.includes('-W-')) shopQty = 0;
-
-    const varR = await client.query(
-      `SELECT id FROM product_variants WHERE product_id = $1 ORDER BY id`,
-      [row.web_id]
-    );
-    const variants = varR.rows;
-    const isLegacyBucket = posSku.startsWith('POS-');
-
-    if (!variants.length) {
-      await client.query(
-        `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
-        [shopQty, row.web_id]
-      );
-      updated += 1;
-      continue;
-    }
-
-    if (isLegacyBucket) {
-      const perVariant = shopQty > 0
-        ? Math.max(1, Math.floor(shopQty / variants.length))
-        : 0;
-      for (const v of variants) {
-        await client.query(
-          `UPDATE product_variants SET stock_quantity = $1 WHERE id = $2`,
-          [perVariant, v.id]
-        );
-      }
-      await client.query(
-        `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
-        [shopQty, row.web_id]
-      );
-    } else {
-      const qty = shopQty;
-      await client.query(
-        `UPDATE product_variants SET stock_quantity = $1 WHERE product_id = $2`,
-        [qty, row.web_id]
-      );
-      const sumR = await client.query(
-        `SELECT COALESCE(SUM(stock_quantity), 0)::int AS total
-         FROM product_variants WHERE product_id = $1`,
-        [row.web_id]
-      );
-      await client.query(
-        `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
-        [sumR.rows[0]?.total ?? qty, row.web_id]
-      );
-    }
-    updated += 1;
+    updated += await applyWebsiteStockRow(client, row);
   }
   return { updated };
 };
 
-/** Full alignment: stock rows, warehouse backfill, repairs, website sync. */
+/** Full alignment: link website products, stock rows, warehouse backfill, website sync. */
 const syncInventoryAlignment = async () => {
+  const { ensureAllEcommerceProductsInPos } = require('./inventoryChannel');
+  const websiteLinks = await ensureAllEcommerceProductsInPos();
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -324,6 +411,7 @@ const syncInventoryAlignment = async () => {
     const website = await syncWebsiteStockFromPosShop();
 
     return {
+      websiteLinks,
       levels,
       warehouse,
       repaired,
@@ -343,6 +431,8 @@ module.exports = {
   repairWarehousePieces,
   syncWarehouseInventory,
   syncLegacyBucketsFromPeCatalog,
+  syncLegacyBucketForCategory,
+  syncWebsiteStockForPosProduct,
   syncWebsiteStockFromPosShop,
   syncInventoryAlignment,
   warehouseCountFor,

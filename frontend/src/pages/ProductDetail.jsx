@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ShoppingBag, Plus, Minus, ChevronLeft } from 'lucide-react';
+import { Check, ShoppingBag, Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
@@ -32,6 +32,7 @@ function sizesForCategoryName(name) {
   if (n.includes('shoe')) return ['38', '39', '40', '41', '42', '43', '44', '45'];
   if (n.includes('trouser') || n.includes('pant')) return ['30', '32', '34', '36', '38'];
   if (n.includes('shirt')) return ['M', 'L', 'XL', 'XXL', '3XL'];
+  if (n.includes('suit')) return ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
   if (n.includes('track')) return ['M', 'L', 'XL', 'XXL'];
   if (n.includes('outer')) return ['M', 'L', 'XL', 'XXL'];
   return ['M', 'L', 'XL', 'XXL'];
@@ -52,6 +53,33 @@ const getProductBaseImage = (product) => (
   product?.image_url
 );
 
+/** One carousel slide per color variant (multi-color products). */
+const buildColorCarouselSlides = (variantMeta, product) => {
+  if (!product || variantMeta.colors.length <= 1) return [];
+
+  return variantMeta.colors
+    .map(({ color, variants: colorVariants }) => {
+      const rep = colorVariants.find((v) => getVariantImage(v)) || colorVariants[0];
+      const src =
+        getDefaultAngleImage(rep, product) ||
+        getVariantImage(rep) ||
+        getProductBaseImage(product);
+      if (!src) return null;
+      return {
+        id: `color-${color}`,
+        color,
+        src,
+        thumb:
+          getImageSrc(rep?.image_url, 'thumbnail') ||
+          getImageSrc(rep?.image, 'thumbnail') ||
+          src,
+        label: color,
+        type: 'color',
+      };
+    })
+    .filter(Boolean);
+};
+
 const enrichShoeVariants = (variants, categoryName) => {
   const isShoe = (categoryName || '').toLowerCase().includes('shoe');
   const hasOnlyGenericSizes = variants.length > 0 && variants.every((v) => !v.size || v.size === 'Standard');
@@ -67,7 +95,8 @@ const enrichShoeVariants = (variants, categoryName) => {
   return enriched;
 };
 
-const buildThumbnailStrip = (product, currentVariant) => {
+/** Thumbnail carousel — color slides first (multi-color), then gallery + angles for selected color. */
+const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides = []) => {
   if (!product) return [];
 
   const seen = new Set();
@@ -80,54 +109,56 @@ const buildThumbnailStrip = (product, currentVariant) => {
 
   let strip = [];
 
-  const angles = parseAngleImages(currentVariant, product);
-  angles.forEach((angle) => {
-    strip = add(strip, {
-      id: `angle-${angle.angle}`,
-      src: angle.url,
-      thumb: angle.thumb || angle.url,
-      label: angle.label,
-      type: 'angle',
+  if (colorSlides.length > 1) {
+    colorSlides.forEach((slide) => {
+      strip = add(strip, { ...slide, type: 'color' });
     });
-  });
+  } else {
+    const base = getProductBaseImage(product);
+    if (base) {
+      strip = add(strip, {
+        id: 'main',
+        src: base,
+        thumb: getImageSrc(product.thumbnail, 'thumbnail') || base,
+        label: product.name,
+        type: 'main',
+      });
+    }
 
-  const base = getDefaultAngleImage(currentVariant, product) || getVariantImage(currentVariant) || getProductBaseImage(product);
-  if (base) {
-    strip = add(strip, {
-      id: 'hero',
-      src: base,
-      thumb: getImageSrc(currentVariant?.image_url, 'thumbnail') || base,
-      label: product.name,
-      type: 'main',
+    parseProductImages(product.images).forEach((image, index) => {
+      strip = add(strip, {
+        id: `gallery-${index}`,
+        src: getImageSrc(image),
+        thumb: getImageSrc(image, 'thumbnail'),
+        label: `${product.name} view ${index + 1}`,
+        type: 'gallery',
+      });
     });
   }
 
-  parseProductImages(product.images).forEach((image, index) => {
-    strip = add(strip, {
-      id: `gallery-${index}`,
-      src: getImageSrc(image),
-      thumb: getImageSrc(image, 'thumbnail'),
-      label: `${product.name} view ${index + 1}`,
-      type: 'gallery',
+  if (colorSelected && currentVariant) {
+    parseAngleImages(currentVariant, product).forEach((angle) => {
+      strip = add(strip, {
+        id: `angle-${angle.angle}`,
+        src: angle.url,
+        thumb: angle.thumb || angle.url,
+        label: angle.label,
+        type: 'angle',
+      });
     });
-  });
 
-  const colorSeen = new Set();
-  (product.variants || []).forEach((variant) => {
-    const color = variant.color || 'Original';
-    if (colorSeen.has(color)) return;
-    const src = getVariantImage(variant);
-    if (!src) return;
-    colorSeen.add(color);
-    strip = add(strip, {
-      id: `color-${color}`,
-      src,
-      thumb: getImageSrc(variant.image_url, 'thumbnail') || src,
-      label: color,
-      type: 'color',
-      color,
-    });
-  });
+    if (colorSlides.length <= 1) {
+      parseProductImages(product.images).forEach((image, index) => {
+        strip = add(strip, {
+          id: `gallery-${index}`,
+          src: getImageSrc(image),
+          thumb: getImageSrc(image, 'thumbnail'),
+          label: `${product.name} view ${index + 1}`,
+          type: 'gallery',
+        });
+      });
+    }
+  }
 
   return strip;
 };
@@ -148,6 +179,9 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
   const [showStickyCart, setShowStickyCart] = useState(false);
+  const [colorCarouselIndex, setColorCarouselIndex] = useState(0);
+
+  const touchStartX = useRef(null);
 
   const relatedSectionRef = useRef(null);
 
@@ -174,12 +208,14 @@ const ProductDetail = () => {
       setSelectedColor('');
       setSelectedSize('');
       setSelectedImage('');
+      setColorCarouselIndex(0);
 
       let found = null;
       try {
         const res = await productAPI.getBySlug(slug);
-        if (res.data?.success && res.data.data) {
-          found = res.data.data;
+        const payload = res.data?.data;
+        if (res.data?.success && payload) {
+          found = Array.isArray(payload) ? payload[0] : payload;
         }
       } catch (error) {
         console.error('Product fetch failed:', error);
@@ -194,7 +230,8 @@ const ProductDetail = () => {
       const metaForDesc = buildVariantMeta(enrichedVariants, found.category_name);
       const richDescription = buildRichDescription(
         { ...found, variants: enrichedVariants },
-        metaForDesc
+        metaForDesc,
+        found.parent_category_name
       );
       const p = {
         ...found,
@@ -217,26 +254,41 @@ const ProductDetail = () => {
         ? meta.variants.find((v) => String(v.id) === urlVariantId)
         : null;
 
-      const firstColor = urlVariant?.color || meta.colors[0]?.color || '';
-      const sizes = sortSizes(
-        meta.variants.filter((v) => v.color === firstColor).map((v) => v.size),
-        meta.isShoe
-      );
-      const firstSize = urlVariant?.size || sizes[0] || '';
-      const initialVariant = meta.variants.find((v) => v.color === firstColor && v.size === firstSize) || meta.variants[0];
+      const productHero = getProductBaseImage(p) || getPremiumImage(p);
+      const multiColor = meta.colors.length > 1;
 
-      if (initialVariant) {
-        setSelectedColor(initialVariant.color);
-        setSelectedSize(initialVariant.size);
+      if (urlVariant) {
+        setSelectedColor(urlVariant.color);
+        setSelectedSize(urlVariant.size);
         setSelectedImage(
-          getDefaultAngleImage(initialVariant, p) ||
-          getVariantImage(initialVariant) ||
-          getProductBaseImage(p) ||
-          getPremiumImage(p)
+          getDefaultAngleImage(urlVariant, p) ||
+          getVariantImage(urlVariant) ||
+          productHero
         );
-        if (initialVariant.id) {
-          setSearchParams({ variant: String(initialVariant.id) }, { replace: true });
+      } else if (!multiColor && meta.variants[0]) {
+        const only = meta.variants[0];
+        setSelectedColor(only.color || '');
+        setSelectedSize(only.size || '');
+        setSelectedImage(productHero);
+      } else if (multiColor) {
+        const firstColor = meta.colors[0]?.color;
+        if (firstColor) {
+          const sizes = meta.variants.filter((v) => v.color === firstColor).map((v) => v.size);
+          const firstSize = sortSizes(sizes, meta.isShoe)[0] || '';
+          const firstVariant = meta.variants.find((v) => v.color === firstColor && v.size === firstSize);
+          setSelectedColor(firstColor);
+          setSelectedSize(firstSize);
+          setSelectedImage(
+            getDefaultAngleImage(firstVariant, p) ||
+            getVariantImage(firstVariant) ||
+            productHero
+          );
+          setColorCarouselIndex(0);
+        } else {
+          setSelectedImage(productHero);
         }
+      } else {
+        setSelectedImage(productHero);
       }
 
       setProduct(p);
@@ -264,12 +316,24 @@ const ProductDetail = () => {
 
   const currentVariant = findVariant(selectedColor, selectedSize) || variantMeta.variants[0];
 
-  const thumbnailStrip = useMemo(
-    () => buildThumbnailStrip(product, currentVariant),
-    [product, currentVariant]
+  const colorCarouselSlides = useMemo(
+    () => buildColorCarouselSlides(variantMeta, product),
+    [variantMeta, product]
   );
 
+  const hasColorCarousel = colorCarouselSlides.length > 1;
+
+  const thumbnailStrip = useMemo(
+    () => buildThumbnailStrip(product, currentVariant, Boolean(selectedColor), colorCarouselSlides),
+    [product, currentVariant, selectedColor, colorCarouselSlides]
+  );
+
+  const heroFromColorCarousel = hasColorCarousel
+    ? colorCarouselSlides[colorCarouselIndex]?.src
+    : null;
+
   const currentDisplayImage = selectedImage ||
+    heroFromColorCarousel ||
     thumbnailStrip[0]?.src ||
     getProductBaseImage(product) ||
     getPremiumImage(product);
@@ -305,6 +369,28 @@ const ProductDetail = () => {
     variantValue: variantSummary,
   });
 
+  const goToColorSlide = useCallback((index) => {
+    const slide = colorCarouselSlides[index];
+    if (!slide) return;
+    setColorCarouselIndex(index);
+    setSelectedColor(slide.color);
+    const sizes = sizesForColor(slide.color);
+    const inStockSizes = sizes.filter((s) => isVariantAvailable(findVariant(slide.color, s)));
+    const keepSize = inStockSizes.includes(selectedSize) ? selectedSize : null;
+    const nextSize = keepSize || inStockSizes[0] || sizes[0] || '';
+    setSelectedSize(nextSize);
+    const variant = findVariant(slide.color, nextSize);
+    setSelectedImage(
+      getDefaultAngleImage(variant, product) ||
+      slide.src ||
+      getVariantImage(variant) ||
+      getProductBaseImage(product)
+    );
+    if (variant?.id) {
+      setSearchParams({ variant: String(variant.id) }, { replace: true });
+    }
+  }, [colorCarouselSlides, findVariant, product, selectedSize, setSearchParams, sizesForColor]);
+
   const handleColorSelect = (color) => {
     setSelectedColor(color);
     const sizes = sizesForColor(color);
@@ -313,10 +399,13 @@ const ProductDetail = () => {
     const nextSize = keepSize || inStockSizes[0] || sizes[0] || '';
     setSelectedSize(nextSize);
     const variant = findVariant(color, nextSize);
+    const slideIndex = colorCarouselSlides.findIndex((s) => s.color === color);
+    if (slideIndex >= 0) setColorCarouselIndex(slideIndex);
     if (variant) {
       setSelectedImage(
         getDefaultAngleImage(variant, product) ||
-        getVariantImage(variant)
+        getVariantImage(variant) ||
+        getProductBaseImage(product)
       );
       if (variant.id) {
         setSearchParams({ variant: String(variant.id) }, { replace: true });
@@ -330,7 +419,8 @@ const ProductDetail = () => {
     if (variant) {
       setSelectedImage(
         getDefaultAngleImage(variant, product) ||
-        getVariantImage(variant)
+        getVariantImage(variant) ||
+        getProductBaseImage(product)
       );
       if (variant.id) {
         setSearchParams({ variant: String(variant.id) }, { replace: true });
@@ -415,7 +505,7 @@ const ProductDetail = () => {
             {/* Gallery — pins on desktop until the full right column (incl. description) has scrolled */}
             <div className="space-y-4">
               <div className="lg:sticky lg:top-24 lg:self-start">
-              <div className="relative aspect-square bg-white overflow-hidden rounded-sm border border-gold-600/10">
+              <div className="relative aspect-square bg-white overflow-hidden rounded-sm border border-gold-600/10 group">
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={currentDisplayImage}
@@ -428,24 +518,92 @@ const ProductDetail = () => {
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
                     className="w-full h-full object-contain p-6 md:p-10"
+                    onTouchStart={(e) => {
+                      touchStartX.current = e.touches[0]?.clientX ?? null;
+                    }}
+                    onTouchEnd={(e) => {
+                      if (!hasColorCarousel || touchStartX.current == null) return;
+                      const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
+                      if (Math.abs(delta) < 40) return;
+                      if (delta < 0) {
+                        goToColorSlide((colorCarouselIndex + 1) % colorCarouselSlides.length);
+                      } else {
+                        goToColorSlide(
+                          (colorCarouselIndex - 1 + colorCarouselSlides.length) % colorCarouselSlides.length
+                        );
+                      }
+                      touchStartX.current = null;
+                    }}
                   />
                 </AnimatePresence>
+
+                {hasColorCarousel && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => goToColorSlide(
+                        (colorCarouselIndex - 1 + colorCarouselSlides.length) % colorCarouselSlides.length
+                      )}
+                      aria-label="Previous color"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-navy-950/70 text-gold-400 border border-gold-600/30 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity hover:bg-navy-950"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => goToColorSlide((colorCarouselIndex + 1) % colorCarouselSlides.length)}
+                      aria-label="Next color"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-navy-950/70 text-gold-400 border border-gold-600/30 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity hover:bg-navy-950"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 px-4">
+                      {colorCarouselSlides.map((slide, index) => (
+                        <button
+                          key={slide.id}
+                          type="button"
+                          aria-label={`View ${slide.label}`}
+                          onClick={() => goToColorSlide(index)}
+                          className={`h-1.5 rounded-full transition-all ${
+                            index === colorCarouselIndex
+                              ? 'w-6 bg-gold-500'
+                              : 'w-1.5 bg-gold-600/40 hover:bg-gold-500/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-sm bg-navy-950/75 text-[10px] font-bold uppercase tracking-widest text-gold-300 border border-gold-600/20">
+                      {colorCarouselSlides[colorCarouselIndex]?.label}
+                    </span>
+                  </>
+                )}
               </div>
 
               {thumbnailStrip.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1 snap-x snap-mandatory">
                   {thumbnailStrip.map((thumb) => {
-                    const isSelected = currentDisplayImage === thumb.src;
+                    const isColorThumb = thumb.type === 'color';
+                    const isSelected = isColorThumb
+                      ? selectedColor === thumb.color
+                      : currentDisplayImage === thumb.src;
                     return (
                       <button
                         key={thumb.id}
                         type="button"
                         onClick={() => {
-                          setSelectedImage(thumb.src);
-                          if (thumb.color) handleColorSelect(thumb.color);
+                          if (isColorThumb) {
+                            const idx = colorCarouselSlides.findIndex((s) => s.color === thumb.color);
+                            if (idx >= 0) goToColorSlide(idx);
+                            else handleColorSelect(thumb.color);
+                          } else {
+                            setSelectedImage(thumb.src);
+                          }
                         }}
                         aria-label={`View ${thumb.label}`}
-                        className={`relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-sm overflow-hidden bg-white border-2 transition-all ${
+                        title={thumb.label}
+                        className={`relative shrink-0 snap-start rounded-sm overflow-hidden bg-white border-2 transition-all ${
+                          isColorThumb ? 'w-16 h-16 sm:w-20 sm:h-20' : 'w-16 h-16 sm:w-20 sm:h-20'
+                        } ${
                           isSelected
                             ? 'border-gold-500 shadow-md shadow-gold-500/20'
                             : 'border-gold-600/15 hover:border-gold-500/50'
@@ -458,6 +616,11 @@ const ProductDetail = () => {
                           decoding="async"
                           className="w-full h-full object-cover"
                         />
+                        {isColorThumb && (
+                          <span className="absolute inset-x-0 bottom-0 bg-navy-950/80 text-[8px] font-bold uppercase tracking-wider text-gold-200 py-0.5 truncate px-1">
+                            {thumb.label}
+                          </span>
+                        )}
                         {isSelected && (
                           <span className="absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold-600 text-navy-950">
                             <Check size={10} strokeWidth={3} />
@@ -502,8 +665,6 @@ const ProductDetail = () => {
                   </h3>
                   <div className="flex flex-col gap-2">
                     {variantMeta.colors.map(({ color, variants: colorVariants }) => {
-                      const rep = colorVariants[0];
-                      const thumb = getImageSrc(rep?.image_url, 'thumbnail') || getVariantImage(rep);
                       const isSelected = selectedColor === color;
                       const colorAvailable = colorVariants.some(isVariantAvailable);
 
@@ -513,20 +674,15 @@ const ProductDetail = () => {
                           type="button"
                           disabled={!colorAvailable}
                           onClick={() => handleColorSelect(color)}
-                          className={`flex items-center gap-3 px-4 py-3 border text-left transition-all ${
+                          className={`flex items-center justify-between w-full px-4 py-3 border text-left transition-all ${
                             !colorAvailable ? 'opacity-40 cursor-not-allowed border-gold-600/10' :
                             isSelected
                               ? 'border-gold-500 bg-gold-600/10 text-white'
                               : 'border-gold-600/20 text-slate-300 hover:border-gold-500/60'
                           }`}
                         >
-                          {thumb && (
-                            <span className="shrink-0 w-10 h-10 rounded-sm overflow-hidden bg-white border border-gold-600/10">
-                              <img src={thumb} alt="" className="w-full h-full object-cover" />
-                            </span>
-                          )}
                           <span className="text-[11px] font-medium tracking-wide">{color}</span>
-                          {isSelected && <Check size={14} className="ml-auto text-gold-500 shrink-0" />}
+                          {isSelected && <Check size={14} className="text-gold-500 shrink-0" />}
                         </button>
                       );
                     })}

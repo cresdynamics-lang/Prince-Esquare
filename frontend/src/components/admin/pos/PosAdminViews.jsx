@@ -1,5 +1,5 @@
 // NEW — POS & Inventory admin views (embedded in AdminDashboard)
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Users, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -350,7 +350,7 @@ const Empty = ({ icon: Icon, message }) => (
 );
 
 /** Shown to admins on POS Terminal — sellers get the live checkout screen instead */
-export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory }) => {
+export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory, onEnableTestPos }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -388,6 +388,15 @@ export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory }) => {
       )}
 
       <div className="flex flex-wrap gap-3">
+        {onEnableTestPos && (
+          <button
+            type="button"
+            onClick={onEnableTestPos}
+            className="px-5 py-3 rounded-xl bg-sky-600 text-white text-[10px] font-black uppercase tracking-widest"
+          >
+            Open test checkout
+          </button>
+        )}
         <button
           type="button"
           onClick={() => go('pos-sales')}
@@ -538,6 +547,11 @@ export const StockOverviewView = () => {
 
   return (
     <div className="p-2 space-y-4">
+      <div className="rounded-xl border border-gold-500/15 bg-navy-900/40 px-4 py-3 text-xs text-gold-500/70 leading-relaxed">
+        <strong className="text-gold-400">Physical stock lives here.</strong> Shop floor and warehouse counts are managed in this tab.
+        Website stock mirrors shop floor automatically after transfers, sales, and stock takes.
+        Use <span className="text-gold-300">Sales &amp; Finance</span> for revenue — not for moving pieces between store and shop.
+      </div>
       <VariantStockToolbar category={exportCategory} onImported={reload} />
       <ProductCatalogToolbar category={exportCategory} onImported={reload} />
       <StockExcelToolbar onImported={reload} />
@@ -548,31 +562,72 @@ export const StockOverviewView = () => {
 
 export const StockMovementsView = () => {
   const [rows, setRows] = useState([]);
-  useEffect(() => {
-    inventoryAPI.movements({ limit: 50 }).then((r) => setRows(r.data?.data?.movements || []));
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 30;
+
+  const load = () => {
+    setLoading(true);
+    inventoryAPI.movements({ limit, page, type: typeFilter || undefined })
+      .then((r) => setRows(r.data?.data?.movements || []))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [page, typeFilter]);
+
   const color = (t) => ({ STOCK_IN: 'text-green-400', STOCK_OUT: 'text-orange-400', SALE_POS: 'text-red-400', SALE_ONLINE: 'text-red-400', ADJUSTMENT: 'text-amber-400', VOID: 'text-gray-400' }[t] || '');
   const label = (m) => {
     if (m.movement_type === 'STOCK_IN') return 'Store → Shop';
     if (m.movement_type === 'STOCK_OUT') return 'Shop → Store';
+    if (m.movement_type === 'VOID') return 'Sale void / return';
     return m.movement_type;
   };
+
   return (
-    <div className="p-2 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-gold-500/50 text-xs"><tr><th className="p-2 text-left">Date</th><th>Product</th><th>Type</th><th>Qty</th><th>Notes</th></tr></thead>
-        <tbody>
-          {rows.map((m) => (
-            <tr key={m.id} className={`border-t border-gold-500/10 ${color(m.movement_type)}`}>
-              <td className="p-2">{format(new Date(m.created_at), 'dd MMM yyyy HH:mm')}</td>
-              <td>{m.product?.name}</td>
-              <td>{label(m)}</td>
-              <td>{m.qty}</td>
-              <td className="text-gold-500/50">{m.notes || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="p-2 space-y-4">
+      <div className="flex flex-wrap gap-2 items-center">
+        <select
+          value={typeFilter}
+          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+          className="bg-navy-950 border border-gold-500/20 rounded-lg px-3 py-2 text-white text-sm"
+        >
+          <option value="">All movement types</option>
+          <option value="STOCK_IN">Store → Shop</option>
+          <option value="STOCK_OUT">Shop → Store</option>
+          <option value="SALE_POS">POS sale</option>
+          <option value="SALE_ONLINE">Online sale</option>
+          <option value="ADJUSTMENT">Stock take</option>
+          <option value="VOID">Void / return</option>
+        </select>
+        <button type="button" onClick={load} className="text-gold-400 text-sm underline">Refresh</button>
+      </div>
+      {loading ? <TableSkeleton /> : rows.length === 0 ? (
+        <Empty message="No movements recorded yet" />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-gold-500/50 text-xs"><tr><th className="p-2 text-left">Date</th><th>Product</th><th>Type</th><th>Qty</th><th>Notes</th></tr></thead>
+            <tbody>
+              {rows.map((m) => (
+                <tr key={m.id} className={`border-t border-gold-500/10 ${color(m.movement_type)}`}>
+                  <td className="p-2">{format(new Date(m.created_at), 'dd MMM yyyy HH:mm')}</td>
+                  <td>{m.product?.name}</td>
+                  <td>{label(m)}</td>
+                  <td>{m.qty}</td>
+                  <td className="text-gold-500/50">{m.notes || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="px-3 py-1 border border-gold-500/20 rounded text-gold-400 text-sm disabled:opacity-40">Previous</button>
+        <span className="text-gold-500/50 text-sm self-center">Page {page}</span>
+        <button type="button" disabled={rows.length < limit} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 border border-gold-500/20 rounded text-gold-400 text-sm disabled:opacity-40">Next</button>
+      </div>
     </div>
   );
 };
@@ -696,7 +751,7 @@ const StockSummaryPieceRow = ({ piece, detailOpen, onToggleDetail, onViewFull, o
   );
 };
 
-const StockSummaryCategoryRow = ({ row, expanded, onToggle, piecesState, onLoadMore, onViewProduct, onTransfer, transferBusy, inventoryMode }) => {
+const StockSummaryCategoryRow = ({ row, expanded, onToggle, piecesState, onLoadMore, onViewProduct, onTransfer, onBulkToShop, transferBusy, inventoryMode }) => {
   const category = row.product?.name || row.name;
   const cache = piecesState[category];
   const isOpen = expanded === category;
@@ -751,6 +806,18 @@ const StockSummaryCategoryRow = ({ row, expanded, onToggle, piecesState, onLoadM
         <tr className="border-t border-gold-500/5 bg-navy-950/40">
           <td colSpan={8} className="p-0">
             <div className="px-4 py-3 border-l-2 border-gold-500/30 ml-3">
+              {onBulkToShop && (
+                <div className="mb-3 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={transferBusy}
+                    onClick={() => onBulkToShop(category)}
+                    className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded border border-gold-500/30 text-gold-400 hover:bg-gold-600/10 disabled:opacity-50"
+                  >
+                    Move all warehouse → shop
+                  </button>
+                </div>
+              )}
               {cache?.loading && !cache?.items?.length && (
                 <p className="text-gold-500/40 text-xs py-4 text-center">Loading pieces…</p>
               )}
@@ -913,6 +980,35 @@ export const DailyStockSheetView = () => {
     }
   };
 
+  const handleBulkToShop = async (category) => {
+    setTransferBusy(true);
+    try {
+      const res = await inventoryAPI.categoryPieces({
+        category,
+        limit: 500,
+        offset: 0,
+        location: 'store',
+      });
+      const pieces = (res.data?.data?.items || []).filter((p) => (p.storeQty ?? 0) > 0);
+      if (!pieces.length) {
+        toast.error('No warehouse stock to move for this category');
+        return;
+      }
+      let moved = 0;
+      for (const piece of pieces) {
+        await inventoryAPI.stockIn({ productId: piece.id, qty: 1, notes: 'Bulk store → shop' });
+        moved += 1;
+      }
+      toast.success(`Moved ${moved} piece(s) from warehouse to shop`);
+      load();
+      if (expanded === category) fetchPieces(category, { location: inventoryMode });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Bulk transfer failed');
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+
   const toggleCategory = (category) => {
     if (expanded === category) {
       setExpanded(null);
@@ -981,6 +1077,7 @@ export const DailyStockSheetView = () => {
                   onLoadMore={(cat) => fetchPieces(cat, { append: true, location: inventoryMode })}
                   onViewProduct={setProductModalId}
                   onTransfer={handleTransfer}
+                  onBulkToShop={handleBulkToShop}
                   transferBusy={transferBusy}
                   inventoryMode={inventoryMode}
                 />
@@ -1006,42 +1103,258 @@ export const DailyStockSheetView = () => {
 };
 
 export const StockTakeView = () => {
+  const [location, setLocation] = useState('shop');
   const [items, setItems] = useState([]);
   const [counts, setCounts] = useState({});
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    inventoryAPI.stockLevels(categoryFilter ? { category: categoryFilter } : {})
+      .then((r) => {
+        const list = r.data?.data || [];
+        setItems(list);
+        setCounts(Object.fromEntries(
+          list.map((p) => [p.id, location === 'shop' ? p.currentQty : (p.storeQty ?? 0)])
+        ));
+      })
+      .finally(() => setLoading(false));
+  }, [location, categoryFilter]);
+
   useEffect(() => {
-    inventoryAPI.stockLevels().then((r) => {
-      const list = r.data?.data || [];
-      setItems(list);
-      setCounts(Object.fromEntries(list.map((p) => [p.id, p.currentQty])));
-    });
-  }, []);
+    load();
+  }, [load]);
+
   const save = async () => {
     const payload = items
-      .map((p) => ({ productId: p.id, physicalQty: counts[p.id] ?? p.currentQty }))
-      .filter((r) => r.physicalQty !== (items.find((i) => i.id === r.productId)?.currentQty ?? 0));
-    if (!payload.length) return toast.error('No variances');
-    await inventoryAPI.stockTake(payload);
-    toast.success('Adjustments saved');
+      .map((p) => ({
+        productId: p.id,
+        physicalQty: counts[p.id] ?? (location === 'shop' ? p.currentQty : (p.storeQty ?? 0)),
+      }))
+      .filter((r) => {
+        const system = location === 'shop'
+          ? (items.find((i) => i.id === r.productId)?.currentQty ?? 0)
+          : (items.find((i) => i.id === r.productId)?.storeQty ?? 0);
+        return r.physicalQty !== system;
+      });
+    if (!payload.length) return toast.error('No variances to save');
+    const api = location === 'shop' ? inventoryAPI.stockTake : inventoryAPI.storeStockTake;
+    await api(payload);
+    toast.success(`${location === 'shop' ? 'Shop' : 'Warehouse'} stock take saved — website stock updated`);
+    load();
   };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await inventoryAPI.exportStockTake({
+        location,
+        category: categoryFilter || undefined,
+      });
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Stock-Take-${location}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleTemplate = async () => {
+    try {
+      const res = await inventoryAPI.downloadStockTakeTemplate(location);
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Stock-Take-${location}-Template.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Template download failed');
+    }
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await inventoryAPI.importStockTake(file, { location });
+      const d = res.data?.data || {};
+      if (res.data?.success) {
+        toast.success(
+          res.data.message ||
+            `Applied ${d.adjusted || 0} adjustment(s)${d.skipped?.length ? `, ${d.skipped.length} skipped` : ''}`
+        );
+        load();
+        window.dispatchEvent(new Event('inventory:reload'));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const categories = [...new Set(items.map((p) => p.category).filter(Boolean))].sort();
+
+  const totals = useMemo(() => {
+    let costValue = 0;
+    let retailValue = 0;
+    let varianceUnits = 0;
+    for (const p of items) {
+      const system = location === 'shop' ? p.currentQty : (p.storeQty ?? 0);
+      const physical = counts[p.id] ?? system;
+      const variance = physical - system;
+      const cost = p.costPrice ?? 0;
+      const retail = p.retailPrice ?? p.shop_price ?? 0;
+      costValue += cost * physical;
+      retailValue += retail * physical;
+      varianceUnits += variance;
+    }
+    return { costValue, retailValue, profit: retailValue - costValue, varianceUnits };
+  }, [items, counts, location]);
+
+  const fmt = (n) => (n == null || Number.isNaN(n) ? '—' : formatKES(n));
+
   return (
-    <div className="p-2">
-      <button onClick={save} className="mb-4 px-4 py-2 bg-gold-600 text-navy-950 rounded text-sm font-medium">Save Adjustments</button>
-      <table className="w-full text-sm">
-        <thead className="text-gold-500/50 text-xs"><tr><th className="p-2">Product</th><th>System</th><th>Physical</th><th>Variance</th></tr></thead>
-        <tbody>
-          {items.map((p) => {
-            const v = (counts[p.id] ?? p.currentQty) - p.currentQty;
-            return (
-              <tr key={p.id} className="border-t border-gold-500/10">
-                <td className="p-2">{p.name}</td>
-                <td>{p.currentQty}</td>
-                <td><input type="number" min={0} value={counts[p.id] ?? p.currentQty} onChange={(e) => setCounts({ ...counts, [p.id]: Number(e.target.value) })} className="w-20 bg-navy-950 border border-gold-500/20 rounded px-2 py-1 text-white" /></td>
-                <td className={v < 0 ? 'text-red-400' : v > 0 ? 'text-green-400' : 'text-gray-400'}>{v}</td>
+    <div className="p-2 space-y-4">
+      <p className="text-xs text-gold-500/50">
+        Variance = Physical Count − System Qty (same as Excel). Download the sheet, fill Physical Count, upload to update shop, warehouse, and website stock automatically.
+      </p>
+      <div className="flex flex-wrap gap-2 items-center">
+        {[
+          ['shop', 'Shop floor'],
+          ['store', 'Warehouse'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setLocation(id)}
+            className={`px-3 py-1.5 rounded-lg text-xs border ${
+              location === id ? 'bg-gold-600/20 border-gold-500/40 text-gold-300' : 'border-gold-500/15 text-gold-500/50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded-lg px-3 py-1.5 text-white text-sm"
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading || loading}
+          className="px-3 py-1.5 border border-gold-500/30 text-gold-400 rounded-lg text-xs"
+        >
+          {downloading ? 'Downloading…' : 'Download Excel'}
+        </button>
+        <label className="px-3 py-1.5 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs cursor-pointer">
+          {uploading ? 'Uploading…' : 'Upload adjustments'}
+          <input type="file" accept=".xlsx" className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+        <button type="button" onClick={handleTemplate} className="text-gold-500/50 text-xs underline">
+          Blank template
+        </button>
+        <button onClick={save} className="px-4 py-2 bg-gold-600 text-navy-950 rounded text-sm font-medium ml-auto">
+          Save on screen
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
+          <p className="text-gold-500/40 uppercase tracking-wider">Cost value (counted)</p>
+          <p className="text-gold-200 font-semibold mt-1">{fmt(totals.costValue)}</p>
+        </div>
+        <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
+          <p className="text-gold-500/40 uppercase tracking-wider">Retail value (counted)</p>
+          <p className="text-gold-200 font-semibold mt-1">{fmt(totals.retailValue)}</p>
+        </div>
+        <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
+          <p className="text-gold-500/40 uppercase tracking-wider">Potential profit</p>
+          <p className="text-emerald-400 font-semibold mt-1">{fmt(totals.profit)}</p>
+        </div>
+        <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
+          <p className="text-gold-500/40 uppercase tracking-wider">Net variance (units)</p>
+          <p className={`font-semibold mt-1 ${totals.varianceUnits < 0 ? 'text-red-400' : totals.varianceUnits > 0 ? 'text-green-400' : 'text-gold-200'}`}>
+            {totals.varianceUnits > 0 ? '+' : ''}{totals.varianceUnits}
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-gold-500/40 text-sm py-8 text-center">Loading stock list…</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead className="text-gold-500/50 text-xs">
+              <tr>
+                <th className="p-2 text-left">Product</th>
+                <th className="p-2">SKU</th>
+                <th className="p-2">Web</th>
+                <th className="p-2">Cost</th>
+                <th className="p-2">Retail</th>
+                <th className="p-2">System</th>
+                <th className="p-2">Physical</th>
+                <th className="p-2">Variance</th>
+                <th className="p-2">Profit</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {items.map((p) => {
+                const system = location === 'shop' ? p.currentQty : (p.storeQty ?? 0);
+                const physical = counts[p.id] ?? system;
+                const variance = physical - system;
+                const cost = p.costPrice ?? 0;
+                const retail = p.retailPrice ?? p.shop_price ?? 0;
+                const lineProfit = (retail - cost) * physical;
+                return (
+                  <tr key={p.id} className="border-t border-gold-500/10">
+                    <td className="p-2 max-w-[200px] truncate" title={p.name}>{p.name}</td>
+                    <td className="p-2 text-gold-500/60 text-xs">{p.sku}</td>
+                    <td className="p-2 text-center">{p.on_website ? '✓' : '—'}</td>
+                    <td className="p-2 text-right text-xs">{cost ? fmt(cost) : '—'}</td>
+                    <td className="p-2 text-right text-xs">{fmt(retail)}</td>
+                    <td className="p-2 text-center">{system}</td>
+                    <td className="p-2">
+                      <input
+                        type="number"
+                        min={0}
+                        value={physical}
+                        onChange={(e) => setCounts({ ...counts, [p.id]: Number(e.target.value) })}
+                        className="w-20 bg-navy-950 border border-gold-500/20 rounded px-2 py-1 text-white text-center"
+                      />
+                    </td>
+                    <td className={`p-2 text-center font-medium ${variance < 0 ? 'text-red-400' : variance > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                      {variance > 0 ? '+' : ''}{variance}
+                    </td>
+                    <td className="p-2 text-right text-xs text-emerald-400/80">{fmt(lineProfit)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

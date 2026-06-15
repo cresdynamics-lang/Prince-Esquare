@@ -8,7 +8,6 @@ const { upsertWebsiteVariants } = require('./websiteVariants');
 const { skuFromName } = require('../utils/stockExcelParser');
 const {
   linkProductPair,
-  findPosProductForEcommerce,
   inferPosBucketName,
 } = require('./productPosLink');
 const { ensureStoreStockRow } = require('./inventoryMovement');
@@ -61,7 +60,7 @@ const createPosInventoryItem = async (
   return r.rows[0];
 };
 
-/** When an admin creates a website product, ensure a matching POS inventory row exists. */
+/** When an admin creates a website product, ensure a dedicated POS inventory row exists. */
 const ensurePosForEcommerceProduct = async (product, options = {}) => {
   const shopPriceOverride = options.shop_price ?? options.shopPrice;
   if (product.pos_stock_product_id) {
@@ -69,50 +68,142 @@ const ensurePosForEcommerceProduct = async (product, options = {}) => {
     if (linked.rows.length) return linked.rows[0];
   }
 
+  const byEcom = await db.query(`SELECT * FROM pos_products WHERE ecommerce_product_id = $1`, [product.id]);
+  if (byEcom.rows.length) {
+    if (!product.pos_stock_product_id) {
+      await linkProductPair(product.id, byEcom.rows[0].id, { syncPrices: false });
+    }
+    return byEcom.rows[0];
+  }
+
   let categorySlug = null;
+  let categoryName = 'General';
   if (product.category_id) {
-    const c = await db.query('SELECT slug FROM categories WHERE id = $1', [product.category_id]);
+    const c = await db.query('SELECT slug, name FROM categories WHERE id = $1', [product.category_id]);
     categorySlug = c.rows[0]?.slug || null;
+    categoryName = c.rows[0]?.name || inferPosBucketName(product.name, categorySlug) || 'General';
+  } else {
+    categoryName = inferPosBucketName(product.name, categorySlug) || 'General';
   }
 
   const sellPrice = parseFloat(product.discount_price || product.price || 0);
   const listPrice = parseFloat(product.price || 0);
   const shopPrice = shopPriceOverride != null ? parseFloat(shopPriceOverride) : sellPrice;
 
-  const existingPos = await findPosProductForEcommerce(product.id, product.name, categorySlug);
-
-  if (existingPos && !existingPos.ecommerce_product_id) {
-    await linkProductPair(product.id, existingPos.id, { syncPrices: false });
-    await db.query(
-      `UPDATE pos_products SET shop_price = $1, online_price = $2 WHERE id = $3`,
-      [shopPrice, listPrice, existingPos.id]
-    );
-    return { ...existingPos, shop_price: shopPrice, online_price: listPrice };
-  }
-
-  if (existingPos?.ecommerce_product_id && existingPos.ecommerce_product_id !== product.id) {
-    const category = inferPosBucketName(product.name, categorySlug) || 'General';
-    const dedicated = await createPosInventoryItem({
-      name: product.name,
-      sku: product.sku,
-      category,
-      shopPrice,
-      onlinePrice: listPrice,
-    });
-    await linkProductPair(product.id, dedicated.id, { syncPrices: false });
-    return dedicated;
-  }
-
-  const category = inferPosBucketName(product.name, categorySlug) || 'General';
   const created = await createPosInventoryItem({
     name: product.name,
     sku: product.sku,
-    category,
+    category: categoryName,
     shopPrice,
     onlinePrice: listPrice,
+    ecommerceProductId: product.id,
   });
   await linkProductPair(product.id, created.id, { syncPrices: false });
   return created;
+};
+
+const syncPosMetadataFromEcommerce = async (product, posRow = null) => {
+  const posId = posRow?.id || product.pos_stock_product_id;
+  if (!posId) return null;
+
+  let categoryName = 'General';
+  if (product.category_id) {
+    const c = await db.query('SELECT name, slug FROM categories WHERE id = $1', [product.category_id]);
+    categoryName = c.rows[0]?.name || inferPosBucketName(product.name, c.rows[0]?.slug) || categoryName;
+  } else {
+    categoryName = inferPosBucketName(product.name, null) || categoryName;
+  }
+
+  const shopPrice = parseFloat(product.pos_sell_price ?? product.discount_price ?? product.price ?? 0);
+  const listPrice = parseFloat(product.price ?? shopPrice);
+
+  await db.query(
+    `UPDATE pos_products
+     SET name = $1, category = $2, shop_price = $3, online_price = $4,
+         ecommerce_product_id = COALESCE(ecommerce_product_id, $5)
+     WHERE id = $6`,
+    [product.name, categoryName, shopPrice, listPrice, product.id, posId]
+  );
+  return { id: posId, categoryName, shopPrice, listPrice };
+};
+
+/** One-time seed: copy website stock_quantity into POS shop when POS qty is still zero. */
+const seedPosOpeningStockIfEmpty = async (posProductId, qty) => {
+  const amount = parseInt(qty, 10);
+  if (!posProductId || amount < 1) return { seeded: false };
+
+  const currentR = await db.query(
+    `SELECT current_qty FROM pos_stock_levels WHERE product_id = $1`,
+    [posProductId]
+  );
+  const current = currentR.rows[0]?.current_qty ?? 0;
+  if (current > 0) return { seeded: false, currentQty: current };
+
+  const { setShopQty, afterInventoryChange, ensureStoreStockRow } = require('./inventoryMovement');
+  await ensureStoreStockRow(db, posProductId);
+  const shopQty = await setShopQty(posProductId, amount);
+  const levels = { shopQty, storeQty: 0 };
+  await afterInventoryChange(posProductId, levels);
+  return { seeded: true, shopQty };
+};
+
+/** Backfill POS rows for every website product — safe to run repeatedly. */
+const needsDedicatedInventoryRow = async (product) => {
+  if (!product.pos_stock_product_id) return false;
+
+  const posR = await db.query(
+    `SELECT id, sku, ecommerce_product_id FROM pos_products WHERE id = $1`,
+    [product.pos_stock_product_id]
+  );
+  const pos = posR.rows[0];
+  if (!pos) return false;
+
+  if (String(pos.sku || '').startsWith('POS-')) return true;
+  if (pos.ecommerce_product_id && pos.ecommerce_product_id !== product.id) return true;
+
+  const shareR = await db.query(
+    `SELECT COUNT(*)::int AS n FROM products WHERE pos_stock_product_id = $1`,
+    [product.pos_stock_product_id]
+  );
+  return (shareR.rows[0]?.n ?? 0) > 1;
+};
+
+const ensureAllEcommerceProductsInPos = async () => {
+  const products = await db.query(
+    `SELECT p.*, c.slug AS category_slug, c.name AS category_name
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     ORDER BY p.created_at ASC`
+  );
+
+  let linked = 0;
+  let split = 0;
+  let stockSeeded = 0;
+
+  for (const product of products.rows) {
+    const hadLink = Boolean(product.pos_stock_product_id);
+    let posRow;
+
+    if (await needsDedicatedInventoryRow(product)) {
+      await db.query(`UPDATE products SET pos_stock_product_id = NULL WHERE id = $1`, [product.id]);
+      posRow = await ensurePosForEcommerceProduct({ ...product, pos_stock_product_id: null });
+      split += 1;
+      linked += 1;
+    } else {
+      posRow = await ensurePosForEcommerceProduct(product);
+      if (!hadLink) linked += 1;
+    }
+
+    if (!posRow?.id) continue;
+
+    await syncPosMetadataFromEcommerce(product, posRow);
+
+    const websiteQty = parseInt(product.stock_quantity, 10) || 0;
+    const seed = await seedPosOpeningStockIfEmpty(posRow.id, websiteQty);
+    if (seed.seeded) stockSeeded += 1;
+  }
+
+  return { scanned: products.rows.length, linked, split, stockSeeded };
 };
 
 /** Publish an inventory-only POS item to the website (or re-activate an existing link). */
@@ -230,6 +321,9 @@ const unpublishFromWebsite = async (posProductId) => {
 
 module.exports = {
   ensurePosForEcommerceProduct,
+  ensureAllEcommerceProductsInPos,
+  syncPosMetadataFromEcommerce,
+  seedPosOpeningStockIfEmpty,
   publishPosToWebsite,
   unpublishFromWebsite,
   createPosInventoryItem,

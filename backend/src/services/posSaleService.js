@@ -304,7 +304,6 @@ const processSale = async ({
     const sale = saleR.rows[0];
     const movementType = channel === 'ONLINE' ? 'SALE_ONLINE' : 'SALE_POS';
     const stockUpdates = [];
-    let legacyWebsiteSale = false;
 
     for (const item of pricedItems) {
       const sellCheck = await assertSellableOnShopFloor(
@@ -339,7 +338,6 @@ const processSale = async ({
           variantId: item.variantId || null,
         });
         stockUpdates.push(...pieceUpdates);
-        legacyWebsiteSale = true;
         continue;
       }
 
@@ -413,18 +411,19 @@ const processSale = async ({
     await client.query('COMMIT');
 
     const { refreshDailySnapshot } = require('./dailyStockSnapshot');
-    if (legacyWebsiteSale) {
-      const { syncLegacyBucketsFromPeCatalog, syncWebsiteStockFromPosShop } = require('./inventoryWarehouseSync');
-      try {
-        await syncLegacyBucketsFromPeCatalog();
-        await syncWebsiteStockFromPosShop();
-      } catch (e) {
-        console.error('Post website-sale stock sync warning:', e.message);
-      }
-    }
+    const { syncWebsiteStockForPosProduct } = require('./inventoryWarehouseSync');
+    const syncedProducts = new Set();
     for (const u of stockUpdates) {
       await refreshDailySnapshot(u.productId);
       await emitStockUpdated(u.productId, u.newQty);
+      syncedProducts.add(u.productId);
+    }
+    for (const productId of syncedProducts) {
+      try {
+        await syncWebsiteStockForPosProduct(productId);
+      } catch (e) {
+        console.error('Post-sale website sync warning:', e.message);
+      }
     }
 
     const itemsR = await db.query(
@@ -461,30 +460,45 @@ const voidSale = async (saleId, voidReason, voidedById = null, voidedByName = nu
 
     const itemsR = await client.query(`SELECT * FROM pos_sale_items WHERE sale_id = $1`, [saleId]);
     const stockUpdates = [];
+    const receiptPattern = `%${sale.receipt_number}%`;
 
-    for (const item of itemsR.rows) {
+    const saleMovementsR = await client.query(
+      `SELECT product_id, SUM(qty)::int AS qty
+       FROM pos_stock_movements
+       WHERE movement_type IN ('SALE_POS', 'SALE_ONLINE')
+         AND notes LIKE $1
+       GROUP BY product_id`,
+      [receiptPattern]
+    );
+
+    const restoreTargets = saleMovementsR.rows.length
+      ? saleMovementsR.rows
+      : itemsR.rows.map((item) => ({ product_id: item.product_id, qty: item.qty }));
+
+    for (const target of restoreTargets) {
+      const saleItem = itemsR.rows.find((item) => item.product_id === target.product_id) || itemsR.rows[0];
       const upd = await client.query(
         `UPDATE pos_stock_levels SET current_qty = current_qty + $1, updated_at = NOW()
          WHERE product_id = $2 RETURNING current_qty`,
-        [item.qty, item.product_id]
+        [target.qty, target.product_id]
       );
       if (!upd.rows.length) {
         await client.query(
           `INSERT INTO pos_stock_levels (product_id, current_qty) VALUES ($1, $2)`,
-          [item.product_id, item.qty]
+          [target.product_id, target.qty]
         );
-        stockUpdates.push({ productId: item.product_id, newQty: item.qty });
+        stockUpdates.push({ productId: target.product_id, newQty: target.qty });
       } else {
-        stockUpdates.push({ productId: item.product_id, newQty: upd.rows[0].current_qty });
+        stockUpdates.push({ productId: target.product_id, newQty: upd.rows[0].current_qty });
       }
 
       await client.query(
         `INSERT INTO pos_stock_movements (product_id, variant_id, movement_type, qty, recorded_by, notes)
          VALUES ($1, $2, 'VOID'::"PosMovementType", $3, $4, $5)`,
         [
-          item.product_id,
-          item.variant_id,
-          item.qty,
+          target.product_id,
+          saleItem?.variant_id || null,
+          target.qty,
           voidedById,
           `Void ${sale.receipt_number}: ${voidReason}${voidedByName ? ` (${voidedByName})` : ''}`,
         ]
@@ -521,9 +535,19 @@ const voidSale = async (saleId, voidReason, voidedById = null, voidedByName = nu
     await client.query('COMMIT');
 
     const { refreshDailySnapshot } = require('./dailyStockSnapshot');
+    const { syncWebsiteStockForPosProduct } = require('./inventoryWarehouseSync');
+    const syncedProducts = new Set();
     for (const u of stockUpdates) {
       await refreshDailySnapshot(u.productId);
       await emitStockUpdated(u.productId, u.newQty);
+      syncedProducts.add(u.productId);
+    }
+    for (const productId of syncedProducts) {
+      try {
+        await syncWebsiteStockForPosProduct(productId);
+      } catch (e) {
+        console.error('Post-void website sync warning:', e.message);
+      }
     }
 
     const itemsOut = await db.query(

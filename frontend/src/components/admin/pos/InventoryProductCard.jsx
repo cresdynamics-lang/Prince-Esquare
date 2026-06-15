@@ -1,4 +1,5 @@
-import { Store, ShoppingBag, Globe, Pencil, FileText } from 'lucide-react';
+import { useState } from 'react';
+import { Store, ShoppingBag, Globe, Pencil, FileText, EyeOff } from 'lucide-react';
 import { formatKES } from '../../../lib/format';
 
 const SizeChip = ({ size, stock, outOfStockStyle }) => {
@@ -26,29 +27,31 @@ const SizeChip = ({ size, stock, outOfStockStyle }) => {
   );
 };
 
-const webStatusBadge = (p) => {
+const publishStatus = (p) => {
   const live = p.on_website ?? (p.website_product_id && p.website_published);
-  if (live) {
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Live on website</span>;
-  }
-  if (p.website_product_id) {
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">Hidden on website</span>;
-  }
-  return <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy-800 text-gold-500/50">Inventory only — not on website</span>;
+  if (live) return { label: 'Live on website', cls: 'bg-emerald-500/15 text-emerald-400' };
+  if (p.website_product_id) return { label: 'Hidden on website', cls: 'bg-amber-500/15 text-amber-400' };
+  if (p.website_details || p.description) return { label: 'Draft — ready to publish', cls: 'bg-sky-500/15 text-sky-300' };
+  return { label: 'Inventory only', cls: 'bg-navy-800 text-gold-500/50' };
 };
 
 const InventoryProductCard = ({
   product,
   onEdit,
   onPublish,
+  onUnpublish,
   onTransferIn,
   onTransferOut,
+  onThresholdChange,
 }) => {
+  const [thresholdDraft, setThresholdDraft] = useState(String(product.low_stock_threshold ?? ''));
   const inShop = (product.currentQty ?? 0) > 0;
   const liveOnWeb = product.on_website ?? (product.website_product_id && product.website_published);
   const showImage = liveOnWeb && product.website_thumbnail;
   const colorGroups = product.color_groups || [];
   const hasVariants = colorGroups.length > 0;
+  const status = publishStatus(product);
+  const isLow = product.low_stock_threshold != null && (product.currentQty ?? 0) <= product.low_stock_threshold;
 
   return (
     <article className="bg-navy-950/60 border border-gold-500/15 rounded-xl overflow-hidden">
@@ -89,7 +92,7 @@ const InventoryProductCard = ({
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            {webStatusBadge(product)}
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${status.cls}`}>{status.label}</span>
             {inShop ? (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25">
                 Available in shop
@@ -99,6 +102,9 @@ const InventoryProductCard = ({
                 Not in shop
               </span>
             )}
+            {isLow && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-300">Low stock alert</span>
+            )}
             <span className="text-[10px] text-sky-300/90 flex items-center gap-1">
               <Store size={11} /> Store {product.storeQty ?? 0}
             </span>
@@ -106,6 +112,26 @@ const InventoryProductCard = ({
               <ShoppingBag size={11} /> Shop {product.currentQty ?? 0}
             </span>
           </div>
+
+          {onThresholdChange && (
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="text-gold-500/50 uppercase tracking-widest">Low at</span>
+              <input
+                type="number"
+                min={0}
+                value={thresholdDraft}
+                onChange={(e) => setThresholdDraft(e.target.value)}
+                className="w-14 bg-navy-950 border border-gold-500/20 rounded px-2 py-1 text-white"
+              />
+              <button
+                type="button"
+                onClick={() => onThresholdChange(product, Number(thresholdDraft) || 0)}
+                className="text-gold-400 hover:text-gold-300 underline"
+              >
+                Save
+              </button>
+            </div>
+          )}
 
           {showImage && product.description && (
             <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">{product.description}</p>
@@ -171,6 +197,11 @@ const InventoryProductCard = ({
           <Globe size={12} />
           {product.website_product_id ? 'Update web' : 'Publish to website'}
         </button>
+        {product.website_product_id && onUnpublish && (
+          <button type="button" onClick={() => onUnpublish(product)} className="flex items-center gap-1 px-3 py-1.5 border border-red-500/25 text-red-400 rounded text-[10px]">
+            <EyeOff size={12} /> Unpublish
+          </button>
+        )}
       </div>
     </article>
   );

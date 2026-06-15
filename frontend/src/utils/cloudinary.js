@@ -11,10 +11,17 @@ export const isBlobUrl = (url) =>
   typeof url === 'string' && url.startsWith('blob:');
 
 /** Safe src for <img> — blob URLs expire after navigation/reload and must not be persisted. */
-export const resolveDisplayImageUrl = (url) => {
+export const resolveDisplayImageUrl = (url, { width = 400 } = {}) => {
   if (!url || isBlobUrl(url)) return '';
-  if (typeof url === 'object') return getImageSrc(url);
-  return url;
+  if (typeof url === 'object') return getImageSrc(url, width <= 480 ? 'thumbnail' : 'optimized');
+  return isCloudinaryUrl(url) ? optimizeCloudinaryUrl(url, { width }) : url;
+};
+
+/** Raw Cloudinary URL for DB storage (transforms applied at display time). */
+export const getPersistImageUrl = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  return item.url || item.secure_url || '';
 };
 
 export const revokeBlobUrl = (url) => {
@@ -68,14 +75,31 @@ export const toImageJson = (item) => {
   };
 };
 
+const stripCloudinaryTransforms = (pathAfterUpload) => {
+  const segments = pathAfterUpload.split('/');
+  while (segments.length > 0 && segments[0] && !/^v\d+/.test(segments[0]) && segments[0].includes('_')) {
+    segments.shift();
+  }
+  return segments.join('/');
+};
+
 export const optimizeCloudinaryUrl = (url, { width = 800, height, crop = 'limit' } = {}) => {
   if (!url || !isCloudinaryUrl(url)) return url;
-  const parts = url.split('/upload/');
-  if (parts.length !== 2) return url;
+  const marker = '/upload/';
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;
+  const base = url.slice(0, idx + marker.length);
+  const assetPath = stripCloudinaryTransforms(url.slice(idx + marker.length));
   const transforms = [`f_auto`, `q_auto`, `w_${width}`, `c_${crop}`];
   if (height) transforms.push(`h_${height}`);
-  return `${parts[0]}/upload/${transforms.join(',')}/${parts[1]}`;
+  return `${base}${transforms.join(',')}/${assetPath}`;
 };
+
+/** Hero carousel — fills viewport without aggressive zoom */
+export const heroImageUrl = (url) =>
+  isCloudinaryUrl(url)
+    ? optimizeCloudinaryUrl(url, { width: 1600, height: 900, crop: 'fill' })
+    : url;
 
 export const parseProductImages = (images) => {
   if (!images) return [];

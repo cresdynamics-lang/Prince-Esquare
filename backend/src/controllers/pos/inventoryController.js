@@ -12,6 +12,7 @@ const {
   transferShopToStore,
   receiveAtStore,
   applyStockTake,
+  applyStoreStockTake,
   STORE_TO_SHOP,
   SHOP_TO_STORE,
 } = require('../../services/inventoryMovement');
@@ -230,7 +231,17 @@ exports.syncAlignment = async (req, res, next) => {
   try {
     const { syncInventoryAlignment } = require('../../services/inventoryWarehouseSync');
     const result = await syncInventoryAlignment();
-    formatResponse(res, 200, true, 'Inventory aligned — warehouse backfilled and website stock synced', result);
+    formatResponse(res, 200, true, 'Inventory aligned — website products linked and stock synced', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.ensureWebsiteLinks = async (req, res, next) => {
+  try {
+    const { ensureAllEcommerceProductsInPos } = require('../../services/inventoryChannel');
+    const result = await ensureAllEcommerceProductsInPos();
+    formatResponse(res, 200, true, 'Website products linked to inventory', result);
   } catch (error) {
     next(error);
   }
@@ -261,6 +272,79 @@ exports.stockTake = async (req, res, next) => {
     formatResponse(res, 200, true, 'Stock take saved', { adjustments });
   } catch (error) {
     next(error);
+  }
+};
+
+exports.storeStockTake = async (req, res, next) => {
+  try {
+    const schema = Joi.array().items(
+      Joi.object({
+        productId: Joi.string().uuid().required(),
+        physicalQty: Joi.number().integer().min(0).required(),
+      })
+    );
+    const { error, value } = schema.validate(req.body);
+    if (error) return formatResponse(res, 400, false, error.message);
+
+    const adjustments = [];
+    for (const row of value) {
+      const result = await applyStoreStockTake(row.productId, row.physicalQty, {
+        recordedBy: req.user?.id || null,
+      });
+      if (result.variance !== 0) {
+        adjustments.push({ productId: row.productId, variance: result.variance });
+      }
+    }
+
+    formatResponse(res, 200, true, 'Store stock take saved', { adjustments });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportStockTake = async (req, res, next) => {
+  try {
+    const { exportStockTakeBuffer } = require('../../services/stockTakeExcel');
+    const location = req.query.location === 'store' ? 'store' : 'shop';
+    const category = req.query.category || null;
+    const buffer = await exportStockTakeBuffer({ category, location });
+    const label = location === 'store' ? 'warehouse' : 'shop';
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Stock-Take-${label}-${new Date().toISOString().slice(0, 10)}.xlsx"`
+    );
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.importStockTake = async (req, res, next) => {
+  try {
+    if (!req.file?.buffer) {
+      return formatResponse(res, 400, false, 'No Excel file uploaded');
+    }
+    const location = req.body.location === 'store' ? 'store' : 'shop';
+    const { parseStockTakeBuffer, importStockTakeRows } = require('../../services/stockTakeExcel');
+    const rows = await parseStockTakeBuffer(req.file.buffer);
+    const result = await importStockTakeRows(rows, {
+      location,
+      recordedBy: req.user?.id || null,
+    });
+    const label = location === 'store' ? 'Warehouse' : 'Shop';
+    formatResponse(
+      res,
+      200,
+      true,
+      `${label} stock take applied — ${result.adjusted} adjusted, ${result.skipped.length} skipped`,
+      result
+    );
+  } catch (error) {
+    formatResponse(res, 400, false, error.message || 'Stock take import failed');
   }
 };
 
@@ -507,6 +591,55 @@ exports.downloadTemplate = async (req, res, next) => {
     const ExcelJS = require('exceljs');
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Sheet1');
+
+    if (req.query.type === 'stock-take') {
+      const location = req.query.location === 'store' ? 'Warehouse' : 'Shop';
+      ws.addRow([
+        'Inventory ID',
+        'SKU',
+        'Product Name',
+        'Category',
+        'On Website',
+        'Cost Price',
+        'Retail Price',
+        'System Qty',
+        'Physical Count',
+        'Variance',
+        'Cost Value',
+        'Retail Value',
+        'Profit',
+      ]);
+      ws.addRow([
+        '(auto)',
+        'SKU-EXAMPLE',
+        'Example Product',
+        'Shirts',
+        'Yes',
+        2500,
+        4500,
+        10,
+        10,
+        0,
+        25000,
+        45000,
+        20000,
+      ]);
+      ws.getCell('J2').value = { formula: 'I2-H2' };
+      ws.getCell('K2').value = { formula: 'F2*I2' };
+      ws.getCell('L2').value = { formula: 'G2*I2' };
+      ws.getCell('M2').value = { formula: 'L2-K2' };
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="Stock-Take-${location}-Template.xlsx"`
+      );
+      ws.columns.forEach((col) => { col.width = 16; });
+      await wb.xlsx.write(res);
+      return res.end();
+    }
 
     if (req.query.type === 'catalog') {
       ws.addRow(['SKU', 'Product Name', 'Category', 'Shop Price', 'Opening Qty', 'Store Qty', 'Website SKU']);

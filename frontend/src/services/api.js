@@ -26,7 +26,10 @@ API.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   } else {
     try {
-      const authStorage = JSON.parse(localStorage.getItem('prince-esquire-auth'));
+      const raw =
+        sessionStorage.getItem('prince-esquire-auth') ||
+        localStorage.getItem('prince-esquire-auth');
+      const authStorage = raw ? JSON.parse(raw) : null;
       const stored = authStorage?.state?.token;
       if (stored) config.headers.Authorization = `Bearer ${stored}`;
       // eslint-disable-next-line no-unused-vars
@@ -54,10 +57,13 @@ API.interceptors.response.use(
       }
     }
     if (status === 429 && typeof window !== 'undefined') {
+      const backendMsg = error.response?.data?.message;
       const retryAfter = error.response?.headers?.['retry-after'];
-      const msg = retryAfter
-        ? `Too many requests. Try again in ${retryAfter} seconds.`
-        : 'Too many requests. Please wait a moment and try again.';
+      const msg =
+        backendMsg ||
+        (retryAfter
+          ? `Too many requests. Try again in ${retryAfter} seconds.`
+          : 'Too many requests. Please wait a moment and try again.');
       error.rateLimited = true;
       error.userMessage = msg;
     }
@@ -137,6 +143,8 @@ export const adminProductAPI = {
   getAll: (params) => API.get('/admin/products', { params }),
   create: (data) => API.post('/admin/products', data),
   update: (id, data) => API.put(`/admin/products/${id}`, data),
+  patchFlags: (id, data) => API.patch(`/admin/products/${id}/flags`, data),
+  bulkAction: (data) => API.post('/admin/products/bulk', data),
   remove: (id) => API.delete(`/admin/products/${id}`),
 };
 
@@ -209,7 +217,8 @@ export const adminSettingsAPI = {
 
 export const adminUploadAPI = {
   upload: (formData) => API.post('/admin/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
   }),
 };
 
@@ -266,6 +275,19 @@ export const inventoryAPI = {
   categoryPieces: (params) => API.get('/inventory/category-pieces', { params }),
   categorySummary: () => API.get('/inventory/category-summary'),
   stockTake: (body) => API.post('/inventory/stock-take', body),
+  storeStockTake: (body) => API.post('/inventory/store-stock-take', body),
+  exportStockTake: (params) =>
+    API.get('/inventory/export-stock-take', { params, responseType: 'blob' }),
+  importStockTake: (file, { location = 'shop' } = {}) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('location', location);
+    return API.post('/inventory/import-stock-take', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  downloadStockTakeTemplate: (location) =>
+    API.get('/inventory/template', { params: { type: 'stock-take', location }, responseType: 'blob' }),
   updateThreshold: (id, body) => API.patch(`/inventory/products/${id}/threshold`, body),
   publishToWebsite: (id, body) => API.post(`/inventory/products/${id}/publish`, body),
   unpublishFromWebsite: (id) => API.post(`/inventory/products/${id}/unpublish`),
@@ -275,6 +297,7 @@ export const inventoryAPI = {
   syncFromWebsite: (id) => API.post(`/inventory/products/${id}/sync-website`),
   seedDemo: () => API.post('/inventory/seed-demo'),
   syncAlignment: () => API.post('/inventory/sync-alignment'),
+  ensureWebsiteLinks: () => API.post('/inventory/ensure-website-links'),
   downloadCatalogTemplate: () =>
     API.get('/inventory/template', { params: { type: 'catalog' }, responseType: 'blob' }),
   exportProductCatalog: (category) =>

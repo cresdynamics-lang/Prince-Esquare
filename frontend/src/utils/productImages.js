@@ -80,14 +80,15 @@ export const PREMIUM_IMAGES = {
   'wallet': '/WhatsApp Image 2026-05-12 at 8.07.25 PM.jpeg',
 };
 
-export const getPremiumImage = (product) => {
+export const getPremiumImage = (product, { width = 400 } = {}) => {
   if (!product) return LOCAL_IMAGES[0];
   
   // If product has a custom thumbnail that isn't a placeholder, use it
   const customImage =
+    product.image_url ||
     product.thumbnail_optimized ||
-    getImageSrc(product.thumbnail) ||
-    getImageSrc(product.image_url) ||
+    getImageSrc(product.thumbnail, width <= 480 ? 'thumbnail' : 'optimized') ||
+    getImageSrc(product.image_url, width <= 480 ? 'thumbnail' : 'optimized') ||
     product.thumbnail ||
     product.image_url;
   if (
@@ -97,7 +98,7 @@ export const getPremiumImage = (product) => {
     !customImage.includes('unsplash')
   ) {
     return isCloudinaryUrl(customImage)
-      ? optimizeCloudinaryUrl(customImage, { width: 800 })
+      ? optimizeCloudinaryUrl(customImage, { width })
       : customImage;
   }
 
@@ -112,28 +113,33 @@ export const getPremiumImage = (product) => {
   if (name.includes('presidential')) return PREMIUM_IMAGES['presidential'];
   if (name.includes('gurkha')) return PREMIUM_IMAGES['gurkha'];
   if (name.includes('linen')) return PREMIUM_IMAGES['linen'];
+  if (name.includes('tracksuit') || name.includes('track suit')) {
+    return PREMIUM_IMAGES['track-suits'] || '/WhatsApp Image 2026-05-12 at 8.07.38 PM.jpeg';
+  }
   if (name.includes('suit')) return PREMIUM_IMAGES['suits'];
   if (name.includes('shoe') || name.includes('loafers')) return PREMIUM_IMAGES['shoes'];
   
   // Then category
   if (PREMIUM_IMAGES[category]) return PREMIUM_IMAGES[category];
 
-  // If no match, use product ID to pick a consistent "random" local image
-  const id = product.id || 0;
-  return LOCAL_IMAGES[id % LOCAL_IMAGES.length];
+  // If no match, use product id/slug hash to pick a consistent local fallback (not always polo)
+  const key = String(product.id || product.slug || product.name || '');
+  const hash = key.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return LOCAL_IMAGES[hash % LOCAL_IMAGES.length];
 };
 
 const preloadedImages = new Set();
 
-export const preloadProductImages = (urls = []) => {
+export const preloadProductImages = (urls = [], { width = 560 } = {}) => {
   if (typeof window === 'undefined') return;
 
   urls.filter((url) => url && !isBlobUrl(url)).forEach((url) => {
-    if (preloadedImages.has(url)) return;
-    preloadedImages.add(url);
+    const src = isCloudinaryUrl(url) ? optimizeCloudinaryUrl(url, { width }) : url;
+    if (preloadedImages.has(src)) return;
+    preloadedImages.add(src);
 
     const image = new Image();
     image.decoding = 'async';
-    image.src = url;
+    image.src = src;
   });
 };

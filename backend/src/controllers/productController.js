@@ -1,5 +1,5 @@
 const { formatResponse } = require('../utils/responseFormatter');
-const { applyProductImageOptimization } = require('../utils/cloudinaryImage');
+const { applyProductImageOptimization, optimizeCloudinaryUrl } = require('../utils/cloudinaryImage');
 const db = require('../config/db');
 const { getPosStockForProductIds } = require('../services/productPosLink');
 const { attachVariantAvailability } = require('../utils/productAvailability');
@@ -27,6 +27,10 @@ const forAudience = (data, req) => {
 
 const attachPosStock = async (products, { forStaff = false } = {}) => {
     const list = Array.isArray(products) ? products : [products];
+    if (!forStaff) {
+        const enriched = await attachVariantAvailability(list);
+        return Array.isArray(products) ? enriched : enriched[0];
+    }
     const ids = list.map((p) => p.id).filter(Boolean);
     const stockMap = await getPosStockForProductIds(ids);
     const withPos = list.map((p) => {
@@ -168,8 +172,9 @@ exports.getProductBySlug = async (req, res, next) => {
     try {
         const { slug } = req.params;
         const productResult = await db.query(
-            'SELECT p.*, c.name as category_name, b.name as brand_name FROM products p ' +
+            'SELECT p.*, c.name as category_name, p_cat.name as parent_category_name, b.name as brand_name FROM products p ' +
             'LEFT JOIN categories c ON p.category_id = c.id ' +
+            'LEFT JOIN categories p_cat ON c.parent_id = p_cat.id ' +
             'LEFT JOIN brands b ON p.brand_id = b.id ' +
             'WHERE p.slug = $1 AND p.is_active = true',
             [slug]
@@ -222,24 +227,16 @@ exports.createProduct = async (req, res, next) => {
             }
         }
 
-        const { ensurePosForEcommerceProduct } = require('../services/inventoryChannel');
+        const { ensurePosForEcommerceProduct, seedPosOpeningStockIfEmpty } = require('../services/inventoryChannel');
         const posRow = await ensurePosForEcommerceProduct(result.rows[0]);
-        const openingQty = parseInt(inventory_opening_qty, 10);
+        const openingQty =
+          parseInt(inventory_opening_qty, 10) || parseInt(stock_quantity, 10) || 0;
         if (posRow?.id && openingQty > 0) {
-          const { importCatalogRows } = require('../services/productCatalogImport');
-          await importCatalogRows(
-            [{
-              name: result.rows[0].name,
-              sku: posRow.sku || productSku,
-              category: posRow.category || 'General',
-              shopPrice: parseFloat(pos_sell_price || discount_price || price || 0),
-              openingQty,
-              websiteSku: productSku,
-            }],
-            { performedBy: req.user?.id || null }
-          );
+          await seedPosOpeningStockIfEmpty(posRow.id, openingQty);
         }
 
+        const { invalidateCatalogueCache } = require('./catalogueController');
+        invalidateCatalogueCache();
         formatResponse(res, 201, true, 'Product created successfully', result.rows[0]);
     } catch (error) {
         next(error);
@@ -292,7 +289,114 @@ exports.updateProduct = async (req, res, next) => {
             }
         }
 
+        const { ensurePosForEcommerceProduct, syncPosMetadataFromEcommerce } = require('../services/inventoryChannel');
+        const posRow = await ensurePosForEcommerceProduct(result.rows[0]);
+        await syncPosMetadataFromEcommerce(result.rows[0], posRow);
+
+        const { invalidateCatalogueCache } = require('./catalogueController');
+        invalidateCatalogueCache();
         formatResponse(res, 200, true, 'Product updated successfully', result.rows[0]);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Bulk mark or delete products
+// @route   POST /api/admin/products/bulk
+exports.bulkProductAction = async (req, res, next) => {
+    try {
+        const { ids, action } = req.body || {};
+        const uuidList = [...new Set(Array.isArray(ids) ? ids : [])].filter(Boolean);
+        if (!uuidList.length) {
+            return formatResponse(res, 400, false, 'No products selected');
+        }
+
+        const handlers = {
+            delete: async () => {
+                const r = await db.query(
+                    'DELETE FROM products WHERE id = ANY($1::uuid[]) RETURNING id',
+                    [uuidList]
+                );
+                return { deleted: r.rows.length };
+            },
+            feature: async () => {
+                const r = await db.query(
+                    'UPDATE products SET is_featured = true, updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING id',
+                    [uuidList]
+                );
+                return { updated: r.rows.length, is_featured: true };
+            },
+            unfeature: async () => {
+                const r = await db.query(
+                    'UPDATE products SET is_featured = false, updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING id',
+                    [uuidList]
+                );
+                return { updated: r.rows.length, is_featured: false };
+            },
+            publish: async () => {
+                const r = await db.query(
+                    'UPDATE products SET is_active = true, updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING id',
+                    [uuidList]
+                );
+                return { updated: r.rows.length, is_active: true };
+            },
+            unpublish: async () => {
+                const r = await db.query(
+                    'UPDATE products SET is_active = false, updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING id',
+                    [uuidList]
+                );
+                return { updated: r.rows.length, is_active: false };
+            },
+        };
+
+        if (!handlers[action]) {
+            return formatResponse(res, 400, false, 'Invalid bulk action');
+        }
+
+        const result = await handlers[action]();
+        const { invalidateCatalogueCache } = require('./catalogueController');
+        invalidateCatalogueCache();
+        formatResponse(res, 200, true, 'Bulk action completed', { action, ...result });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Quick-mark product (featured / published)
+// @route   PATCH /api/admin/products/:id/flags
+exports.patchProductFlags = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { is_featured, is_active } = req.body || {};
+        const updates = [];
+        const values = [];
+        let idx = 1;
+
+        if (is_featured !== undefined) {
+            updates.push(`is_featured = $${idx++}`);
+            values.push(Boolean(is_featured));
+        }
+        if (is_active !== undefined) {
+            updates.push(`is_active = $${idx++}`);
+            values.push(Boolean(is_active));
+        }
+        if (!updates.length) {
+            return formatResponse(res, 400, false, 'Provide is_featured and/or is_active');
+        }
+
+        values.push(id);
+        const result = await db.query(
+            `UPDATE products SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING *`,
+            values
+        );
+
+        if (result.rows.length === 0) {
+            return formatResponse(res, 404, false, 'Product not found');
+        }
+
+        const { invalidateCatalogueCache } = require('./catalogueController');
+        invalidateCatalogueCache();
+        formatResponse(res, 200, true, 'Product updated', result.rows[0]);
     } catch (error) {
         next(error);
     }
@@ -309,6 +413,8 @@ exports.deleteProduct = async (req, res, next) => {
             return formatResponse(res, 404, false, 'Product not found');
         }
 
+        const { invalidateCatalogueCache } = require('./catalogueController');
+        invalidateCatalogueCache();
         formatResponse(res, 200, true, 'Product deleted successfully');
     } catch (error) {
         next(error);
@@ -344,22 +450,29 @@ exports.getRelatedProducts = async (req, res, next) => {
 exports.adminGetProducts = async (req, res, next) => {
     try {
         const { search } = req.query;
+        const lite = req.query.lite === '1' || req.query.lite === 'true';
         const params = [];
         let where = '';
         if (search && String(search).trim()) {
             params.push(`%${String(search).trim()}%`);
             where = ` WHERE (p.name ILIKE $1 OR p.sku ILIKE $1 OR p.slug ILIKE $1) `;
         }
+        const productCols = lite
+            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.category_id, p.brand_id, p.created_at`
+            : 'p.*';
         const result = await db.query(
-            `SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.created_at DESC`,
+            `SELECT ${productCols}, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.created_at DESC`,
             params
         );
         const products = result.rows;
 
         if (products.length > 0) {
             const productIds = products.map((p) => p.id);
+            const variantCols = lite
+                ? 'id, product_id, color, size, stock_quantity, price_modifier, image_url, sku, stock_id'
+                : 'id, product_id, color, size, stock_quantity, price_modifier, image_url, sku, stock_id, angle_images';
             const variantsResult = await db.query(
-                'SELECT * FROM product_variants WHERE product_id = ANY($1::uuid[]) ORDER BY color, size',
+                `SELECT ${variantCols} FROM product_variants WHERE product_id = ANY($1::uuid[]) ORDER BY color, size`,
                 [productIds]
             );
             const variantsByProduct = {};
@@ -379,7 +492,13 @@ exports.adminGetProducts = async (req, res, next) => {
             }
             for (const p of products) {
                 p.variants = variantsByProduct[p.id] || [];
-                applyProductImageOptimization(p);
+                if (lite) {
+                    if (p.thumbnail) {
+                        p.thumbnail_optimized = optimizeCloudinaryUrl(p.thumbnail, { width: 120 });
+                    }
+                } else {
+                    applyProductImageOptimization(p);
+                }
             }
         }
 

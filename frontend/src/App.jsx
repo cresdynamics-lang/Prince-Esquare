@@ -33,6 +33,13 @@ function App() {
   );
 
   useEffect(() => {
+    // Drop legacy localStorage auth — staff must enter password each browser session
+    try {
+      localStorage.removeItem('prince-esquire-auth');
+    } catch {
+      /* ignore */
+    }
+
     const done = () => setAuthHydrated(true);
     if (useAuthStore.persist?.hasHydrated?.()) {
       setAuthHydrated(true);

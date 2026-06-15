@@ -10,6 +10,11 @@ const uploadStreamToCloudinary = (buffer, folder = UPLOAD_FOLDER) =>
         folder,
         upload_preset: UPLOAD_PRESET,
         resource_type: 'image',
+        eager: [
+          { width: 400, crop: 'limit', fetch_format: 'auto', quality: 'auto:good' },
+          { width: 800, crop: 'limit', fetch_format: 'auto', quality: 'auto:good' },
+        ],
+        eager_async: true,
       },
       (error, result) => {
         if (error) return reject(error);

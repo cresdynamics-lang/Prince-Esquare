@@ -47,6 +47,12 @@ const setOpeningStock = async (client, productId, shopQty, storeQty, dateStr) =>
   return { shop, store };
 };
 
+const resolveAuditPerformer = async (client, performedBy) => {
+  if (!performedBy) return null;
+  const r = await client.query(`SELECT id FROM pos_profiles WHERE id = $1 LIMIT 1`, [performedBy]);
+  return r.rows[0]?.id || null;
+};
+
 const importCatalogRows = async (rows, { performedBy = null, date = new Date() } = {}) => {
   const dateStr = toDateStr(date);
   const results = { created: 0, updated: 0, linked: 0, date: dateStr, products: [], warnings: [] };
@@ -107,10 +113,11 @@ const importCatalogRows = async (rows, { performedBy = null, date = new Date() }
       });
     }
 
+    const auditBy = await resolveAuditPerformer(client, performedBy);
     await client.query(
       `INSERT INTO pos_audit_logs (action, entity, performed_by, details)
        VALUES ('CATALOG_IMPORT', 'pos_products', $1, $2)`,
-      [performedBy, JSON.stringify({ count: rows.length, date: dateStr })]
+      [auditBy, JSON.stringify({ count: rows.length, date: dateStr })]
     );
 
     await client.query('COMMIT');

@@ -42,7 +42,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'prince-esquire-auth',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
         token: state.token,

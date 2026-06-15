@@ -82,6 +82,8 @@ cd "$FRONTEND"
 npm ci --include=dev 2>/dev/null || NODE_ENV=development npm install
 if [ "$SKIP_BUILD" != "1" ]; then
   NODE_ENV=production npm run build
+  # Ensure nginx (www-data) can read Vite output — SCP/uploads sometimes leave assets at 700
+  chmod -R a+rX "$FRONTEND/dist/assets" 2>/dev/null || true
 fi
 
 echo ""

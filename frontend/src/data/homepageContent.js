@@ -1,13 +1,21 @@
-/** Curated homepage content — matches prince-esquire.co.ke brand presentation */
+/** Curated homepage content — fallback when live product slides are unavailable */
 
 export const HERO_SLIDES = [
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
     subtitle: 'Bespoke Craftsmanship',
     title: 'THE PRESIDENTIAL COLLECTION',
     desc: 'Exquisite shirts tailored for the modern leader. Experience the pinnacle of sartorial excellence.',
     cta: 'Discover Collection',
     link: '/products?category=shirts',
+  },
+  {
+    image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
+    subtitle: 'Tailored Excellence',
+    title: 'LUXURY SUITS NAIROBI',
+    desc: 'Two-piece and three-piece tailoring for weddings, boardrooms, and black-tie occasions.',
+    cta: 'Shop Suits',
+    link: '/suits',
   },
   {
     image: '/WhatsApp Image 2026-05-12 at 8.07.12 PM.jpeg',
@@ -26,7 +34,7 @@ export const HERO_SLIDES = [
     link: '/products?category=linen',
   },
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.38 PM.jpeg',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
     subtitle: 'Premium Tracksuits',
     title: 'CASUAL LUXURY',
     desc: 'Elevate your off-duty look with our signature velour and cotton tracksuits.',
@@ -54,7 +62,7 @@ export const CATEGORY_TILES = [
   {
     title: 'Luxury Tracksuits',
     subtitle: 'Prada & Zegna Collections',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
     span: 'md:col-span-1 md:row-span-1',
     category: 'track-suits',
   },
@@ -97,7 +105,7 @@ export const CATEGORY_TILES = [
   {
     title: 'The Finishing Room',
     subtitle: 'Belts, Ties & Final Details',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.22 PM.jpeg',
     span: 'md:col-span-2 md:row-span-1',
     category: 'belts-ties',
   },

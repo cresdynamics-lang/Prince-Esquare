@@ -1,0 +1,162 @@
+{
+  "_Nike": {
+    "name": "NIKE AIR FORCE 1 LOW SNEAKERS",
+    "color": "White",
+    "style": "sneaker",
+    "price": 18500,
+    "featured": true,
+    "description": "Nike Air Force 1 low-top sneakers — classic white leather cupsole trainer.\n\nKey features:\n• Premium white leather upper.\n• Iconic AF1 low silhouette.\n• Rubber cupsole with pivot tread.\n• Padded collar for comfort.\n• Streetwear and casual staple.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Nike": {
+    "name": "NIKE CLASSIC LOW SNEAKERS",
+    "color": "White",
+    "style": "sneaker",
+    "price": 17200,
+    "description": "Nike-inspired classic low sneakers — clean trainer profile for daily wear.\n\nKey features:\n• Smooth leather upper.\n• Low-top lace-up design.\n• White rubber sole.\n• Minimal branding detail.\n• Versatile casual sneaker.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "___Nike_Air_Force_1_Low___Grey___Black_Edition___": {
+    "name": "NIKE AIR FORCE 1 GREY BLACK EDITION",
+    "color": "Grey",
+    "style": "sneaker",
+    "price": 19200,
+    "featured": true,
+    "description": "Nike Air Force 1 grey and black edition — two-tone low-top trainer.\n\nKey features:\n• Grey and black leather panels.\n• Classic AF1 silhouette.\n• Contrast white midsole.\n• Street-ready casual sneaker.\n• Premium trainer construction.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "_Sneakers_Lacoste_en_color_beige_": {
+    "name": "LACOSTE BEIGE CANVAS SNEAKERS",
+    "color": "Beige",
+    "style": "sneaker",
+    "price": 16800,
+    "description": "Lacoste beige canvas sneakers — lightweight casual trainer with crocodile branding.\n\nKey features:\n• Beige canvas upper.\n• White rubber sole.\n• Lacoste crocodile emblem.\n• Breathable summer sneaker.\n• Smart-casual trainer style.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Zapatillas_Lacoste_L_Spin_Evo_": {
+    "name": "LACOSTE L-SPIN EVO SNEAKERS",
+    "color": "White",
+    "style": "sneaker",
+    "price": 17500,
+    "description": "Lacoste L-Spin Evo sneakers — athletic-inspired casual trainer.\n\nKey features:\n• Mesh and synthetic upper.\n• Cushioned EVA sole.\n• Lacoste sport styling.\n• Lightweight daily wear.\n• Modern casual sneaker.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Tommy_luxury_sneakers___Description__Low_top_": {
+    "name": "TOMMY HILFIGER LOW-TOP SNEAKERS",
+    "color": "White",
+    "style": "sneaker",
+    "price": 18200,
+    "featured": true,
+    "description": "Tommy Hilfiger luxury low-top sneakers — premium casual trainer.\n\nKey features:\n• Clean white leather upper.\n• Signature flag branding.\n• Rubber cupsole.\n• Preppy casual styling.\n• Designer everyday sneaker.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Luxury_timberland_men_shoe": {
+    "name": "TIMBERLAND SLIP-ON CASUAL SNEAKERS",
+    "color": "Brown",
+    "style": "slip-on",
+    "price": 17800,
+    "description": "Timberland slip-on casual sneakers — brown gradient upper with chunky white sole.\n\nKey features:\n• Brown two-tone leather upper.\n• Elastic side gussets.\n• Chunky white rubber sole.\n• Tree logo embossing.\n• Hybrid loafer-sneaker style.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Classic_Western_elegance_meets_modern_comfort_": {
+    "name": "BROWN LEATHER PENNY SNEAKER LOAFERS",
+    "color": "Brown",
+    "style": "hybrid",
+    "price": 16500,
+    "description": "Brown leather penny sneaker loafers — dress loafer upper with white cupsole.\n\nKey features:\n• Polished brown leather upper.\n• Penny strap detail.\n• Thick white rubber sole.\n• Hybrid casual loafer.\n• Smart-casual crossover shoe.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Men_Running_Shoes_Outdoor_Walking_Soft_Casual_Sneakers": {
+    "name": "BLACK PEBBLED LEATHER CASUAL SNEAKERS",
+    "color": "Black",
+    "style": "sneaker",
+    "price": 14200,
+    "description": "Black pebbled leather casual sneakers — platform sole trainer for daily wear.\n\nKey features:\n• Textured black leather upper.\n• Thick white platform sole.\n• Lace-up closure.\n• Comfort cushioned insole.\n• Modern minimalist trainer.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "T_nis_Casual_Preto_RS6": {
+    "name": "BLACK CASUAL LOW SNEAKERS",
+    "color": "Black",
+    "style": "sneaker",
+    "price": 13800,
+    "description": "Black casual low sneakers — minimalist lace-up with white sole contrast.\n\nKey features:\n• Solid black smooth upper.\n• White rubber cupsole.\n• Clean low-top profile.\n• Everyday street sneaker.\n• Versatile black trainer.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Hermes_Moccasins_and_Derbies_Suede_Loafers": {
+    "name": "BEIGE CANVAS H BUCKLE SNEAKER LOAFERS",
+    "color": "Beige",
+    "style": "hybrid",
+    "price": 24500,
+    "featured": true,
+    "description": "Hermes-inspired beige canvas sneaker loafers — H-buckle strap with white cupsole.\n\nKey features:\n• Beige textured canvas upper.\n• Brown leather collar trim.\n• Silver H-buckle hardware.\n• Thick white rubber sole.\n• Luxury casual hybrid loafer.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Raguler_shoe_for_men": {
+    "name": "GREY SUEDE SNEAKER LOAFERS",
+    "color": "Grey",
+    "style": "hybrid",
+    "price": 15800,
+    "description": "Grey suede sneaker loafers — slip-on moc toe with white wedge sole.\n\nKey features:\n• Charcoal grey suede upper.\n• Moccasin toe stitching.\n• White wedge rubber sole.\n• Slip-on casual loafer.\n• Relaxed weekend style.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "876794621182876400": {
+    "name": "NAVY MESH TASSEL SNEAKER LOAFERS",
+    "color": "Navy",
+    "style": "hybrid",
+    "price": 16200,
+    "description": "Navy mesh tassel sneaker loafers — breathable upper with white platform sole.\n\nKey features:\n• Navy knitted mesh upper.\n• Leather tassel strap detail.\n• Thick white rubber sole.\n• Slip-on casual profile.\n• Sporty loafer hybrid.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "794603928028600300": {
+    "name": "BLACK TASSEL KILTIE SNEAKER LOAFERS",
+    "color": "Black",
+    "style": "hybrid",
+    "price": 16800,
+    "description": "Black leather tassel kiltie sneaker loafers — formal upper with white platform sole.\n\nKey features:\n• Smooth black leather upper.\n• Double tassel kiltie detail.\n• Chunky white rubber sole.\n• Dress-casual hybrid loafer.\n• Statement slip-on style.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "846606429998996400": {
+    "name": "BLACK SUEDE SNEAKER LOAFERS",
+    "color": "Black",
+    "style": "hybrid",
+    "price": 15500,
+    "description": "Black suede sneaker loafers — moc toe slip-on with white cupsole.\n\nKey features:\n• Matte black suede upper.\n• Moccasin stitched toe.\n• Thick white rubber sole.\n• Tan leather lining.\n• Casual slip-on loafer.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "1080582504344820100": {
+    "name": "BLACK LACOSTE TASSEL SUEDE LOAFERS",
+    "color": "Black",
+    "style": "hybrid",
+    "price": 17200,
+    "description": "Lacoste black suede tassel loafers — white platform sole casual slip-on.\n\nKey features:\n• Black suede upper with tassels.\n• White chunky platform sole.\n• Moc-toe construction.\n• Lacoste casual styling.\n• Premium weekend loafer.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "759489924671366400": {
+    "name": "BURGUNDY SANTONI PEBBLED SNEAKERS",
+    "color": "Burgundy",
+    "style": "sneaker",
+    "price": 28500,
+    "featured": true,
+    "description": "Santoni burgundy pebbled leather sneakers — Italian luxury casual trainer.\n\nKey features:\n• Deep burgundy pebbled leather.\n• Gold Santoni script branding.\n• White rubber cupsole.\n• Orange logo outsole detail.\n• Premium designer sneaker.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "709387378830554100": {
+    "name": "NAVY PEBBLED PENNY SNEAKER LOAFERS",
+    "color": "Navy",
+    "style": "hybrid",
+    "price": 16400,
+    "description": "Navy pebbled penny sneaker loafers — textured leather with white sole.\n\nKey features:\n• Navy pebbled grain leather.\n• Penny strap across vamp.\n• Thick white rubber cupsole.\n• Tan interior lining.\n• Smart-casual hybrid loafer.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "1148417973749969400": {
+    "name": "BLACK WOVEN PENNY SNEAKER LOAFERS",
+    "color": "Black",
+    "style": "hybrid",
+    "price": 15900,
+    "description": "Black woven penny sneaker loafers — braided texture with white flat sole.\n\nKey features:\n• Woven black textile upper.\n• Smooth penny strap detail.\n• Flat white rubber sole.\n• Slip-on casual loafer.\n• Textured statement shoe.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "349451252355834700": {
+    "name": "CHARCOAL LORO PIANA PEBBLED SNEAKER LOAFERS",
+    "color": "Grey",
+    "style": "hybrid",
+    "price": 32000,
+    "featured": true,
+    "description": "Loro Piana-inspired charcoal pebbled sneaker loafers — luxury casual hybrid.\n\nKey features:\n• Dark grey pebbled leather.\n• Penny loafer strap detail.\n• Off-white rubber cupsole.\n• Tan leather lining.\n• Italian luxury casual style.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "1017954322005851300": {
+    "name": "NAVY SUEDE STRIPE CASUAL SNEAKERS",
+    "color": "Navy",
+    "style": "sneaker",
+    "price": 14800,
+    "description": "Navy suede casual sneakers — three-stripe design with tan heel panel.\n\nKey features:\n• Navy suede and mesh upper.\n• White diagonal stripe detail.\n• Tan suede heel accent.\n• White rubber sole.\n• Sporty street sneaker.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  },
+  "Hanley_Leather_Shoes___Khaki": {
+    "name": "KHAKI LEATHER CASUAL SNEAKERS",
+    "color": "Tan",
+    "style": "sneaker",
+    "price": 15200,
+    "description": "Khaki leather casual sneakers — earthy tone low-top trainer.\n\nKey features:\n• Khaki tan leather upper.\n• White contrast sole.\n• Lace-up casual design.\n• Everyday smart-casual sneaker.\n• Warm neutral palette.\n\nAvailable EU sizes 40–46. Styled at Prince Esquire for everyday casual wear."
+  }
+}

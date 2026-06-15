@@ -34,8 +34,10 @@ import {
   posAPI,
 } from '../services/api';
 import { useEffect } from 'react';
+import { compressImageFile } from '../utils/compressImage';
 import {
   getUploadUrl,
+  getPersistImageUrl,
   getImageSrc,
   parseProductImages,
   toImageJson,
@@ -51,6 +53,7 @@ import {
   buildColorGroupsFromVariants,
   getSizeOptionsForCategory,
 } from '../utils/inventoryVariants';
+import { ConfirmProvider, useConfirm } from '../components/admin/ConfirmDialog';
 
 /** Scrollable table wrapper for mobile */
 const AdminTable = ({ children }) => (
@@ -190,7 +193,10 @@ const AdminDashboard = () => {
     switch (activeSection) {
       case 'dashboard':
         if (isSeller) return null;
-        return <DashboardView onOpenPos={() => setActiveSection('pos-inventory')} />;
+        return <DashboardView onOpenPos={() => {
+          setActiveSection('pos-inventory');
+          navigate('/admin/dashboard?module=overview', { replace: true });
+        }} />;
       case 'orders': return <OrdersView readOnly={isSeller} />;
       case 'pos-sales': return <PosSalesView channel="POS" readOnly={isSeller} />;
       case 'products': return <ProductsView />;
@@ -224,7 +230,7 @@ const AdminDashboard = () => {
           <AdminPosTerminalInfo
             onOpenInventory={(tab) => {
               setActiveSection('pos-inventory');
-              if (tab) sessionStorage.setItem('pos-hub-tab', tab);
+              navigate(`/admin/dashboard?module=${tab || 'overview'}`, { replace: true });
             }}
           />
         );
@@ -248,6 +254,7 @@ const AdminDashboard = () => {
   const isMobileMenuVisible = isMobileNavOpen;
 
   return (
+    <ConfirmProvider>
     <div className="flex h-dvh bg-navy-950 text-gold-50 font-sans overflow-hidden">
       {isMobileNavOpen && (
         <button
@@ -391,6 +398,7 @@ const AdminDashboard = () => {
         </div>
       </main>
     </div>
+    </ConfirmProvider>
   );
 };
 
@@ -537,6 +545,7 @@ const parseOrderAddress = (value) => {
 };
 
 const OrdersView = ({ readOnly = false }) => {
+  const confirm = useConfirm();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -633,7 +642,14 @@ const OrdersView = ({ readOnly = false }) => {
   };
 
   const handleCancelOrder = async () => {
-    if (!editOrder || !window.confirm('Cancel this order? Stock will be restored if already paid.')) return;
+    if (!editOrder) return;
+    const ok = await confirm({
+      title: 'Cancel order',
+      message: 'Cancel this order? Stock will be restored if already paid.',
+      confirmLabel: 'Cancel order',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     setActionError('');
     try {
@@ -648,7 +664,14 @@ const OrdersView = ({ readOnly = false }) => {
   };
 
   const handleRefundOrder = async () => {
-    if (!editOrder || !window.confirm('Refund this paid order and restore stock?')) return;
+    if (!editOrder) return;
+    const ok = await confirm({
+      title: 'Refund order',
+      message: 'Refund this paid order and restore stock to inventory?',
+      confirmLabel: 'Refund order',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     setActionError('');
     try {
@@ -1096,7 +1119,7 @@ export const FinanceOverview = () => {
         adminAnalyticsAPI.getStats().catch(() => ({ data: { data: {} } })),
         adminAnalyticsAPI.getTopProducts().catch(() => ({ data: { data: [] } })),
         adminOrderAPI.getAll().catch(() => ({ data: { data: [] } })),
-        adminProductAPI.getAll().catch(() => ({ data: { data: [] } })),
+        adminProductAPI.getAll({ lite: 1 }).catch(() => ({ data: { data: [] } })),
         posAPI.listSales({ limit: 500 }).catch(() => ({ data: { data: { sales: [] } } })),
       ]);
 
@@ -1279,6 +1302,10 @@ export const FinanceOverview = () => {
 
   return (
     <div className="space-y-8">
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/90 leading-relaxed">
+        Revenue and analytics only. To move stock between <strong>warehouse and shop floor</strong>, use{' '}
+        <strong>POS &amp; Inventory → Stock Management</strong>. Website stock mirrors shop floor automatically.
+      </div>
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Shop + online — one view</span>
@@ -1604,6 +1631,7 @@ const buildProductSku = (productName) => {
 };
 
 const ProductsView = () => {
+  const confirm = useConfirm();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1616,6 +1644,8 @@ const ProductsView = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -1683,9 +1713,10 @@ const ProductsView = () => {
   };
 
   const handleThumbnailChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const rawFile = e.target.files[0];
+    if (rawFile) {
       setUploading(true);
+      const file = await compressImageFile(rawFile).catch(() => rawFile);
       const localPreview = URL.createObjectURL(file);
       setFormData((prev) => {
         revokeBlobUrl(prev.thumbnailPreview);
@@ -1702,13 +1733,13 @@ const ProductsView = () => {
         const res = await adminUploadAPI.upload(uploadData);
         if (res.data.success) {
           const uploaded = res.data.data[0];
-          const finalUrl = getUploadUrl(uploaded);
+          const persistUrl = getPersistImageUrl(uploaded) || getUploadUrl(uploaded);
           setFormData((prev) => {
             revokeBlobUrl(prev.thumbnailPreview);
             return {
               ...prev,
-              thumbnail: finalUrl,
-              thumbnailPreview: getImageSrc(uploaded) || finalUrl,
+              thumbnail: persistUrl,
+              thumbnailPreview: getImageSrc(uploaded, 'thumbnail') || getImageSrc(uploaded),
             };
           });
         }
@@ -1722,11 +1753,14 @@ const ProductsView = () => {
   };
 
   const handleGalleryChange = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-    
+    const rawFiles = Array.from(e.target.files);
+    if (rawFiles.length === 0) return;
+
     setUploading(true);
-    
+    const files = await Promise.all(
+      rawFiles.map((f) => compressImageFile(f).catch(() => f))
+    );
+
     // Add placeholders with local previews
     const newItems = files.map(file => ({
         id: Math.random().toString(36).substring(7),
@@ -1753,9 +1787,15 @@ const ProductsView = () => {
             const updatedGallery = nextGallery.map(item => {
                 if (item.isUploading && urlIdx < uploadedUrls.length) {
                     const uploaded = uploadedUrls[urlIdx++];
-                    const url = getUploadUrl(uploaded);
+                    const url = getPersistImageUrl(uploaded) || getUploadUrl(uploaded);
                     revokeBlobUrl(item.preview);
-                    return { ...item, url, urlJson: toImageJson(uploaded), preview: getImageSrc(uploaded) || url, isUploading: false };
+                    return {
+                      ...item,
+                      url,
+                      urlJson: toImageJson(uploaded),
+                      preview: getImageSrc(uploaded, 'thumbnail') || getImageSrc(uploaded),
+                      isUploading: false,
+                    };
                 }
                 return item;
             });
@@ -1831,8 +1871,9 @@ const ProductsView = () => {
   };
 
   const handleColorImage = async (groupKey, e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    const file = await compressImageFile(rawFile).catch(() => rawFile);
     const localPreview = URL.createObjectURL(file);
     setFormData((prev) => ({
       ...prev,
@@ -1846,13 +1887,17 @@ const ProductsView = () => {
       const res = await adminUploadAPI.upload(uploadData);
       if (res.data.success) {
         const uploaded = res.data.data[0];
-        const url = getUploadUrl(uploaded);
+        const url = getPersistImageUrl(uploaded) || getUploadUrl(uploaded);
         setFormData((prev) => ({
           ...prev,
           color_groups: prev.color_groups.map((group) => {
             if (group._key !== groupKey) return group;
             revokeBlobUrl(group.imagePreview);
-            return { ...group, image_url: url, imagePreview: getImageSrc(uploaded) || url };
+            return {
+              ...group,
+              image_url: url,
+              imagePreview: getImageSrc(uploaded, 'thumbnail') || getImageSrc(uploaded),
+            };
           }),
         }));
       }
@@ -1865,7 +1910,7 @@ const ProductsView = () => {
     setLoading(true);
     try {
       const [prodRes, catRes] = await Promise.all([
-        adminProductAPI.getAll(),
+        adminProductAPI.getAll({ lite: 1 }),
         adminCategoryAPI.getAll(),
       ]);
       setProducts(prodRes.data.data);
@@ -1900,8 +1945,97 @@ const ProductsView = () => {
     if (stockFilter === 'out_of_stock' && stock > 0) return false;
     if (statusFilter === 'active' && !p.is_active) return false;
     if (statusFilter === 'inactive' && p.is_active) return false;
+    if (statusFilter === 'featured' && !p.is_featured) return false;
+    if (statusFilter === 'not_featured' && p.is_featured) return false;
     return true;
   });
+
+  const handleToggleFeatured = async (product) => {
+    const next = !product.is_featured;
+    try {
+      await adminProductAPI.patchFlags(product.id, { is_featured: next });
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_featured: next } : p)));
+    } catch {
+      alert('Could not update featured status');
+    }
+  };
+
+  const handleTogglePublished = async (product) => {
+    const next = !product.is_active;
+    try {
+      await adminProductAPI.patchFlags(product.id, { is_active: next });
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_active: next } : p)));
+    } catch {
+      alert('Could not update publish status');
+    }
+  };
+
+  const selectedCount = selectedIds.size;
+  const allFilteredSelected =
+    filteredProducts.length > 0 && filteredProducts.every((p) => selectedIds.has(p.id));
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredProducts.forEach((p) => next.delete(p.id));
+      } else {
+        filteredProducts.forEach((p) => next.add(p.id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const runBulkAction = async (action) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+
+    if (action === 'delete') {
+      const ok = await confirm({
+        title: `Delete ${ids.length} product${ids.length === 1 ? '' : 's'}`,
+        message:
+          `Permanently remove ${ids.length} selected product${ids.length === 1 ? '' : 's'} from your store? This cannot be undone.`,
+        confirmLabel: `Delete ${ids.length}`,
+        variant: 'danger',
+      });
+      if (!ok) return;
+    }
+
+    setBulkBusy(true);
+    try {
+      await adminProductAPI.bulkAction({ ids, action });
+      if (action === 'delete') {
+        setProducts((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+      } else {
+        const patchByAction = {
+          feature: { is_featured: true },
+          unfeature: { is_featured: false },
+          publish: { is_active: true },
+          unpublish: { is_active: false },
+        };
+        const patch = patchByAction[action];
+        if (patch) {
+          setProducts((prev) => prev.map((p) => (selectedIds.has(p.id) ? { ...p, ...patch } : p)));
+        }
+      }
+      clearSelection();
+    } catch {
+      alert('Bulk action failed');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const handleCategorySelect = (category) => {
     setFormData({
@@ -1945,10 +2079,12 @@ const ProductsView = () => {
         stock_quantity: totalVariantStock(productColorGroups) || product.stock_quantity || 0,
         is_featured: product.is_featured || false,
         is_active: product.is_active ?? true,
-        thumbnail: resolveDisplayImageUrl(product.thumbnail) || '',
+        thumbnail: product.thumbnail || '',
         images: Array.isArray(product.images) ? product.images : [],
         color_groups: productColorGroups,
-        thumbnailPreview: resolveDisplayImageUrl(product.thumbnail) || '',
+        thumbnailPreview: product.thumbnail
+          ? (getImageSrc(product.thumbnail, 'thumbnail') || resolveDisplayImageUrl(product.thumbnail))
+          : '',
         gallery: parseProductImages(product.images).map((img) => ({
           id: Math.random().toString(36).substring(7),
           preview: getImageSrc(img),
@@ -1985,13 +2121,18 @@ const ProductsView = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        await adminProductAPI.remove(id);
-        fetchData();
-      } catch (error) {
-        alert('Error deleting product');
-      }
+    const ok = await confirm({
+      title: 'Delete product',
+      message: 'This product will be permanently removed from your store. This action cannot be undone.',
+      confirmLabel: 'Delete product',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminProductAPI.remove(id);
+      fetchData();
+    } catch (error) {
+      alert('Error deleting product');
     }
   };
 
@@ -2043,7 +2184,8 @@ const ProductsView = () => {
       fetchData();
     } catch (error) {
       console.error('Error saving product:', error);
-      alert('Error saving product');
+      const msg = error.response?.data?.message || error.userMessage || error.message;
+      alert(msg ? `Error saving product: ${msg}` : 'Error saving product');
     } finally {
       setSubmitting(false);
     }
@@ -2102,8 +2244,68 @@ const ProductsView = () => {
           <option value="all">All status</option>
           <option value="active">Published</option>
           <option value="inactive">Unpublished</option>
+          <option value="featured">Featured</option>
+          <option value="not_featured">Not featured</option>
         </select>
       </div>
+
+      {selectedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-3 p-4 bg-gold-600/10 border border-gold-500/30 rounded-2xl">
+          <span className="text-sm font-bold text-gold-200">
+            {selectedCount} selected
+          </span>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => runBulkAction('feature')}
+            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-gold-500/30 text-gold-300 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
+          >
+            <Star size={12} className="inline mr-1 -mt-0.5" />
+            Mark featured
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => runBulkAction('unfeature')}
+            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-gold-500/20 text-gold-500/60 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
+          >
+            Unmark featured
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => runBulkAction('publish')}
+            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-green-500/30 text-green-400 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
+          >
+            Publish
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => runBulkAction('unpublish')}
+            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-gold-500/20 text-gold-500/60 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
+          >
+            Unpublish
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => runBulkAction('delete')}
+            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-red-500/40 text-red-400 rounded-lg hover:bg-red-400/10 disabled:opacity-50"
+          >
+            <Trash2 size={12} className="inline mr-1 -mt-0.5" />
+            Delete selected
+          </button>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={clearSelection}
+            className="ml-auto text-xs text-gold-500/50 hover:text-gold-400 underline"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm text-gold-100">
         {loading ? (
@@ -2115,11 +2317,21 @@ const ProductsView = () => {
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-navy-800/50">
               <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+                <th className="px-4 py-4 w-12">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAllFiltered}
+                    aria-label="Select all filtered products"
+                    className="w-4 h-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
+                  />
+                </th>
                 <th className="px-6 py-4">Product Details</th>
                 <th className="px-6 py-4">SKU</th>
                 <th className="px-6 py-4">Category</th>
                 <th className="px-6 py-4">Price</th>
                 <th className="px-6 py-4">Stock</th>
+                <th className="px-6 py-4">Marks</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -2128,18 +2340,43 @@ const ProductsView = () => {
               {filteredProducts.map((p) => {
                 const variantColors = [...new Set((p.variants || []).map((v) => v.color).filter(Boolean))];
                 return (
-                <tr key={p.id} className="hover:bg-navy-800/30 transition-colors">
+                <tr
+                  key={p.id}
+                  className={`hover:bg-navy-800/30 transition-colors ${selectedIds.has(p.id) ? 'bg-gold-600/5' : ''}`}
+                >
+                  <td className="px-4 py-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p.id)}
+                      onChange={() => toggleSelected(p.id)}
+                      aria-label={`Select ${p.name}`}
+                      className="w-4 h-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
+                    />
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-navy-800 rounded-xl border border-gold-500/10 overflow-hidden flex items-center justify-center">
-                        {resolveDisplayImageUrl(p.thumbnail) ? (
-                          <img src={resolveDisplayImageUrl(p.thumbnail)} alt={p.name} className="w-full h-full object-cover" />
+                        {resolveDisplayImageUrl(p.thumbnail, { width: 96 }) ? (
+                          <img
+                            src={resolveDisplayImageUrl(p.thumbnail, { width: 96 })}
+                            alt={p.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <ShoppingBag size={24} className="text-gold-500/40" />
                         )}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
+                          {p.is_featured && (
+                            <span className="bg-gold-600/15 text-gold-400 text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-widest border border-gold-500/20">
+                              Featured
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] font-mono text-gold-500/40 uppercase mt-1">{p.slug}</div>
                       </div>
                     </div>
@@ -2156,6 +2393,34 @@ const ProductsView = () => {
                         {variantColors.length} color{variantColors.length !== 1 ? 's' : ''}
                       </p>
                     )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFeatured(p)}
+                        title={p.is_featured ? 'Remove from featured' : 'Mark as featured (homepage carousel)'}
+                        className={`p-2 rounded-lg transition-all ${
+                          p.is_featured
+                            ? 'text-gold-400 bg-gold-600/15 hover:bg-gold-600/25'
+                            : 'text-gold-500/30 hover:text-gold-400 hover:bg-navy-800'
+                        }`}
+                      >
+                        <Star size={16} className={p.is_featured ? 'fill-current' : ''} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePublished(p)}
+                        title={p.is_active ? 'Unpublish' : 'Publish on website'}
+                        className={`p-2 rounded-lg transition-all ${
+                          p.is_active
+                            ? 'text-green-400/70 hover:text-green-400 hover:bg-green-400/10'
+                            : 'text-gold-500/30 hover:text-gold-400 hover:bg-navy-800'
+                        }`}
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${p.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'}`}>
@@ -2212,6 +2477,7 @@ const ProductsView = () => {
               {/* Basic Info */}
               <div className="space-y-6">
                 <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">General Information</h5>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Product Name</label>
@@ -2427,7 +2693,7 @@ const ProductsView = () => {
                           </>
                         )}
                       </div>
-                      <div className="flex-1 space-y-1">
+                      <div className="flex-1 space-y-2">
                         <p className="text-[10px] font-black text-gold-100 uppercase tracking-widest">
                           {formData.thumbnailPreview ? 'Current Thumbnail' : 'Select Thumbnail'}
                         </p>
@@ -2642,7 +2908,7 @@ const ProductsView = () => {
                       onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
                       className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
                     />
-                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured</span>
+                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured (homepage carousel)</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input 
@@ -2682,6 +2948,7 @@ const ProductsView = () => {
 
 
 const CategoriesView = () => {
+  const confirm = useConfirm();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -2754,13 +3021,18 @@ const CategoriesView = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
-      try {
-        await adminCategoryAPI.remove(id);
-        fetchCategories();
-      } catch (error) {
-        alert('Error deleting category');
-      }
+    const ok = await confirm({
+      title: 'Delete category',
+      message: 'Products in this category may be affected. Are you sure you want to delete it?',
+      confirmLabel: 'Delete category',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCategoryAPI.remove(id);
+      fetchCategories();
+    } catch (error) {
+      alert('Error deleting category');
     }
   };
 
@@ -2953,6 +3225,7 @@ const CategoriesView = () => {
 
 
 const BrandsView = () => {
+  const confirm = useConfirm();
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -3025,13 +3298,18 @@ const BrandsView = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this brand?')) {
-      try {
-        await adminBrandAPI.remove(id);
-        fetchBrands();
-      } catch (error) {
-        alert('Error deleting brand');
-      }
+    const ok = await confirm({
+      title: 'Delete brand',
+      message: 'This brand will be removed from your store. Products linked to it will remain but lose the brand label.',
+      confirmLabel: 'Delete brand',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminBrandAPI.remove(id);
+      fetchBrands();
+    } catch (error) {
+      alert('Error deleting brand');
     }
   };
 
@@ -3343,6 +3621,7 @@ const CustomersView = () => {
 
 
 const AdminsView = () => {
+  const confirm = useConfirm();
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -3414,14 +3693,19 @@ const AdminsView = () => {
   };
 
   const handleDeleteStaff = async (id) => {
-    if (window.confirm('Are you sure you want to remove this staff member?')) {
-      try {
-        await adminCustomerAPI.deleteStaff(id);
-        fetchAdmins();
-      } catch (error) {
-        console.error('Error deleting staff:', error);
-        alert('Error deleting staff member.');
-      }
+    const ok = await confirm({
+      title: 'Remove staff member',
+      message: 'This staff member will lose access to the admin dashboard immediately.',
+      confirmLabel: 'Remove staff',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCustomerAPI.deleteStaff(id);
+      fetchAdmins();
+    } catch (error) {
+      console.error('Error deleting staff:', error);
+      alert('Error deleting staff member.');
     }
   };
 
@@ -3822,6 +4106,7 @@ const NewsletterView = () => {
 
 
 const ReviewsView = () => {
+  const confirm = useConfirm();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -3849,7 +4134,13 @@ const ReviewsView = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this review?')) return;
+    const ok = await confirm({
+      title: 'Delete review',
+      message: 'This customer review will be permanently removed from your store.',
+      confirmLabel: 'Delete review',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await adminReviewAPI.remove(id);
       setReviews(reviews.filter(r => r.id !== id));

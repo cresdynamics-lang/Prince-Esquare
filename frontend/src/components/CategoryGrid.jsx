@@ -1,17 +1,9 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CATEGORY_TILES } from '../data/homepageContent';
 
 const CategoryGrid = () => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    CATEGORY_TILES.forEach((cat) => {
-      const img = new Image();
-      img.src = cat.image;
-    });
-  }, []);
 
   return (
     <section className="py-32 bg-navy-950">
@@ -50,9 +42,12 @@ const CategoryGrid = () => {
               className={`relative min-h-[360px] md:min-h-0 overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
               onClick={() => navigate(cat.path || `/products?category=${cat.category}`)}
             >
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-[1.5s] group-hover:scale-110"
-                style={{ backgroundImage: `url('${cat.image}')` }}
+              <img
+                src={cat.image}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-navy-950/95 via-navy-950/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-700" />
 

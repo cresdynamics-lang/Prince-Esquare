@@ -38,9 +38,13 @@ router.get('/stock-levels', requireAdmin, inventoryController.stockLevels);
 router.get('/category-pieces', requireAdmin, inventoryController.categoryPieces);
 router.get('/category-summary', requireAdmin, inventoryController.categorySummary);
 router.post('/stock-take', requireAdmin, inventoryController.stockTake);
+router.post('/store-stock-take', requireAdmin, inventoryController.storeStockTake);
+router.get('/export-stock-take', requireAdmin, inventoryController.exportStockTake);
+router.post('/import-stock-take', requireAdmin, upload.single('file'), inventoryController.importStockTake);
 router.patch('/products/:id/threshold', requireAdmin, inventoryController.updateThreshold);
 router.post('/seed-demo', requireAdmin, inventoryController.seedDemo);
 router.post('/sync-alignment', requireAdmin, inventoryController.syncAlignment);
+router.post('/ensure-website-links', requireAdmin, inventoryController.ensureWebsiteLinks);
 router.post('/products/:id/publish', requireAdmin, inventoryController.publishToWebsite);
 router.post('/products/:id/unpublish', requireAdmin, inventoryController.unpublishFromWebsite);
 

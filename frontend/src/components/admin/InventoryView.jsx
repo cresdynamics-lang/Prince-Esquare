@@ -1,3 +1,6 @@
+/**
+ * @deprecated Legacy multi-shop inventory — not used. Physical stock is managed in PosInventoryHub.
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -6,6 +9,7 @@ import {
   CheckCircle2, Building2
 } from 'lucide-react';
 import { adminInventoryAPI } from '../../services/api';
+import { useConfirm } from './ConfirmDialog';
 
 // ── Fixed inventory item list ──────────────────────────────────────────
 const INVENTORY_ITEMS = [
@@ -51,6 +55,7 @@ const EmptyRow = ({ cols, msg }) => (
 // ── Sub-components ─────────────────────────────────────────────────────
 
 const ShopsPanel = ({ shops, onRefresh }) => {
+  const confirm = useConfirm();
   const [form, setForm] = useState({ name: '', code: '', address: '', phone: '', email: '' });
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -69,7 +74,13 @@ const ShopsPanel = ({ shops, onRefresh }) => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this shop? All inventory data for it will be lost.')) return;
+    const ok = await confirm({
+      title: 'Delete shop',
+      message: 'Delete this shop? All inventory data for it will be permanently lost.',
+      confirmLabel: 'Delete shop',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try { await adminInventoryAPI.deleteShop(id); onRefresh(); }
     catch (e) { alert(e?.response?.data?.message || 'Failed to delete shop'); }
   };

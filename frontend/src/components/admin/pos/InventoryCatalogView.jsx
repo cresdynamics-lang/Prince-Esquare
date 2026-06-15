@@ -5,6 +5,7 @@ import { inventoryAPI, adminCategoryAPI } from '../../../services/api';
 import { ensureSocket, socket } from '../../../lib/socket';
 import InventoryProductModal from './InventoryProductModal';
 import InventoryProductCard from './InventoryProductCard';
+import { useConfirm } from '../ConfirmDialog';
 
 const PAGE_SIZE = 50;
 
@@ -21,6 +22,7 @@ const Empty = ({ message }) => (
 );
 
 const InventoryCatalogView = ({ onCategoryChange }) => {
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [categorySummary, setCategorySummary] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -80,6 +82,24 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
   useEffect(() => {
     ensureSocket();
     adminCategoryAPI.getAll().then((r) => setCategories(r.data?.data || r.data || [])).catch(() => {});
+
+    const linkKey = 'pos-inventory-auto-linked';
+    if (!sessionStorage.getItem(linkKey)) {
+      inventoryAPI.ensureWebsiteLinks()
+        .then((res) => {
+          sessionStorage.setItem(linkKey, '1');
+          const d = res.data?.data || {};
+          if (d.linked > 0 || d.stockSeeded > 0) {
+            toast.success(
+              `Synced ${d.linked || 0} website product(s) into inventory` +
+                (d.stockSeeded ? ` (${d.stockSeeded} with opening stock)` : '')
+            );
+            reloadAll();
+          }
+        })
+        .catch(() => {});
+    }
+
     const onReload = () => reloadAll();
     socket.on('stock:updated', onReload);
     socket.on('store:updated', onReload);
@@ -143,8 +163,14 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
     }
     const apiMap = { in: inventoryAPI.stockIn, out: inventoryAPI.stockOut, receive: inventoryAPI.receiveAtStore };
     try {
-      await apiMap[type]({ productId: form.productId, qty, notes: form.notes || '' });
-      toast.success({ in: 'Moved store → shop', out: 'Moved shop → store', receive: 'Received at store' }[type]);
+      const res = await apiMap[type]({ productId: form.productId, qty, notes: form.notes || '' });
+      const data = res.data?.data || {};
+      const tally = data.shopQty != null
+        ? ` Shop: ${data.shopQty}, Store: ${data.storeQty ?? '—'}`
+        : data.storeQty != null
+          ? ` Store: ${data.storeQty}`
+          : '';
+      toast.success(`${{ in: 'Moved store → shop', out: 'Moved shop → store', receive: 'Received at store' }[type]}${tally}`);
       setPanel(null);
       reloadAll();
     } catch (err) {
@@ -153,16 +179,17 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
   };
 
   const handleSeedCatalog = async () => {
-    if (
-      !window.confirm(
+    const ok = await confirm({
+      title: 'Build inventory catalog',
+      message:
         'Build one inventory row per piece from the stock sheet?\n\n' +
-          'Example: 590 shirts → 590 shop rows + ~148 warehouse backup rows.\n' +
-          'Shop = sales floor (POS). Store = back warehouse.\n' +
-          'Nothing is published to the website — you choose which pieces to publish.'
-      )
-    ) {
-      return;
-    }
+        'Example: 590 shirts → 590 shop rows + ~148 warehouse backup rows.\n' +
+        'Shop = sales floor (POS). Store = back warehouse.\n' +
+        'Nothing is published to the website — you choose which pieces to publish.',
+      confirmLabel: 'Build catalog',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setSeeding(true);
     try {
       const res = await inventoryAPI.seedDemo();
@@ -193,9 +220,10 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
       const repaired = res.data?.data?.repaired?.repaired ?? 0;
       const legacy = res.data?.data?.legacy?.updated ?? 0;
       const web = res.data?.data?.website?.updated ?? 0;
+      const linked = res.data?.data?.websiteLinks?.linked ?? 0;
       toast.success(
-        w || repaired || legacy
-          ? `Synced — ${w} warehouse added, ${legacy} website buckets updated, ${web} web listings refreshed`
+        linked || w || repaired || legacy
+          ? `Synced — ${linked} website linked, ${w} warehouse added, ${legacy} buckets updated, ${web} listings refreshed`
           : 'Inventory aligned (shop, warehouse, website)'
       );
       reloadAll();
@@ -224,6 +252,9 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-gold-500/50 px-1">
+        Every website product appears here automatically. Shop stock is the source of truth — when you sell or move stock in POS, the website updates itself.
+      </p>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           <button
@@ -362,6 +393,31 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
             }}
             onTransferIn={(prod) => openPanel('in', prod.id)}
             onTransferOut={(prod) => openPanel('out', prod.id)}
+            onUnpublish={async (prod) => {
+              const ok = await confirm({
+                title: 'Unpublish from website',
+                message: `"${prod.name}" will be hidden from the website. Inventory and shop stock are unchanged.`,
+                confirmLabel: 'Unpublish',
+                variant: 'warning',
+              });
+              if (!ok) return;
+              try {
+                await inventoryAPI.unpublishFromWebsite(prod.id);
+                toast.success('Removed from website');
+                reloadAll();
+              } catch (err) {
+                toast.error(err.response?.data?.message || 'Unpublish failed');
+              }
+            }}
+            onThresholdChange={async (prod, threshold) => {
+              try {
+                await inventoryAPI.updateThreshold(prod.id, { low_stock_threshold: threshold });
+                toast.success('Low-stock threshold saved');
+                reloadAll();
+              } catch (err) {
+                toast.error(err.response?.data?.message || 'Could not save threshold');
+              }
+            }}
           />
         ))}
 
@@ -428,6 +484,13 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
               </p>
             )}
             <input type="number" min={1} value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} className="w-full bg-navy-950 border border-gold-500/20 rounded p-2 text-white" placeholder="Quantity" />
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={2}
+              className="w-full bg-navy-950 border border-gold-500/20 rounded p-2 text-white text-sm resize-none"
+              placeholder="Notes (optional)"
+            />
             <div className="flex gap-2">
               <button type="button" onClick={() => setPanel(null)} className="flex-1 py-2 border border-gold-500/30 text-gold-400 rounded text-sm">Cancel</button>
               <button type="button" onClick={() => submitMovement(panel)} className="flex-1 py-2 bg-gold-600 text-navy-950 rounded text-sm font-medium">Confirm</button>
@@ -440,11 +503,24 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setPublishItem(null)}>
           <div className="bg-navy-900 border border-gold-500/20 rounded-xl p-6 max-w-md w-full space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-gold-400 text-sm">Publish — {publishItem.name}</h3>
-            <p className="text-[10px] text-gold-500/50">Publishing adds this product to the website with images you set in edit.</p>
+            <p className="text-[10px] text-gold-500/50">Set category and price before going live. Add images in Edit details first.</p>
+            <select
+              value={publishForm.category_id}
+              onChange={(e) => setPublishForm({ ...publishForm, category_id: e.target.value })}
+              className="w-full bg-navy-950 border border-gold-500/20 rounded p-2 text-white text-sm"
+            >
+              <option value="">Select website category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
             <input type="number" value={publishForm.price} onChange={(e) => setPublishForm({ ...publishForm, price: e.target.value })} className="w-full bg-navy-950 border border-gold-500/20 rounded p-2 text-white" placeholder="Website price" />
+            <p className="text-[10px] text-gold-500/40">Shop stock on publish: {publishItem.currentQty ?? 0} (mirrors to website)</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setPublishItem(null)} className="flex-1 py-2 border border-gold-500/30 text-gold-400 rounded text-sm">Cancel</button>
             <button
               type="button"
-              disabled={publishBusy}
+              disabled={publishBusy || !publishForm.category_id}
               onClick={async () => {
                 setPublishBusy(true);
                 try {
@@ -462,10 +538,11 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
                   setPublishBusy(false);
                 }
               }}
-              className="w-full py-2 bg-gold-600 text-navy-950 rounded font-medium disabled:opacity-50"
+              className="flex-1 py-2 bg-gold-600 text-navy-950 rounded font-medium disabled:opacity-50"
             >
               Publish
             </button>
+            </div>
           </div>
         </div>
       )}

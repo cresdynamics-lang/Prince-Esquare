@@ -28,6 +28,8 @@ backend/uploads/*
 # DB sync bundles (upload to server manually)
 backend/data/full-sync.json
 backend/data/products-export.json
+backend/data/catalog-snapshots/*.json
+!backend/data/catalog-snapshots/README.md
 
 # Logs
 npm-debug.log*

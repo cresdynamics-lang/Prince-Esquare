@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -7,9 +7,29 @@ import ProductShowcase from '../components/ProductShowcase';
 import CategoryGrid from '../components/CategoryGrid';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
+import { bannerAPI } from '../services/api';
 import { localBusinessSchema, organizationSchema, routeSeo, websiteSchema } from '../seo/seoData';
 
 const Home = () => {
+  const [homepageData, setHomepageData] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    bannerAPI
+      .getHomepageData()
+      .then((res) => {
+        if (!cancelled) setHomepageData(res.data?.data || null);
+      })
+      .catch((error) => {
+        console.error('Home: homepage data unavailable', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="bg-navy-950 min-h-screen">
       <SEO
@@ -17,11 +37,11 @@ const Home = () => {
         schema={[organizationSchema, localBusinessSchema, websiteSchema]}
       />
       <Navbar />
-      
-      <main>
-        <HeroSlider />
 
-        <ProductShowcase />
+      <main>
+        <HeroSlider heroSlides={homepageData?.heroSlides} />
+
+        <ProductShowcase categoryRows={homepageData?.categoryRows} />
 
         {/* Quote Section */}
         <section className="py-16 md:py-20 bg-navy-950 text-center relative overflow-hidden border-t border-gold-600/10">
@@ -104,10 +124,10 @@ const Home = () => {
                 <span className="text-gold-500 italic">Discerning Taste</span>
               </h2>
               <p className="text-navy-200 font-light leading-relaxed max-w-xl mx-auto">
-                Step into a world where every detail is considered, every stitch is intentional, 
+                Step into a world where every detail is considered, every stitch is intentional,
                 and your unique style is celebrated.
               </p>
-              <Link 
+              <Link
                 to="/signup"
                 className="inline-block bg-transparent border border-gold-600 text-gold-500 px-16 py-6 text-[10px] font-bold uppercase tracking-[0.3em] hover:bg-gold-600 hover:text-navy-950 transition-all shadow-2xl shadow-gold-600/20"
               >
@@ -155,11 +175,11 @@ const Home = () => {
                 Subscribe to receive exclusive access to new collections, seasonal editorials, and private invitations.
               </p>
             </div>
-            
+
             <form className="flex flex-col md:flex-row gap-4">
-              <input 
-                type="email" 
-                placeholder="EMAIL ADDRESS" 
+              <input
+                type="email"
+                placeholder="EMAIL ADDRESS"
                 className="flex-1 bg-navy-900 border border-gold-600/20 px-8 py-5 text-[10px] font-bold tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/30"
               />
               <button className="bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10">

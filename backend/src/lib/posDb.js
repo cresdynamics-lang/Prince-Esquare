@@ -12,21 +12,33 @@ const parseDraft = (value) => {
   }
 };
 
-const mapProduct = (p) => ({
-  ...p,
-  shop_price: parseFloat(p.shop_price),
-  online_price: p.online_price != null ? parseFloat(p.online_price) : null,
-  website_price: p.website_price != null ? parseFloat(p.website_price) : null,
-  website_discount_price:
-    p.website_discount_price != null ? parseFloat(p.website_discount_price) : null,
-  website_published: Boolean(p.website_published),
-  website_product_id: p.website_product_id || null,
-  website_thumbnail: p.website_thumbnail || null,
-  stock_level: p.current_qty != null ? { current_qty: p.current_qty } : null,
-  currentQty: p.current_qty ?? 0,
-  isLow: (p.current_qty ?? 0) <= p.low_stock_threshold,
-  isOut: (p.current_qty ?? 0) === 0,
-});
+const mapProduct = (p) => {
+  const retailPrice =
+    parseFloat(p.shop_price) ||
+    parseFloat(p.website_discount_price) ||
+    parseFloat(p.website_price) ||
+    parseFloat(p.online_price) ||
+    0;
+  const costRaw = p.cost_price ?? p.website_cost_price;
+  const costPrice = costRaw != null ? parseFloat(costRaw) : null;
+  return {
+    ...p,
+    shop_price: parseFloat(p.shop_price),
+    online_price: p.online_price != null ? parseFloat(p.online_price) : null,
+    website_price: p.website_price != null ? parseFloat(p.website_price) : null,
+    website_discount_price:
+      p.website_discount_price != null ? parseFloat(p.website_discount_price) : null,
+    website_published: Boolean(p.website_published),
+    website_product_id: p.website_product_id || null,
+    website_thumbnail: p.website_thumbnail || null,
+    retailPrice,
+    costPrice,
+    stock_level: p.current_qty != null ? { current_qty: p.current_qty } : null,
+    currentQty: p.current_qty ?? 0,
+    isLow: (p.current_qty ?? 0) <= p.low_stock_threshold,
+    isOut: (p.current_qty ?? 0) === 0,
+  };
+};
 
 const enrichStockRows = async (rows) => {
   const webIds = [...new Set(rows.map((r) => r.ecommerce_product_id || r.website_product_id).filter(Boolean))];
@@ -94,6 +106,10 @@ const enrichStockRows = async (rows) => {
   });
 };
 
+/** Excludes legacy Excel aggregate buckets (POS-SHIRTS etc.). */
+const MANAGED_INVENTORY_FILTER = `p.sku NOT LIKE 'POS-%'`;
+const SHOP_FLOOR_INVENTORY_FILTER = `${MANAGED_INVENTORY_FILTER} AND p.sku NOT LIKE '%-W-%'`;
+
 /** Lightweight low-stock list for dashboard overview (no variant enrichment). */
 const getLowStockSummary = async ({ limit = 25 } = {}) => {
   const r = await db.query(
@@ -101,7 +117,7 @@ const getLowStockSummary = async ({ limit = 25 } = {}) => {
             COALESCE(s.current_qty, 0)::int AS current_qty
      FROM pos_products p
      LEFT JOIN pos_stock_levels s ON s.product_id = p.id
-     WHERE p.sku LIKE 'PE-CAT-%'
+     WHERE ${MANAGED_INVENTORY_FILTER}
        AND COALESCE(s.current_qty, 0) <= p.low_stock_threshold
      ORDER BY COALESCE(s.current_qty, 0) ASC, p.name ASC
      LIMIT $1`,
@@ -121,19 +137,20 @@ const getLowStockSummary = async ({ limit = 25 } = {}) => {
 
 const getStockLevels = async ({ category = null } = {}) => {
   const params = [];
-  let where = `WHERE p.sku LIKE 'PE-CAT-%'`;
+  let where = `WHERE ${MANAGED_INVENTORY_FILTER}`;
   if (category) {
     params.push(category);
-    where = `WHERE p.category = $1 AND p.sku LIKE 'PE-CAT-%'`;
+    where = `WHERE p.category = $1 AND ${MANAGED_INVENTORY_FILTER}`;
   }
 
   const r = await db.query(`
     SELECT p.id, p.name, p.sku, p.category, p.low_stock_threshold, p.ecommerce_product_id,
-           p.shop_price, p.online_price, p.created_at, p.website_details,
+           p.shop_price, p.online_price, p.cost_price, p.created_at, p.website_details,
            ec.id AS website_product_id,
            ec.is_active AS website_published,
            ec.price AS website_price,
            ec.discount_price AS website_discount_price,
+           ec.cost_price AS website_cost_price,
            ec.thumbnail AS website_thumbnail,
            ec.description AS website_description,
            ec.category_id AS website_category_id,
@@ -200,7 +217,7 @@ const getShopFloorCategoryTotals = async () => {
            COUNT(*) FILTER (WHERE COALESCE(s.current_qty, 0) > 0)::int AS in_stock_pieces
     FROM pos_products p
     LEFT JOIN pos_stock_levels s ON s.product_id = p.id
-    WHERE p.sku LIKE 'PE-CAT-%' AND p.sku NOT LIKE '%-W-%'
+    WHERE ${SHOP_FLOOR_INVENTORY_FILTER}
     GROUP BY p.category
     ORDER BY p.category ASC
   `);

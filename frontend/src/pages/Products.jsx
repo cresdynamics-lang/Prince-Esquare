@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import { useCartStore } from '../store/useCartStore';
-import { getPremiumImage, preloadProductImages } from '../utils/productImages';
+import { getPremiumImage } from '../utils/productImages';
 import { catalogueAPI, productAPI, adminCategoryAPI } from '../services/api';
 import { buildBreadcrumbSchema, categoryFallbackIntro, routeSeo } from '../seo/seoData';
 const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
@@ -109,7 +109,6 @@ const Products = ({ categoryOverride = null }) => {
       try {
         const catalogueRes = await catalogueAPI.get();
         const catalogue = catalogueRes.data.data || {};
-        preloadProductImages(catalogue.image_urls || []);
         const fetchedProducts = filterCatalogueProducts(catalogue.products || [], currentCategory, currentSub);
         const allCats = catalogue.categories || [];
         const parents = allCats.filter(c => !c.parent_id);
@@ -341,7 +340,7 @@ const Products = ({ categoryOverride = null }) => {
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-10 gap-y-12 sm:gap-y-20">
               <AnimatePresence mode="popLayout">
-                {filteredProducts.map((product) => {
+                {filteredProducts.map((product, index) => {
                   const outOfStock = product.out_of_stock === true;
                   return (
                   <motion.div
@@ -355,10 +354,11 @@ const Products = ({ categoryOverride = null }) => {
                     <Link to={`/product/${product.slug}`} className="block">
                       <div className="relative aspect-square bg-navy-950 overflow-hidden mb-6 border border-gold-600/10 group-hover:border-gold-600 transition-colors">
                         <img
-                          src={getPremiumImage(product)}
+                          src={product.image_url || getPremiumImage(product, { width: 400 })}
                           alt={product.name}
-                          loading="eager"
+                          loading="lazy"
                           decoding="async"
+                          fetchPriority={index < 2 ? 'high' : 'low'}
                           className={`w-full h-full object-contain p-3 bg-white transition-transform duration-700 group-hover:scale-105 ${outOfStock ? 'opacity-50' : ''}`}
                         />
                         {outOfStock && (
