@@ -330,8 +330,12 @@ async function deleteSuitProducts(rows) {
     const del = await client.query('DELETE FROM products WHERE id = ANY($1::uuid[]) RETURNING id', [ids]);
 
     if (posIds.length) {
+      await client.query('DELETE FROM pos_sale_items WHERE product_id = ANY($1::uuid[])', [posIds]);
+      await client.query('DELETE FROM pos_stock_movements WHERE product_id = ANY($1::uuid[])', [posIds]);
+      await client.query('DELETE FROM pos_daily_stock_snapshots WHERE product_id = ANY($1::uuid[])', [posIds]);
       await client.query('DELETE FROM pos_store_stock_levels WHERE product_id = ANY($1::uuid[])', [posIds]);
       await client.query('DELETE FROM pos_stock_levels WHERE product_id = ANY($1::uuid[])', [posIds]);
+      await client.query('DELETE FROM pos_product_variants WHERE product_id = ANY($1::uuid[])', [posIds]);
       await client.query('DELETE FROM pos_products WHERE id = ANY($1::uuid[])', [posIds]);
     }
 
