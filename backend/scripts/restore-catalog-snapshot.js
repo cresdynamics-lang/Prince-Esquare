@@ -51,7 +51,7 @@ const jsonCol = (v) => {
            category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images,
            pos_stock_product_id, ratings_avg, ratings_count, created_at, updated_at
          ) VALUES (
-           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20,$21
+           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,NULL,$17,$18,$19,$20
          )
          ON CONFLICT (id) DO UPDATE SET
            name = EXCLUDED.name, slug = EXCLUDED.slug, sku = EXCLUDED.sku,
@@ -61,13 +61,12 @@ const jsonCol = (v) => {
            brand_id = EXCLUDED.brand_id, stock_quantity = EXCLUDED.stock_quantity,
            is_featured = EXCLUDED.is_featured, is_active = EXCLUDED.is_active,
            thumbnail = EXCLUDED.thumbnail, images = EXCLUDED.images,
-           pos_stock_product_id = EXCLUDED.pos_stock_product_id,
            updated_at = EXCLUDED.updated_at`,
         [
           p.id, p.name, p.slug, p.sku, p.description, p.price, p.discount_price,
           p.pos_sell_price, p.cost_price ?? null, p.category_id, p.brand_id,
           p.stock_quantity ?? 0, p.is_featured ?? false, p.is_active ?? true,
-          p.thumbnail, jsonCol(p.images), p.pos_stock_product_id,
+          p.thumbnail, jsonCol(p.images),
           p.ratings_avg ?? 0, p.ratings_count ?? 0, p.created_at, p.updated_at,
         ]
       );
@@ -163,6 +162,10 @@ const jsonCol = (v) => {
     // Re-link bidirectional FKs from product rows
     for (const p of products) {
       if (!p.pos_stock_product_id) continue;
+      await client.query(
+        `UPDATE products SET pos_stock_product_id = $1 WHERE id = $2`,
+        [p.pos_stock_product_id, p.id]
+      );
       await client.query(
         `UPDATE pos_products SET ecommerce_product_id = $1 WHERE id = $2`,
         [p.id, p.pos_stock_product_id]
