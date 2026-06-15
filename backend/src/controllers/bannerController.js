@@ -85,7 +85,10 @@ const DEDICATED_CATEGORY_ROUTES = {
 };
 
 /** Subcategories hidden from homepage product rows, tiles, and hero carousel. */
-const HOMEPAGE_HIDDEN_CATEGORY_SLUGS = new Set(['casual']);
+const HOMEPAGE_HIDDEN_CATEGORY_SLUGS = new Set(['casual', 'caps-hats']);
+
+/** Homepage category rows shown first (replaces hidden categories in prominence). */
+const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['knitted-polos'];
 
 const categoryViewAllPath = (row) => {
   const parentSlug = row.parent_slug;
@@ -155,6 +158,13 @@ const buildCategoryProductRows = async () => {
   return [...groups.values()]
     .filter((group) => group.products.length > 0)
     .sort((a, b) => {
+      const aPri = HOMEPAGE_PRIORITY_CATEGORY_SLUGS.indexOf(a.slug);
+      const bPri = HOMEPAGE_PRIORITY_CATEGORY_SLUGS.indexOf(b.slug);
+      if (aPri !== -1 || bPri !== -1) {
+        if (aPri === -1) return 1;
+        if (bPri === -1) return -1;
+        return aPri - bPri;
+      }
       const aFeatured = a.products.some((p) => p.is_featured);
       const bFeatured = b.products.some((p) => p.is_featured);
       if (aFeatured !== bFeatured) return bFeatured ? 1 : -1;
@@ -238,6 +248,16 @@ const buildCategoryTiles = async () => {
 
   const tiles = result.rows
     .filter((c) => c.image && !HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(c.slug))
+    .sort((a, b) => {
+      const aPri = HOMEPAGE_PRIORITY_CATEGORY_SLUGS.indexOf(a.slug);
+      const bPri = HOMEPAGE_PRIORITY_CATEGORY_SLUGS.indexOf(b.slug);
+      if (aPri !== -1 || bPri !== -1) {
+        if (aPri === -1) return 1;
+        if (bPri === -1) return -1;
+        return aPri - bPri;
+      }
+      return a.name.localeCompare(b.name);
+    })
     .map((c, index) => ({
       title: c.name,
       subtitle: 'Shop Collection',
