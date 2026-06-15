@@ -84,6 +84,9 @@ const DEDICATED_CATEGORY_ROUTES = {
   linen: '/linen',
 };
 
+/** Subcategories hidden from homepage product rows, tiles, and hero carousel. */
+const HOMEPAGE_HIDDEN_CATEGORY_SLUGS = new Set(['casual']);
+
 const categoryViewAllPath = (row) => {
   const parentSlug = row.parent_slug;
   const slug = row.slug;
@@ -118,6 +121,8 @@ const buildCategoryProductRows = async () => {
   const groups = new Map();
 
   for (const row of result.rows) {
+    if (HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(row.category_slug)) continue;
+
     const key = row.category_slug;
     if (!groups.has(key)) {
       groups.set(key, {
@@ -203,7 +208,9 @@ const buildHeroSlidesFromProducts = async () => {
     );
   }
 
-  const slides = result.rows.map(mapHeroProductSlide);
+  const slides = result.rows
+    .filter((p) => !HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(p.category_slug))
+    .map(mapHeroProductSlide);
   const { slides: merged } = await applyHeroCategoryOverrides(result.rows, slides);
   return merged;
 };
@@ -230,7 +237,7 @@ const buildCategoryTiles = async () => {
   );
 
   const tiles = result.rows
-    .filter((c) => c.image)
+    .filter((c) => c.image && !HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(c.slug))
     .map((c, index) => ({
       title: c.name,
       subtitle: 'Shop Collection',
