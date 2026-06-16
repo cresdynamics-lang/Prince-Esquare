@@ -29,6 +29,7 @@ exports.posLogin = async (req, res, next) => {
       token,
       user: {
         id: profile.id,
+        name: profile.full_name,
         fullName: profile.full_name,
         email: profile.email,
         role: profile.role,

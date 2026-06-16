@@ -31,7 +31,7 @@ exports.register = async (req, res, next) => {
         const token = signToken({ id: user.id, role: user.role, fullName: user.name, accountType: 'user' });
 
         formatResponse(res, 201, true, 'User registered successfully', {
-            user,
+            user: { ...user, fullName: user.name },
             token
         });
     } catch (error) {
@@ -63,7 +63,7 @@ exports.login = async (req, res, next) => {
         delete user.password;
 
         formatResponse(res, 200, true, 'Login successful', {
-            user,
+            user: { ...user, fullName: user.name },
             token
         });
     } catch (error) {
@@ -93,7 +93,7 @@ exports.adminLogin = async (req, res, next) => {
         delete user.password;
 
         formatResponse(res, 200, true, 'Admin login successful', {
-            admin: { ...user, fullName: user.name },
+            admin: { ...user, fullName: user.name, full_name: user.name },
             token
         });
     } catch (error) {

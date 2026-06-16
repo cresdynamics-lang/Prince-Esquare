@@ -260,7 +260,7 @@ exports.createProduct = async (req, res, next) => {
                         'Variant',
                         value,
                         v.price_override || 0,
-                        v.stock || 0,
+                        0,
                         v.image_url || null,
                         v.color || null,
                         v.size || null,
@@ -299,7 +299,13 @@ exports.updateProduct = async (req, res, next) => {
         const isStaff = req.user?.role === 'staff';
         const productSku = generateProductSku({ name, slug, sku });
 
-        if (is_active === true) {
+        const existingR = await db.query('SELECT is_active FROM products WHERE id = $1', [id]);
+        if (existingR.rows.length === 0) {
+            return formatResponse(res, 404, false, 'Product not found');
+        }
+        const nextActive = isStaff ? Boolean(existingR.rows[0].is_active) : (is_active !== undefined ? is_active : true);
+
+        if (nextActive === true && !isStaff) {
             const linkR = await db.query('SELECT pos_stock_product_id FROM products WHERE id = $1', [id]);
             if (!linkR.rows.length) {
                 return formatResponse(res, 404, false, 'Product not found');
@@ -317,39 +323,49 @@ exports.updateProduct = async (req, res, next) => {
         const result = await db.query(
             'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, price = $5, discount_price = $6, pos_sell_price = $7, category_id = $8, brand_id = $9, ' +
             'stock_quantity = $10, is_featured = $11, is_active = $12, thumbnail = $13, images = $14 WHERE id = $15 RETURNING *',
-            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price ?? null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, is_active !== undefined ? is_active : true, thumbnail || null, JSON.stringify(images || []), id]
+            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price ?? null, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), id]
         );
 
         if (result.rows.length === 0) {
             return formatResponse(res, 404, false, 'Product not found');
         }
 
-        // Handle variants (admin only — staff cannot change sizes)
-        if (variants && Array.isArray(variants) && !isStaff) {
-            // Delete removed variants
-            const incomingIds = variants.map(v => v.id).filter(Boolean);
+        if (variants && Array.isArray(variants)) {
+            const existingVariants = await db.query(
+                'SELECT id, stock_quantity FROM product_variants WHERE product_id = $1',
+                [id]
+            );
+            const stockById = new Map(existingVariants.rows.map((row) => [row.id, row.stock_quantity]));
+
+            const incomingIds = variants.map((v) => v.id).filter(Boolean);
             if (incomingIds.length > 0) {
                 await db.query('DELETE FROM product_variants WHERE product_id = $1 AND id NOT IN (SELECT unnest($2::uuid[]))', [id, incomingIds]);
             } else {
                 await db.query('DELETE FROM product_variants WHERE product_id = $1', [id]);
             }
 
-            // Insert or update
             for (const v of variants) {
                 const value = `${v.size || ''} / ${v.color || ''}`;
                 const variantSku = generateVariantSku(productSku, v);
+                const stockQty = v.id ? (stockById.get(v.id) ?? 0) : 0;
                 if (v.id) {
                     await db.query(
                         'UPDATE product_variants SET name = $1, value = $2, price_modifier = $3, stock_quantity = $4, image_url = $5, color = $6, size = $7, sku = $8, stock_id = $9 WHERE id = $10',
-                        ['Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku, v.id]
+                        ['Variant', value, v.price_override || 0, stockQty, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku, v.id]
                     );
                 } else {
                     await db.query(
                         'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, sku, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                        [id, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku]
+                        [id, 'Variant', value, v.price_override || 0, 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku]
                     );
                 }
             }
+
+            const sumR = await db.query(
+                'SELECT COALESCE(SUM(stock_quantity), 0)::int AS total FROM product_variants WHERE product_id = $1',
+                [id]
+            );
+            await db.query('UPDATE products SET stock_quantity = $1 WHERE id = $2', [sumR.rows[0]?.total || 0, id]);
         }
 
         const { ensurePosForEcommerceProduct, syncPosMetadataFromEcommerce } = require('../services/inventoryChannel');

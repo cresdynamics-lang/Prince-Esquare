@@ -4,6 +4,7 @@ import { ChevronDown, Menu, X, ShoppingBag, Search, User, LogOut } from 'lucide-
 import { Link, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { userInitials } from '../lib/format';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -199,8 +200,17 @@ const Navbar = () => {
           <Search size={18} className="cursor-pointer hover:text-gold-200 transition-colors" />
           
           <div className="relative group">
-            <Link to={isAuthenticated ? "/profile" : "/login"}>
-              <User size={18} className="cursor-pointer hover:text-gold-200 transition-colors" />
+            <Link to={isAuthenticated ? "/profile" : "/login"} className="relative block">
+              {isAuthenticated ? (
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-gold-500/30 bg-navy-900 text-[10px] font-bold text-gold-300"
+                  title={user?.name || user?.email || ''}
+                >
+                  {userInitials(user)}
+                </span>
+              ) : (
+                <User size={18} className="cursor-pointer hover:text-gold-200 transition-colors" />
+              )}
             </Link>
             {isAuthenticated && (
               <div className="absolute top-full right-0 mt-6 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">

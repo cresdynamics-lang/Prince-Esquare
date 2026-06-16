@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { orderAPI, authAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { userInitials } from '../lib/format';
 
 const Profile = () => {
   const { user, logout, isAuthenticated } = useAuthStore();
@@ -60,9 +61,10 @@ const Profile = () => {
             <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
               <div className="w-32 h-32 bg-navy-800 border-2 border-gold-600/20 flex items-center justify-center relative group">
                 <div className="absolute inset-0 border border-gold-600/50 scale-110 opacity-0 group-hover:opacity-100 transition-all duration-500" />
-                <User size={64} className="text-gold-500/50" />
-                {user?.avatar && (
+                {user?.avatar ? (
                   <img src={user.avatar} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl font-bold text-gold-400 tracking-wider">{userInitials(user)}</span>
                 )}
               </div>
               

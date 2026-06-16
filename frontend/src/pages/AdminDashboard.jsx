@@ -19,7 +19,7 @@ import ShiftSummaryView from '../components/pos/ShiftSummaryView';
 import { posAdminAPI } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore, isStaffSession } from '../store/useAuthStore';
-import { nameInitials } from '../lib/format';
+import { userInitials } from '../lib/format';
 import { 
   adminAnalyticsAPI, 
   adminOrderAPI, 
@@ -378,9 +378,9 @@ const AdminDashboard = () => {
               </button>
               <div
                 className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform text-sm"
-                title={user?.fullName || user?.name || user?.full_name || ''}
+                title={[user?.fullName, user?.name, user?.full_name, user?.email].filter(Boolean).join(' · ')}
               >
-                {nameInitials(user?.fullName || user?.name || user?.full_name)}
+                {userInitials(user)}
               </div>
             </div>
           </div>
@@ -1680,7 +1680,7 @@ const ProductsView = () => {
   const confirm = useConfirm();
   const authUser = useAuthStore((s) => s.user);
   const staffUser = authUser?.role === 'staff';
-  const canEditSizes = isFullAdmin(authUser);
+  const canPublish = isFullAdmin(authUser);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2199,10 +2199,8 @@ const ProductsView = () => {
     setSubmitting(true);
     try {
       const payload = { ...formData };
-      payload.variants = flattenColorGroups(formData.color_groups);
-      payload.stock_quantity = payload.variants.length
-        ? payload.variants.reduce((sum, row) => sum + (parseInt(row.stock, 10) || 0), 0)
-        : parseInt(formData.stock_quantity, 10) || 0;
+      payload.variants = flattenColorGroups(formData.color_groups).map((row) => ({ ...row, stock: 0 }));
+      payload.stock_quantity = 0;
       payload.brand_id = null;
 
       // Remove frontend-only state fields
@@ -2261,12 +2259,12 @@ const ProductsView = () => {
       </div>
 
       <p className="text-xs text-gold-500/50 -mt-4 mb-2">
-        Add product details and images here. New items are recorded in store inventory automatically; admin adjusts sizes in Inventory.
+        Add product details, images, and sizes here. Web stock is adjusted by admin in Inventory after the item is saved.
       </p>
 
       {staffUser && (
         <p className="text-xs text-amber-400/80 mb-2">
-          Staff: you can add products and upload images. Size breakdown is managed by admin in Inventory.
+          Staff: pick colors and sizes when adding a product. Website stock counts are set by admin in Inventory.
         </p>
       )}
 
@@ -2597,26 +2595,16 @@ const ProductsView = () => {
                     <p className="text-[9px] text-gold-500/35">In-store price for this product — not the category bucket average.</p>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Shop inventory qty</label>
+                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Store intake qty</label>
                     <input
                       type="number"
                       min="0"
-                      placeholder="Auto-add to POS inventory"
+                      placeholder="Units received in warehouse"
                       value={formData.inventory_opening_qty}
                       onChange={(e) => setFormData({ ...formData, inventory_opening_qty: e.target.value })}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                     />
-                    <p className="text-[9px] text-gold-500/35">Opening qty when creating — links this product to shop inventory.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Website Stock</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={formData.stock_quantity}
-                      onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
+                    <p className="text-[9px] text-gold-500/35">Warehouse opening qty — transfer to shop in Inventory.</p>
                   </div>
                 </div>
 
@@ -2809,13 +2797,14 @@ const ProductsView = () => {
                 </div>
               </div>
 
-              {/* Variants — colors & sizes (admin only) */}
-              {canEditSizes && (
+              {/* Variants — colors & sizes */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
                   <div>
                     <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Colors & Sizes</h5>
-                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">Add each color, then set website stock per size. Zero stock hides that option from customers.</p>
+                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">
+                      Choose which sizes exist for each color. Admin sets website stock in Inventory — not here.
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -2930,7 +2919,6 @@ const ProductsView = () => {
                             <thead className="text-gold-500/40">
                               <tr>
                                 <th className="text-left p-2">Size</th>
-                                <th className="p-2">Web stock</th>
                                 <th className="p-2 w-10" />
                               </tr>
                             </thead>
@@ -2938,15 +2926,6 @@ const ProductsView = () => {
                               {group.sizes.map((row) => (
                                 <tr key={row._key} className="border-t border-gold-500/10">
                                   <td className="p-2 font-bold text-gold-100">{row.size}</td>
-                                  <td className="p-2">
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={row.stock}
-                                      onChange={(e) => updateSizeInGroup(group._key, row._key, 'stock', e.target.value)}
-                                      className="w-20 bg-navy-950 border border-gold-500/10 rounded px-2 py-1 text-gold-100 text-center"
-                                    />
-                                  </td>
                                   <td className="p-2 text-right">
                                     <button type="button" onClick={() => removeSizeFromGroup(group._key, row._key)} className="text-red-400/60 hover:text-red-400">
                                       <Trash2 size={14} />
@@ -2962,13 +2941,6 @@ const ProductsView = () => {
                   ))}
                 </div>
               </div>
-              )}
-
-              {!canEditSizes && staffUser && (
-                <p className="text-xs text-gold-500/50 border border-gold-500/10 rounded-xl p-4">
-                  Sizes and website publish are handled by admin in Inventory after you save this product.
-                </p>
-              )}
 
               {/* Status & Submit */}
               <div className="pt-10 border-t border-gold-500/10 flex flex-col md:flex-row items-center justify-between gap-8">
@@ -2982,7 +2954,7 @@ const ProductsView = () => {
                     />
                     <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured (homepage carousel)</span>
                   </label>
-                  {canEditSizes && (
+                  {canPublish && (
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input 
                       type="checkbox" 
@@ -3601,7 +3573,7 @@ const UsersView = () => {
       {!isAdmin && currentUser && (
         <div className="bg-navy-900/40 border border-gold-500/15 rounded-xl p-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-gold-600 text-navy-950 font-bold flex items-center justify-center">
-            {nameInitials(currentUser.fullName || currentUser.name)}
+            {userInitials(currentUser)}
           </div>
           <div>
             <p className="text-sm font-bold text-gold-100">{currentUser.fullName || currentUser.name}</p>
@@ -3714,7 +3686,7 @@ const CustomersView = ({ embedded = false }) => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 bg-gold-600 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 shadow-lg`}>
-                        {c.name ? c.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+                        {userInitials(c)}
                       </div>
                       <div>
                         <div className="text-sm font-bold text-gold-100 flex items-center gap-2">
@@ -4113,7 +4085,7 @@ const ReviewsView = () => {
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-navy-800 rounded-full flex items-center justify-center text-gold-500 font-bold border border-gold-500/10">
-                    {r.user_name?.[0] || 'U'}
+                    {userInitials({ name: r.user_name, email: r.user_email })}
                   </div>
                   <div>
                     <div className="text-sm font-bold text-gold-100">{r.user_name || 'Anonymous'}</div>
