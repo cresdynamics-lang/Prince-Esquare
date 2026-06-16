@@ -43,6 +43,9 @@ const InventoryProductCard = ({
   onTransferIn,
   onTransferOut,
   onThresholdChange,
+  readOnly = false,
+  selected = false,
+  onSelectToggle,
 }) => {
   const [thresholdDraft, setThresholdDraft] = useState(String(product.low_stock_threshold ?? ''));
   const inShop = (product.currentQty ?? 0) > 0;
@@ -54,8 +57,18 @@ const InventoryProductCard = ({
   const isLow = product.low_stock_threshold != null && (product.currentQty ?? 0) <= product.low_stock_threshold;
 
   return (
-    <article className="bg-navy-950/60 border border-gold-500/15 rounded-xl overflow-hidden">
+    <article className={`bg-navy-950/60 border rounded-xl overflow-hidden ${selected ? 'border-gold-500/50 ring-1 ring-gold-500/20' : 'border-gold-500/15'}`}>
       <div className="flex flex-col sm:flex-row gap-4 p-4">
+        {onSelectToggle && (
+          <label className="flex items-start pt-1 shrink-0 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onSelectToggle}
+              className="mt-1 rounded border-gold-500/30 bg-navy-950 text-gold-500 focus:ring-gold-500/40"
+            />
+          </label>
+        )}
         {showImage ? (
           <div className="shrink-0 w-full sm:w-28 h-28 bg-white rounded-lg overflow-hidden border border-gold-500/10">
             <img src={product.website_thumbnail} alt="" className="w-full h-full object-contain p-1" />
@@ -87,7 +100,10 @@ const InventoryProductCard = ({
               {product.website_discount_price && (
                 <p className="text-[10px] text-slate-500 line-through">{formatKES(product.website_price)}</p>
               )}
-              <p className="text-[10px] text-gold-500/40 mt-0.5">POS {formatKES(product.shop_price)}</p>
+              <p className="text-[10px] text-gold-500/40 mt-0.5">Shop {formatKES(product.shop_price)}</p>
+              {product.store_price != null && product.store_price !== product.shop_price && (
+                <p className="text-[10px] text-violet-400/80 mt-0.5">Store {formatKES(product.store_price)}</p>
+              )}
             </div>
           </div>
 
@@ -113,7 +129,7 @@ const InventoryProductCard = ({
             </span>
           </div>
 
-          {onThresholdChange && (
+          {onThresholdChange && !readOnly && (
             <div className="flex items-center gap-2 text-[10px]">
               <span className="text-gold-500/50 uppercase tracking-widest">Low at</span>
               <input
@@ -184,6 +200,8 @@ const InventoryProductCard = ({
       )}
 
       <div className="flex flex-wrap gap-2 px-4 pb-4 pt-1 border-t border-gold-500/5 mx-0">
+        {!readOnly && (
+          <>
         <button type="button" onClick={() => onEdit(product)} className="flex items-center gap-1 px-3 py-1.5 bg-sky-600 text-white rounded text-[10px] font-medium">
           <Pencil size={12} /> Edit details
         </button>
@@ -201,6 +219,8 @@ const InventoryProductCard = ({
           <button type="button" onClick={() => onUnpublish(product)} className="flex items-center gap-1 px-3 py-1.5 border border-red-500/25 text-red-400 rounded text-[10px]">
             <EyeOff size={12} /> Unpublish
           </button>
+        )}
+          </>
         )}
       </div>
     </article>

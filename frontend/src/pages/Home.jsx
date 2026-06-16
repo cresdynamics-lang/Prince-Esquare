@@ -164,32 +164,6 @@ const Home = () => {
         </section>
       </main>
 
-      {/* Newsletter */}
-      <section className="py-32 bg-navy-950 border-t border-gold-600/10">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="max-w-3xl mx-auto text-center space-y-12">
-            <div className="space-y-4">
-              <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold-500">The Gentleman's Registry</span>
-              <h2 className="text-4xl md:text-5xl font-serif text-white">Join the Elite</h2>
-              <p className="text-slate-400 font-light max-w-xl mx-auto italic">
-                Subscribe to receive exclusive access to new collections, seasonal editorials, and private invitations.
-              </p>
-            </div>
-
-            <form className="flex flex-col md:flex-row gap-4">
-              <input
-                type="email"
-                placeholder="EMAIL ADDRESS"
-                className="flex-1 bg-navy-900 border border-gold-600/20 px-8 py-5 text-[10px] font-bold tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/30"
-              />
-              <button className="bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10">
-                Subscribe
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
-
       <Footer />
     </div>
   );

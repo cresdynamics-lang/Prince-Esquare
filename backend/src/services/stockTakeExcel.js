@@ -58,6 +58,24 @@ const HEADER_MAP = {
   count: 'physicalQty',
   'counted qty': 'physicalQty',
   variance: 'variance',
+  'shop system qty': 'shopSystemQty',
+  'shop system': 'shopSystemQty',
+  'shop physical count': 'shopPhysicalQty',
+  'shop physical qty': 'shopPhysicalQty',
+  'shop count': 'shopPhysicalQty',
+  'shop variance': 'shopVariance',
+  'store system qty': 'storeSystemQty',
+  'store system': 'storeSystemQty',
+  'warehouse system qty': 'storeSystemQty',
+  'warehouse system': 'storeSystemQty',
+  'store physical count': 'storePhysicalQty',
+  'store physical qty': 'storePhysicalQty',
+  'warehouse physical count': 'storePhysicalQty',
+  'warehouse physical qty': 'storePhysicalQty',
+  'store count': 'storePhysicalQty',
+  'warehouse count': 'storePhysicalQty',
+  'store variance': 'storeVariance',
+  'warehouse variance': 'storeVariance',
 };
 
 const mapHeaders = (row) => {
@@ -166,8 +184,90 @@ const buildStockTakeWorkbook = async ({ category = null, location = 'shop' } = {
   return wb;
 };
 
-const exportStockTakeBuffer = async (opts) => {
-  const wb = await buildStockTakeWorkbook(opts);
+/** One workbook — shop floor + warehouse counts on the same rows. */
+const buildCombinedStockTakeWorkbook = async ({ category = null } = {}) => {
+  const raw = await posDb.getStockLevels({ category });
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Stock');
+
+  const headers = [
+    'Inventory ID',
+    'SKU',
+    'Product Name',
+    'Category',
+    'On Website',
+    'Cost Price',
+    'Retail Price',
+    'Shop System Qty',
+    'Shop Physical Count',
+    'Shop Variance',
+    'Store System Qty',
+    'Store Physical Count',
+    'Store Variance',
+  ];
+  ws.addRow(headers);
+
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFD4AF37' } };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF1E293B' },
+  };
+
+  raw.forEach((p, idx) => {
+    const rowNum = idx + 2;
+    const shopSystem = systemQtyFor(p, 'shop');
+    const storeSystem = systemQtyFor(p, 'store');
+    const cost = costForRow(p);
+    const retail = retailForRow(p);
+    const onWeb = p.on_website ? 'Yes' : 'No';
+
+    ws.addRow([
+      p.id,
+      p.sku || '',
+      p.name || '',
+      p.category || '',
+      onWeb,
+      cost ?? '',
+      retail,
+      shopSystem,
+      shopSystem,
+      null,
+      storeSystem,
+      storeSystem,
+      null,
+    ]);
+
+    ws.getCell(`J${rowNum}`).value = { formula: `I${rowNum}-H${rowNum}`, result: 0 };
+    ws.getCell(`M${rowNum}`).value = { formula: `L${rowNum}-K${rowNum}`, result: 0 };
+  });
+
+  ws.columns = [
+    { width: 38 },
+    { width: 22 },
+    { width: 36 },
+    { width: 16 },
+    { width: 12 },
+    { width: 12 },
+    { width: 12 },
+    { width: 14 },
+    { width: 16 },
+    { width: 12 },
+    { width: 14 },
+    { width: 16 },
+    { width: 12 },
+  ];
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  return wb;
+};
+
+const exportStockTakeBuffer = async ({ category = null, location = 'both' } = {}) => {
+  const wb =
+    location === 'shop' || location === 'store'
+      ? await buildStockTakeWorkbook({ category, location })
+      : await buildCombinedStockTakeWorkbook({ category });
   return wb.xlsx.writeBuffer();
 };
 
@@ -193,13 +293,25 @@ const resolveProductId = async (row) => {
   return null;
 };
 
+const resolvePhysicalQty = (physicalCol, systemCol, varianceCol, row) => {
+  let physicalQty = physicalCol ? readCellNumber(row.getCell(physicalCol)) : null;
+  const systemQty = systemCol ? readCellNumber(row.getCell(systemCol)) : null;
+  const variance = varianceCol ? readCellNumber(row.getCell(varianceCol)) : null;
+  if (physicalQty == null && systemQty != null && variance != null) {
+    physicalQty = systemQty + variance;
+  }
+  if (physicalQty == null) return null;
+  return Math.max(0, Math.round(physicalQty));
+};
+
 const parseStockTakeWorksheet = (ws) => {
   if (!ws || ws.rowCount < 2) {
     throw new Error('Excel file is empty or missing data rows');
   }
   const cols = mapHeaders(ws.getRow(1));
-  if (!cols.physicalQty && !cols.variance) {
-    throw new Error('Missing "Physical Count" column in row 1');
+  const combined = Boolean(cols.shopPhysicalQty || cols.storePhysicalQty);
+  if (!combined && !cols.physicalQty && !cols.variance) {
+    throw new Error('Missing physical count column(s) in row 1');
   }
   if (!cols.inventoryId && !cols.sku && !cols.name) {
     throw new Error('Need Inventory ID, SKU, or Product Name column to match rows');
@@ -213,33 +325,52 @@ const parseStockTakeWorksheet = (ws) => {
     const inventoryId = cols.inventoryId ? cellText(row.getCell(cols.inventoryId)) : '';
     if (!name && !sku && !inventoryId) continue;
 
-    const physicalQtyCell = cols.physicalQty ? row.getCell(cols.physicalQty) : null;
-    let physicalQty = readCellNumber(physicalQtyCell);
-
-    const systemQty = cols.systemQty ? readCellNumber(row.getCell(cols.systemQty)) : null;
-    const varianceCol = cols.variance ? readCellNumber(row.getCell(cols.variance)) : null;
     const costPrice = cols.costPrice ? readCellNumber(row.getCell(cols.costPrice)) : null;
     const retailPrice = cols.retailPrice ? readCellNumber(row.getCell(cols.retailPrice)) : null;
 
-    if (physicalQty == null && systemQty != null && varianceCol != null) {
-      physicalQty = systemQty + varianceCol;
+    if (combined) {
+      const shopPhysicalQty = resolvePhysicalQty(
+        cols.shopPhysicalQty,
+        cols.shopSystemQty,
+        cols.shopVariance,
+        row
+      );
+      const storePhysicalQty = resolvePhysicalQty(
+        cols.storePhysicalQty,
+        cols.storeSystemQty,
+        cols.storeVariance,
+        row
+      );
+      if (shopPhysicalQty == null && storePhysicalQty == null) continue;
+      rows.push({
+        inventoryId: inventoryId || null,
+        sku: sku || null,
+        name: name || null,
+        shopPhysicalQty,
+        storePhysicalQty,
+        costPrice,
+        retailPrice,
+        combined: true,
+      });
+      continue;
     }
+
+    const physicalQty = resolvePhysicalQty(cols.physicalQty, cols.systemQty, cols.variance, row);
     if (physicalQty == null) continue;
 
     rows.push({
       inventoryId: inventoryId || null,
       sku: sku || null,
       name: name || null,
-      physicalQty: Math.max(0, Math.round(physicalQty)),
+      physicalQty,
       costPrice,
       retailPrice,
-      systemQty,
-      variance: varianceCol,
+      combined: false,
     });
   }
 
   if (!rows.length) throw new Error('No stock take rows found in Excel');
-  return rows;
+  return { rows, combined: rows[0]?.combined ?? combined };
 };
 
 const parseStockTakeBuffer = async (buffer) => {
@@ -247,6 +378,34 @@ const parseStockTakeBuffer = async (buffer) => {
   await wb.xlsx.load(buffer);
   const ws = wb.worksheets[0];
   return parseStockTakeWorksheet(ws);
+};
+
+const applyCostAndRetail = async (row, productId, { updateRetail = true } = {}) => {
+  let costChanged = false;
+  if (row.costPrice != null && row.costPrice >= 0) {
+    await db.query(`UPDATE pos_products SET cost_price = $1 WHERE id = $2`, [
+      row.costPrice,
+      productId,
+    ]);
+    const linkR = await db.query(
+      `SELECT ecommerce_product_id FROM pos_products WHERE id = $1`,
+      [productId]
+    );
+    if (linkR.rows[0]?.ecommerce_product_id) {
+      await db.query(`UPDATE products SET cost_price = $1 WHERE id = $2`, [
+        row.costPrice,
+        linkR.rows[0].ecommerce_product_id,
+      ]);
+    }
+    costChanged = true;
+  }
+  if (updateRetail && row.retailPrice != null && row.retailPrice >= 0) {
+    await db.query(`UPDATE pos_products SET shop_price = $1 WHERE id = $2`, [
+      row.retailPrice,
+      productId,
+    ]);
+  }
+  return costChanged;
 };
 
 /** Apply uploaded stock take — updates POS, movements, audit, and website stock. */
@@ -257,7 +416,7 @@ const importStockTakeRows = async (rows, { location = 'shop', recordedBy = null 
   const apply = location === 'store' ? applyStoreStockTake : applyStockTake;
   const adjustments = [];
   const skipped = [];
-  const costUpdated = [];
+  let costUpdated = 0;
 
   for (const row of rows) {
     const productId = await resolveProductId(row);
@@ -266,35 +425,15 @@ const importStockTakeRows = async (rows, { location = 'shop', recordedBy = null 
       continue;
     }
 
-    if (row.costPrice != null && row.costPrice >= 0) {
-      await db.query(`UPDATE pos_products SET cost_price = $1 WHERE id = $2`, [
-        row.costPrice,
-        productId,
-      ]);
-      const linkR = await db.query(
-        `SELECT ecommerce_product_id FROM pos_products WHERE id = $1`,
-        [productId]
-      );
-      if (linkR.rows[0]?.ecommerce_product_id) {
-        await db.query(`UPDATE products SET cost_price = $1 WHERE id = $2`, [
-          row.costPrice,
-          linkR.rows[0].ecommerce_product_id,
-        ]);
-      }
-      costUpdated.push(productId);
-    }
-
-    if (row.retailPrice != null && row.retailPrice >= 0 && location === 'shop') {
-      await db.query(`UPDATE pos_products SET shop_price = $1 WHERE id = $2`, [
-        row.retailPrice,
-        productId,
-      ]);
+    if (await applyCostAndRetail(row, productId, { updateRetail: location === 'shop' })) {
+      costUpdated += 1;
     }
 
     const result = await apply(productId, row.physicalQty, { recordedBy });
     if (result.variance !== 0) {
       adjustments.push({
         productId,
+        location,
         physicalQty: location === 'shop' ? result.shopQty : result.storeQty,
         variance: result.variance,
       });
@@ -306,14 +445,71 @@ const importStockTakeRows = async (rows, { location = 'shop', recordedBy = null 
     adjusted: adjustments.length,
     adjustments,
     skipped,
-    costUpdated: costUpdated.length,
+    costUpdated,
     location,
+  };
+};
+
+/** Shop + warehouse counts from one sheet. */
+const importCombinedStockTakeRows = async (rows, { recordedBy = null } = {}) => {
+  const { ensureAllEcommerceProductsInPos } = require('./inventoryChannel');
+  await ensureAllEcommerceProductsInPos();
+
+  const adjustments = [];
+  const skipped = [];
+  let costUpdated = 0;
+
+  for (const row of rows) {
+    const productId = await resolveProductId(row);
+    if (!productId) {
+      skipped.push({ ...row, reason: 'Product not found' });
+      continue;
+    }
+
+    if (await applyCostAndRetail(row, productId)) {
+      costUpdated += 1;
+    }
+
+    if (row.shopPhysicalQty != null) {
+      const shop = await applyStockTake(productId, row.shopPhysicalQty, { recordedBy });
+      if (shop.variance !== 0) {
+        adjustments.push({
+          productId,
+          location: 'shop',
+          physicalQty: shop.shopQty,
+          variance: shop.variance,
+        });
+      }
+    }
+
+    if (row.storePhysicalQty != null) {
+      const store = await applyStoreStockTake(productId, row.storePhysicalQty, { recordedBy });
+      if (store.variance !== 0) {
+        adjustments.push({
+          productId,
+          location: 'store',
+          physicalQty: store.storeQty,
+          variance: store.variance,
+        });
+      }
+    }
+  }
+
+  return {
+    processed: rows.length,
+    adjusted: adjustments.length,
+    adjustments,
+    skipped,
+    costUpdated,
+    location: 'both',
   };
 };
 
 module.exports = {
   buildStockTakeWorkbook,
+  buildCombinedStockTakeWorkbook,
   exportStockTakeBuffer,
   parseStockTakeBuffer,
   importStockTakeRows,
+  importCombinedStockTakeRows,
 };

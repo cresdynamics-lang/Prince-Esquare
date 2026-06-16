@@ -32,7 +32,7 @@ exports.createSale = async (req, res, next) => {
   try {
     const schema = Joi.object({
       shiftId: Joi.string().uuid().required(),
-      paymentMethod: Joi.string().valid('CASH', 'MPESA').required(),
+      paymentMethod: Joi.string().valid('CASH', 'MPESA', 'CARD').required(),
       mpesaRef: Joi.when('paymentMethod', {
         is: 'MPESA',
         then: Joi.string().alphanum().min(8).max(12).required(),
@@ -62,15 +62,16 @@ exports.createSale = async (req, res, next) => {
       return formatResponse(res, 403, false, 'Sellers cannot apply discounts');
     }
 
+    const actorId = req.posActorId || req.user.id;
     const sale = await processSale({
       shiftId: value.shiftId,
-      sellerId: req.user.id,
+      sellerId: actorId,
       channel: 'POS',
       paymentMethod: value.paymentMethod,
       mpesaRef: value.mpesaRef,
       discountAmount: value.discountAmount,
       items: value.items,
-      recordedBy: req.user.id,
+      recordedBy: actorId,
     });
 
     formatResponse(res, 201, true, 'Sale completed', sale);

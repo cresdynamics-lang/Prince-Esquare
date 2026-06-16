@@ -2,22 +2,24 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Package, ShoppingBag, Tag, Award, Users, 
-  ShieldCheck, Ticket, Image as ImageIcon, Mail, 
-  Star, Settings, LogOut, Bell, Search, Menu, X, 
+  ShieldCheck, Image as ImageIcon, Mail,
+  Star, Settings, LogOut, Bell, Search, Menu, X,
   ArrowUpRight, ArrowDownRight, MoreVertical, Plus, 
   Download, Filter, CheckCircle2, AlertCircle, Clock, 
-  UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight,
+  UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight, ChevronDown,
   Phone, Globe, Truck, CreditCard, CreditCard as CardIcon,
   Warehouse,
   Store
 } from 'lucide-react';
 import PosInventoryHub from '../components/admin/pos/PosInventoryHub';
+import FinanceHub from '../components/admin/FinanceHub';
 import { AdminPosTerminalInfo, PosSalesView } from '../components/admin/pos/PosAdminViews';
 import PosTerminalView from '../components/pos/PosTerminalView';
 import ShiftSummaryView from '../components/pos/ShiftSummaryView';
 import { posAdminAPI } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore, isStaffSession } from '../store/useAuthStore';
+import { nameInitials } from '../lib/format';
 import { 
   adminAnalyticsAPI, 
   adminOrderAPI, 
@@ -25,13 +27,11 @@ import {
   adminCategoryAPI, 
   adminBrandAPI, 
   adminCustomerAPI,
-  adminCouponAPI,
-  adminBannerAPI,
-  adminNewsletterAPI,
   adminReviewAPI,
   adminSettingsAPI,
   adminUploadAPI,
   posAPI,
+  inventoryAPI,
 } from '../services/api';
 import { useEffect } from 'react';
 import { compressImageFile } from '../utils/compressImage';
@@ -54,6 +54,16 @@ import {
   getSizeOptionsForCategory,
 } from '../utils/inventoryVariants';
 import { ConfirmProvider, useConfirm } from '../components/admin/ConfirmDialog';
+import {
+  canViewInventory,
+  canManageInventory,
+  canUsePosTerminal,
+  canViewCustomers,
+  canManageUsers,
+  canAccessFinance,
+  isFullAdmin,
+  STAFF_PERMISSION_GROUPS,
+} from '../utils/staffPermissions';
 
 /** Scrollable table wrapper for mobile */
 const AdminTable = ({ children }) => (
@@ -107,42 +117,43 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
-    { id: 'customers', label: 'Customers', icon: Users, section: 'People' },
-    { id: 'admins', label: 'Admins', icon: ShieldCheck, section: 'People' },
-    { id: 'coupons', label: 'Coupons', icon: Ticket, section: 'Marketing' },
-    { id: 'banners', label: 'Banners', icon: ImageIcon, section: 'Marketing' },
-    { id: 'newsletter', label: 'Newsletter', icon: Mail, section: 'Marketing' },
-    { id: 'reviews', label: 'Reviews', icon: Star, section: 'Finance', badge: '5' },
-    { id: 'pos-inventory', label: 'POS & Inventory', icon: Warehouse, section: 'POS & Inventory' },
-    { id: 'pos-terminal', label: 'POS Terminal', icon: Store, section: 'POS & Inventory' },
-    { id: 'settings', label: 'Store Settings', icon: Settings, section: 'System' },
+    { id: 'users', label: 'Users', icon: Users, section: 'People' },
+    { id: 'inventory', label: 'Inventory', icon: Warehouse, section: 'Operations' },
+    { id: 'finance', label: 'Finance', icon: CreditCard, section: 'Operations' },
+    { id: 'reviews', label: 'Reviews', icon: Star, section: 'Marketing', badge: '5' },
+    { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
   ], []);
 
-  const sellerSidebarItems = useMemo(() => [
-    { id: 'pos-terminal', label: 'POS Terminal', icon: Store, section: 'Shop' },
-    { id: 'pos-sales', label: 'POS Sales', icon: Package, section: 'Shop' },
-    { id: 'orders', label: 'Online Orders', icon: ShoppingBag, section: 'Shop' },
+  const posOnlySidebarItems = useMemo(() => [
+    { id: 'pos-terminal', label: 'POS Terminal', icon: Store, section: 'POS' },
+    { id: 'finance', label: 'Finance', icon: CreditCard, section: 'POS' },
+    { id: 'orders', label: 'Online Orders', icon: ShoppingBag, section: 'POS' },
   ], []);
 
   const sidebarItems = useMemo(() => {
-    const staffHasPosAccess = (perms) =>
-      perms.includes('pos-inventory') ||
-      perms.includes('finance') ||
-      perms.includes('inventory') ||
-      perms.some((p) => p.startsWith('pos-'));
+    const posOnly =
+      isSeller ||
+      (user?.role === 'staff' &&
+        canUsePosTerminal(user, { isSeller }) &&
+        !canViewInventory(user) &&
+        !['dashboard', 'orders', 'products', 'customers', 'users'].some((p) =>
+          (Array.isArray(user.permissions) ? user.permissions : []).includes(p)
+        ));
 
-    const items = isSeller ? sellerSidebarItems : allSidebarItems;
+    const items = posOnly ? posOnlySidebarItems : allSidebarItems;
     return items.filter((item) => {
-      if (isSeller) return true;
+      if (posOnly) return item.id !== 'finance' || canAccessFinance(user);
       if (user?.role === 'admin') return true;
       if (user?.role === 'staff') {
         const perms = Array.isArray(user.permissions) ? user.permissions : [];
-        if (item.id === 'pos-inventory' || item.id === 'pos-terminal') return staffHasPosAccess(perms);
-        return perms.includes(item.id);
+        if (item.id === 'inventory') return canViewInventory(user);
+        if (item.id === 'finance') return canAccessFinance(user);
+        if (item.id === 'users') return canViewCustomers(user);
+        return perms.includes(item.id) || (item.id === 'users' && perms.includes('customers'));
       }
       return false;
     });
-  }, [isSeller, user, allSidebarItems, sellerSidebarItems]);
+  }, [isSeller, user, allSidebarItems, posOnlySidebarItems]);
 
   useEffect(() => {
     if (!authReady || !staffSession) return undefined;
@@ -171,44 +182,39 @@ const AdminDashboard = () => {
   };
 
   const staffHasPosAccess = (perms) =>
-    perms.includes('pos-inventory') ||
-    perms.includes('finance') ||
-    perms.includes('inventory') ||
-    perms.some((p) => p.startsWith('pos-'));
+    perms.includes('pos-terminal') ||
+    perms.includes('inventory-view') ||
+    perms.includes('inventory-manage');
 
   const navSections = [...new Set(sidebarItems.map((item) => item.section))];
 
   const renderContent = () => {
-    // Basic protection inside renderContent as well
     if (user?.role === 'staff') {
       const perms = Array.isArray(user.permissions) ? user.permissions : [];
       const allowed =
         perms.includes(activeSection) ||
-        ((activeSection === 'pos-inventory' || activeSection === 'pos-terminal') && staffHasPosAccess(perms));
+        (activeSection === 'users' && canViewCustomers(user)) ||
+        (activeSection === 'inventory' && canViewInventory(user)) ||
+        (activeSection === 'finance' && canAccessFinance(user)) ||
+        (activeSection === 'pos-terminal' && canUsePosTerminal(user, { isSeller }));
       if (!allowed) {
         return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
       }
     }
 
+    const inventoryReadOnly = user?.role === 'staff' && !canManageInventory(user);
+
     switch (activeSection) {
       case 'dashboard':
         if (isSeller) return null;
-        return <DashboardView onOpenPos={() => {
-          setActiveSection('pos-inventory');
-          navigate('/admin/dashboard?module=overview', { replace: true });
-        }} />;
+        return <DashboardView onOpenPos={() => setActiveSection('inventory')} />;
       case 'orders': return <OrdersView readOnly={isSeller} />;
-      case 'pos-sales': return <PosSalesView channel="POS" readOnly={isSeller} />;
       case 'products': return <ProductsView />;
-      case 'customers': return <CustomersView />;
-      case 'admins': return <AdminsView />;
-      case 'coupons': return <CouponsView />;
-      case 'banners': return <BannersView />;
-      case 'newsletter': return <NewsletterView />;
-      case 'finance': return <PosInventoryHub initialTab="finance" />;
+      case 'users': return <UsersView />;
+      case 'finance': return <FinanceHub readOnly={isSeller} />;
+      case 'inventory': return <PosInventoryHub readOnlyInventory={inventoryReadOnly} />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
-      case 'pos-inventory': return <PosInventoryHub />;
       case 'pos-terminal':
         if (shiftSummary) {
           return (
@@ -223,15 +229,12 @@ const AdminDashboard = () => {
             />
           );
         }
-        if (isSeller) {
+        if (isSeller || canUsePosTerminal(user, { isSeller })) {
           return <PosTerminalView embedded onClockOut={(summary) => setShiftSummary(summary)} />;
         }
         return (
           <AdminPosTerminalInfo
-            onOpenInventory={(tab) => {
-              setActiveSection('pos-inventory');
-              navigate(`/admin/dashboard?module=${tab || 'overview'}`, { replace: true });
-            }}
+            onOpenInventory={() => setActiveSection('finance')}
           />
         );
       default: return <DashboardView />;
@@ -303,8 +306,8 @@ const AdminDashboard = () => {
                     key={item.id}
                     onClick={() => handleNavClick(item.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                      activeSection === item.id 
-                        ? 'bg-gold-600 text-navy-950 shadow-lg shadow-gold-600/20' 
+                      activeSection === item.id
+                        ? 'bg-gold-600 text-navy-950 shadow-lg shadow-gold-600/20'
                         : 'text-gold-500/60 hover:bg-navy-800/50 hover:text-gold-400'
                     }`}
                   >
@@ -354,8 +357,7 @@ const AdminDashboard = () => {
                 {isSeller ? 'Seller Portal' : 'Admin / Overview'}
               </span>
               <h2 className="text-base sm:text-xl font-serif font-bold text-gold-100 capitalize truncate">
-                {sidebarItems.find((i) => i.id === activeSection)?.label
-                  || (activeSection === 'pos-inventory' ? 'POS & Inventory' : activeSection.replace(/-/g, ' '))}
+                {sidebarItems.find((i) => i.id === activeSection)?.label || activeSection.replace(/-/g, ' ')}
               </h2>
             </div>
           </div>
@@ -374,8 +376,11 @@ const AdminDashboard = () => {
                 <Bell size={20} />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-gold-600 rounded-full border-2 border-navy-900 group-hover:scale-125 transition-transform"></span>
               </button>
-              <div className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform">
-                AD
+              <div
+                className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform text-sm"
+                title={user?.fullName || user?.name || user?.full_name || ''}
+              >
+                {nameInitials(user?.fullName || user?.name || user?.full_name)}
               </div>
             </div>
           </div>
@@ -1100,6 +1105,7 @@ export const FinanceOverview = () => {
   const [topProducts, setTopProducts] = useState([]);
   const [stockDrafts, setStockDrafts] = useState({});
   const [stockModalProduct, setStockModalProduct] = useState(null);
+  const [dailyStockRows, setDailyStockRows] = useState([]);
   const [isLowStockOpen, setIsLowStockOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingStockId, setSavingStockId] = useState(null);
@@ -1115,12 +1121,13 @@ export const FinanceOverview = () => {
   const fetchFinance = async () => {
     setLoading(true);
     try {
-      const [statsRes, topRes, orderRes, productRes, posRes] = await Promise.all([
+      const [statsRes, topRes, orderRes, productRes, posRes, sheetRes] = await Promise.all([
         adminAnalyticsAPI.getStats().catch(() => ({ data: { data: {} } })),
         adminAnalyticsAPI.getTopProducts().catch(() => ({ data: { data: [] } })),
         adminOrderAPI.getAll().catch(() => ({ data: { data: [] } })),
         adminProductAPI.getAll({ lite: 1 }).catch(() => ({ data: { data: [] } })),
         posAPI.listSales({ limit: 500 }).catch(() => ({ data: { data: { sales: [] } } })),
+        inventoryAPI.dailySheet(new Date().toISOString().slice(0, 10)).catch(() => ({ data: { data: [] } })),
       ]);
 
       const fetchedOrders = orderRes.data.data || [];
@@ -1140,6 +1147,7 @@ export const FinanceOverview = () => {
       setProducts(fetchedProducts);
       setOrderDetails(details);
       setPosSales(posRes.data?.data?.sales || []);
+      setDailyStockRows(sheetRes.data?.data || []);
       const drafts = {};
       fetchedProducts.forEach((product) => {
         drafts[stockKey(product)] = product.stock_quantity ?? 0;
@@ -1257,6 +1265,9 @@ export const FinanceOverview = () => {
 
   const inventoryValue = products.reduce((sum, p) => sum + Number(p.price || 0) * getProductStockTotal(p), 0);
   const totalStock = products.reduce((sum, p) => sum + getProductStockTotal(p), 0);
+  const shopOpeningTotal = dailyStockRows.reduce((sum, r) => sum + Number(r.opening_qty || 0), 0);
+  const shopClosingTotal = dailyStockRows.reduce((sum, r) => sum + Number(r.closing_qty || 0), 0);
+  const warehouseTotal = dailyStockRows.reduce((sum, r) => sum + Number(r.store_qty || 0), 0);
   const lowStockRows = inventoryRows.filter((row) => row.stock <= 5).sort((a, b) => a.stock - b.stock);
   const chartData = buildFinanceChart(periodOrders, periodPosSales, period);
   const maxChart = Math.max(...chartData.map((item) => item.total), 1);
@@ -1302,14 +1313,10 @@ export const FinanceOverview = () => {
 
   return (
     <div className="space-y-8">
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/90 leading-relaxed">
-        Revenue and analytics only. To move stock between <strong>warehouse and shop floor</strong>, use{' '}
-        <strong>POS &amp; Inventory → Stock Management</strong>. Website stock mirrors shop floor automatically.
-      </div>
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Shop + online — one view</span>
-          <h3 className="text-3xl font-serif font-bold text-gold-100 mt-2">Sales & Finance</h3>
+          <h3 className="text-3xl font-serif font-bold text-gold-100 mt-2">Finance</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           {['daily', 'weekly', 'monthly'].map((p) => (
@@ -1336,6 +1343,8 @@ export const FinanceOverview = () => {
           { label: 'Online Revenue', value: formatMoney(onlineRevenue), detail: `${periodOrders.length} website orders`, icon: Globe },
           { label: `${getPeriodLabel(period)} Profit`, value: formatMoney(periodProfit), detail: 'Uses cost price when available', icon: ArrowUpRight },
           { label: 'Inventory Value', value: formatMoney(inventoryValue), detail: `${totalStock.toLocaleString()} pieces in stock`, icon: Package },
+          { label: 'Shop Opening (today)', value: shopOpeningTotal.toLocaleString(), detail: 'Total shop floor at start of day', icon: Package },
+          { label: 'Shop Closing (today)', value: shopClosingTotal.toLocaleString(), detail: `Warehouse backup: ${warehouseTotal.toLocaleString()} units`, icon: Package },
           { label: 'Low Stock Alerts', value: lowStockRows.length, detail: 'Sizes at 5 units or less', icon: AlertCircle, action: () => setIsLowStockOpen(true) },
         ].map((card) => (
           <button
@@ -1357,6 +1366,43 @@ export const FinanceOverview = () => {
           </button>
         ))}
       </div>
+
+      {dailyStockRows.length > 0 && (
+        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+          <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
+            <h4 className="font-serif font-bold text-xl text-gold-100">Opening &amp; Closing Stock (today)</h4>
+            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">By category — from POS inventory</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-navy-800/50 text-gold-500/50 text-xs uppercase">
+                <tr>
+                  <th className="p-3">Category</th>
+                  <th className="p-3 text-center">Opening</th>
+                  <th className="p-3 text-center">Sales</th>
+                  <th className="p-3 text-center">Stock In</th>
+                  <th className="p-3 text-center">Stock Out</th>
+                  <th className="p-3 text-center">Closing</th>
+                  <th className="p-3 text-center">Warehouse</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyStockRows.map((row) => (
+                  <tr key={row.name || row.category} className="border-t border-gold-500/10">
+                    <td className="p-3 text-gold-100">{row.name || row.category}</td>
+                    <td className="p-3 text-center tabular-nums">{row.opening_qty ?? 0}</td>
+                    <td className="p-3 text-center tabular-nums text-red-400/90">{row.sales_qty ?? 0}</td>
+                    <td className="p-3 text-center tabular-nums text-green-400/90">{row.stock_in_qty ?? 0}</td>
+                    <td className="p-3 text-center tabular-nums text-orange-400/90">{row.stock_out_qty ?? 0}</td>
+                    <td className="p-3 text-center tabular-nums font-medium text-gold-200">{row.closing_qty ?? 0}</td>
+                    <td className="p-3 text-center tabular-nums text-violet-300/90">{row.store_qty ?? 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
@@ -1632,6 +1678,9 @@ const buildProductSku = (productName) => {
 
 const ProductsView = () => {
   const confirm = useConfirm();
+  const authUser = useAuthStore((s) => s.user);
+  const staffUser = authUser?.role === 'staff';
+  const canEditSizes = isFullAdmin(authUser);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1962,6 +2011,11 @@ const ProductsView = () => {
 
   const handleTogglePublished = async (product) => {
     const next = !product.is_active;
+    if (next && !product.pos_stock_product_id) {
+      alert('Record this item in Inventory first, then publish from Stock Management with images.');
+      onOpenInventory?.();
+      return;
+    }
     try {
       await adminProductAPI.patchFlags(product.id, { is_active: next });
       setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_active: next } : p)));
@@ -2205,6 +2259,16 @@ const ProductsView = () => {
           <Plus size={20} /> Add Product
         </button>
       </div>
+
+      <p className="text-xs text-gold-500/50 -mt-4 mb-2">
+        Add product details and images here. New items are recorded in store inventory automatically; admin adjusts sizes in Inventory.
+      </p>
+
+      {staffUser && (
+        <p className="text-xs text-amber-400/80 mb-2">
+          Staff: you can add products and upload images. Size breakdown is managed by admin in Inventory.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-3 p-4 bg-navy-900/40 border border-gold-500/10 rounded-2xl">
         <div className="relative flex-1 min-w-[200px]">
@@ -2745,7 +2809,8 @@ const ProductsView = () => {
                 </div>
               </div>
 
-              {/* Variants — colors & sizes */}
+              {/* Variants — colors & sizes (admin only) */}
+              {canEditSizes && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
                   <div>
@@ -2897,6 +2962,13 @@ const ProductsView = () => {
                   ))}
                 </div>
               </div>
+              )}
+
+              {!canEditSizes && staffUser && (
+                <p className="text-xs text-gold-500/50 border border-gold-500/10 rounded-xl p-4">
+                  Sizes and website publish are handled by admin in Inventory after you save this product.
+                </p>
+              )}
 
               {/* Status & Submit */}
               <div className="pt-10 border-t border-gold-500/10 flex flex-col md:flex-row items-center justify-between gap-8">
@@ -2910,6 +2982,7 @@ const ProductsView = () => {
                     />
                     <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured (homepage carousel)</span>
                   </label>
+                  {canEditSizes && (
                   <label className="flex items-center gap-3 cursor-pointer group">
                     <input 
                       type="checkbox" 
@@ -2919,6 +2992,7 @@ const ProductsView = () => {
                     />
                     <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Active / Published</span>
                   </label>
+                  )}
                 </div>
 
                 <div className="flex gap-4 w-full md:w-auto">
@@ -3484,7 +3558,67 @@ const BrandsView = () => {
 };
 
 
-const CustomersView = () => {
+const UsersView = () => {
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = canManageUsers(currentUser);
+  const [tab, setTab] = useState('customers');
+
+  const tabs = isAdmin
+    ? [
+        { id: 'customers', label: 'Customers' },
+        { id: 'staff', label: 'Staff' },
+        { id: 'admins', label: 'Admins' },
+      ]
+    : [{ id: 'customers', label: 'Customers' }];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h3 className="text-xl sm:text-2xl font-serif font-bold text-gold-100">Users</h3>
+          <p className="text-xs text-gold-500/40 mt-1">
+            {isAdmin ? 'Website accounts, staff, and administrators' : 'Customer accounts only'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all ${
+                tab === t.id
+                  ? 'bg-gold-600 text-navy-950 border-gold-600'
+                  : 'bg-navy-900/50 text-gold-500/70 border-gold-500/15 hover:border-gold-500/40'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!isAdmin && currentUser && (
+        <div className="bg-navy-900/40 border border-gold-500/15 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-gold-600 text-navy-950 font-bold flex items-center justify-center">
+            {nameInitials(currentUser.fullName || currentUser.name)}
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gold-100">{currentUser.fullName || currentUser.name}</p>
+            <p className="text-xs text-gold-500/50">{currentUser.email} · Staff</p>
+          </div>
+        </div>
+      )}
+
+      {tab === 'customers' && <CustomersView embedded />}
+      {tab === 'staff' && isAdmin && <AdminsView roleFilter="staff" />}
+      {tab === 'admins' && isAdmin && <AdminsView roleFilter="admin" />}
+    </div>
+  );
+};
+
+
+const CustomersView = ({ embedded = false }) => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -3520,6 +3654,7 @@ const CustomersView = () => {
 
   return (
     <div className="space-y-6">
+      {!embedded && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div className="flex flex-col">
           <h3 className="text-xl sm:text-2xl font-serif font-bold text-gold-100">Customer Directory</h3>
@@ -3536,11 +3671,24 @@ const CustomersView = () => {
               className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20" 
             />
           </div>
-          <button className="p-2.5 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl hover:bg-navy-800 transition-all">
-            <Filter size={20} />
-          </button>
         </div>
       </div>
+      )}
+      {embedded && (
+        <div className="flex flex-wrap gap-3 items-center justify-between">
+          <p className="text-xs text-gold-500/40">{customers.length} registered customers</p>
+          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2">
+            <Search size={16} className="text-gold-500/40" />
+            <input 
+              type="text" 
+              placeholder="Search customers..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20 w-48" 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
         {loading ? (
@@ -3620,7 +3768,7 @@ const CustomersView = () => {
 };
 
 
-const AdminsView = () => {
+const AdminsView = ({ roleFilter = null }) => {
   const confirm = useConfirm();
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3636,7 +3784,6 @@ const AdminsView = () => {
   const fetchAdmins = async () => {
     setLoading(true);
     try {
-      // Fetch both staff and admins
       const [resStaff, resAdmin] = await Promise.all([
         adminCustomerAPI.getStaff(),
         adminCustomerAPI.getAdmins(),
@@ -3644,7 +3791,7 @@ const AdminsView = () => {
       const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])];
       setAdmins(combined);
     } catch (error) {
-      console.error('Error fetching admins:', error);
+      console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
@@ -3709,20 +3856,23 @@ const AdminsView = () => {
     }
   };
 
+  const visibleAdmins = roleFilter
+    ? admins.filter((a) => a.role === roleFilter)
+    : admins;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <div>
-          <h3 className="text-xl font-serif font-bold text-gold-100">Admins &amp; Staff</h3>
-          <p className="text-xs text-gold-500/40 mt-1">{admins.length} users with dashboard access</p>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <p className="text-xs text-gold-500/40">{visibleAdmins.length} {roleFilter || 'dashboard'} user(s)</p>
+        {roleFilter === 'staff' && (
         <button 
           type="button"
           onClick={handleOpenModal}
           className="px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-sm"
         >
-          <UserPlus size={20} /> ADD STAFF
+          <UserPlus size={20} /> Add staff
         </button>
+        )}
       </div>
       
       {loading ? (
@@ -3731,7 +3881,7 @@ const AdminsView = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {admins.length > 0 ? admins.map((admin, i) => (
+          {visibleAdmins.length > 0 ? visibleAdmins.map((admin, i) => (
             <div key={i} className={`bg-navy-900/40 border-l-4 border-gold-500 p-6 rounded-r-2xl border-y border-r border-gold-500/10 backdrop-blur-sm group`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -3775,21 +3925,30 @@ const AdminsView = () => {
 
       {/* Admin/Staff Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-navy-900 border border-gold-500/20 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
-          >
-            <div className="flex justify-between items-center p-6 border-b border-gold-500/10 bg-navy-900/50">
-              <h3 className="font-serif font-bold text-gold-100 text-xl">ADD NEW STAFF</h3>
-              <button onClick={handleCloseModal} className="text-gold-500/40 hover:text-gold-500 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <button
+            type="button"
+            aria-label="Close"
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          />
+          <div className="relative flex min-h-full items-center justify-center p-4 py-8">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative bg-navy-900 border border-gold-500/20 rounded-2xl w-full max-w-md max-h-[min(90dvh,720px)] flex flex-col shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 justify-between items-center p-6 border-b border-gold-500/10 bg-navy-900/50">
+                <h3 className="font-serif font-bold text-gold-100 text-xl">Add staff</h3>
+                <button type="button" onClick={handleCloseModal} className="text-gold-500/40 hover:text-gold-500 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="space-y-4">
+              <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                  <div className="space-y-4">
                 <div>
                   <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Full Name</label>
                   <input 
@@ -3828,282 +3987,61 @@ const AdminsView = () => {
 
                 <div>
                   <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access Permissions</label>
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
-                    {['dashboard', 'orders', 'products', 'customers', 'admins', 'coupons', 'banners', 'newsletter', 'finance', 'reviews', 'settings'].map(perm => (
-                      <label key={perm} className="flex items-center gap-2 cursor-pointer group">
-                        <input 
-                          type="checkbox"
-                          checked={formData.permissions.includes(perm)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({ ...formData, permissions: [...formData.permissions, perm] });
-                            } else {
-                              setFormData({ ...formData, permissions: formData.permissions.filter(p => p !== perm) });
-                            }
-                          }}
-                          className="w-3.5 h-3.5 rounded border-gold-500/20 bg-navy-900 text-gold-600 focus:ring-0 focus:ring-offset-0"
-                        />
-                        <span className="text-[10px] uppercase font-bold text-gold-100 group-hover:text-gold-500 transition-colors">{perm}</span>
-                      </label>
+                  <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
+                    {STAFF_PERMISSION_GROUPS.map((group) => (
+                      <div key={group.label}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-gold-500/40 mb-2">{group.label}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {group.permissions.map((perm) => (
+                            <label key={perm} className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={formData.permissions.includes(perm)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFormData({ ...formData, permissions: [...formData.permissions, perm] });
+                                  } else {
+                                    setFormData({
+                                      ...formData,
+                                      permissions: formData.permissions.filter((p) => p !== perm),
+                                    });
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-gold-500/20 bg-navy-900 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                              />
+                              <span className="text-[10px] uppercase font-bold text-gold-100 group-hover:text-gold-500 transition-colors">
+                                {perm.replace(/-/g, ' ')}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
+                  <p className="text-[10px] text-gold-500/40 mt-2">
+                    Inventory view: browse and download only. Inventory manage: update stock (admin-level). POS terminal: checkout access.
+                  </p>
                 </div>
-              </div>
+                </div>
+                </div>
 
-              <button 
-                type="submit" 
-                disabled={submitting}
-                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
-              >
-                {submitting ? 'CREATING...' : 'CREATE STAFF ACCOUNT'}
-              </button>
-            </form>
-          </motion.div>
+                <div className="shrink-0 p-6 pt-4 border-t border-gold-500/10 bg-navy-900 rounded-b-2xl">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+                  >
+                    {submitting ? 'CREATING...' : 'CREATE STAFF ACCOUNT'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         </div>
       )}
     </div>
   );
 };
-
-const CouponsView = () => {
-  const [coupons, setCoupons] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchCoupons = async () => {
-      try {
-        const res = await adminCouponAPI.getAll();
-        setCoupons(res.data.data);
-      } catch (error) {
-        console.error('Error fetching coupons:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCoupons();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Promotional Coupons</h3>
-        <button className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20">
-          Create Coupon
-        </button>
-      </div>
-
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        {loading ? (
-          <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-          </div>
-        ) : coupons.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-              <tr>
-                <th className="px-6 py-4">Code</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Value</th>
-                <th className="px-6 py-4 text-center">Uses</th>
-                <th className="px-6 py-4">Expiry</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {coupons.map((c) => (
-                <tr key={c.id} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="bg-gold-600/10 text-gold-500 font-mono font-bold px-3 py-1 rounded border border-gold-500/20 inline-block uppercase">
-                      {c.code}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-xs text-gold-200">{c.type === 'percentage' ? 'Percentage' : 'Fixed Amount'}</td>
-                  <td className="px-6 py-4 font-bold text-gold-100">
-                    {c.type === 'percentage' ? `${c.value}%` : `KSh ${parseFloat(c.value).toLocaleString()}`}
-                  </td>
-                  <td className="px-6 py-4 text-center text-sm text-gold-500/60">
-                    {c.used_count} / {c.usage_limit || '∞'}
-                  </td>
-                  <td className="px-6 py-4 text-xs text-gold-500/40">
-                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gold-500/40 hover:text-gold-500 transition-colors"><Edit size={16} /></button>
-                      <button className="p-2 text-red-400/40 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
-            No coupons found.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-
-const BannersView = () => {
-  const [banners, setBanners] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        const res = await adminBannerAPI.getAll();
-        setBanners(res.data.data);
-      } catch (error) {
-        console.error('Error fetching banners:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBanners();
-  }, []);
-
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Site Appearance — Banners</h3>
-        <button className="px-6 py-3 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl font-bold flex items-center gap-2">
-           <Plus size={18} /> New Banner
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="py-24 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-        </div>
-      ) : banners.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {banners.map((banner) => (
-            <div key={banner.id} className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden group backdrop-blur-sm">
-              <div className="h-48 overflow-hidden relative">
-                <img 
-                  src={banner.image_url} 
-                  alt={banner.title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-transparent to-transparent opacity-80" />
-                <div className="absolute bottom-4 left-6">
-                  <div className="text-xs font-bold text-gold-500/60 uppercase tracking-widest">{banner.position || 'Main Hero'}</div>
-                  <div className="text-lg font-serif font-bold text-gold-100">{banner.title}</div>
-                </div>
-                <div className="absolute top-4 right-4">
-                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${banner.is_active ? 'bg-green-400 text-navy-950' : 'bg-navy-900 text-gold-500/40'}`}>
-                     {banner.is_active ? 'Active' : 'Draft'}
-                   </span>
-                </div>
-              </div>
-              <div className="p-6 flex items-center justify-between">
-                <div className="text-xs text-gold-500/60 line-clamp-1 max-w-[200px]">
-                  {banner.subtitle || 'No subtitle provided.'}
-                </div>
-                <div className="flex gap-2">
-                  <button className="p-2 bg-navy-800/50 rounded-lg border border-gold-500/10 text-gold-500 hover:text-gold-400 transition-all"><Edit size={16} /></button>
-                  <button className="p-2 bg-navy-800/50 rounded-lg border border-gold-500/10 text-red-400 hover:text-red-300 transition-all"><Trash2 size={16} /></button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="py-24 text-center text-gold-500/40 text-sm bg-navy-900/40 border border-gold-500/10 rounded-2xl border-dashed">
-          No banners found. Click "New Banner" to create your first promotion.
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-const NewsletterView = () => {
-  const [subscribers, setSubscribers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchSubscribers = async () => {
-      try {
-        const res = await adminNewsletterAPI.getSubscribers();
-        setSubscribers(res.data.data);
-      } catch (error) {
-        console.error('Error fetching subscribers:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSubscribers();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {[
-          { label: 'Total Subscribers', val: subscribers.length.toLocaleString(), icon: Mail },
-          { label: 'Growth Rate', val: '+12.5%', icon: ArrowUpRight },
-          { label: 'Email Open Rate', val: '68.2%', icon: Eye },
-        ].map((s, i) => (
-          <div key={i} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2 text-gold-500/40">
-              <s.icon size={16} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">{s.label}</span>
-            </div>
-            <div className="text-2xl font-serif font-bold text-gold-100">{s.val}</div>
-          </div>
-        ))}
-      </div>
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-          <h3 className="font-serif font-bold text-lg text-gold-100">Audience List</h3>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gold-600 text-navy-950 rounded-lg text-xs font-bold hover:bg-gold-500 transition-all">
-            <Download size={16} /> Export Subscribers
-          </button>
-        </div>
-        
-        {loading ? (
-          <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-          </div>
-        ) : subscribers.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-              <tr>
-                <th className="px-6 py-4">Subscriber Email</th>
-                <th className="px-6 py-4">Subscription Date</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {subscribers.map((s) => (
-                <tr key={s.id} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gold-100">{s.email}</td>
-                  <td className="px-6 py-4 text-xs text-gold-500/60">{new Date(s.created_at).toLocaleDateString()}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-green-400/10 text-green-400`}>Active</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-red-400/40 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
-            No newsletter subscribers found.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 
 const ReviewsView = () => {
   const confirm = useConfirm();

@@ -66,8 +66,9 @@ const importCatalogRows = async (rows, { performedBy = null, date = new Date() }
       const name = row.name.trim();
       const category = row.category || 'General';
       const shopPrice = parseFloat(row.shopPrice) || 0;
-      const openingQty = parseInt(row.openingQty, 10) || 0;
-      const storeQty = parseInt(row.storeQty, 10) || 0;
+      const storePrice = parseFloat(row.storePrice) || 0;
+      const storeQty = Math.max(0, parseInt(row.storeQty, 10) || parseInt(row.openingQty, 10) || 0);
+      const shopQty = 0;
 
       let productId = await findPosBySku(client, sku);
       let created = false;
@@ -78,8 +79,9 @@ const importCatalogRows = async (rows, { performedBy = null, date = new Date() }
             name,
             sku,
             category,
-            shopPrice,
-            onlinePrice: shopPrice,
+            shopPrice: shopPrice || storePrice,
+            onlinePrice: shopPrice || storePrice,
+            storePrice: storePrice || shopPrice,
           },
           client
         );
@@ -88,8 +90,13 @@ const importCatalogRows = async (rows, { performedBy = null, date = new Date() }
         results.created += 1;
       } else {
         await client.query(
-          `UPDATE pos_products SET name = $1, category = $2, shop_price = $3, online_price = $4 WHERE id = $5`,
-          [name, category, shopPrice, shopPrice, productId]
+          `UPDATE pos_products
+           SET name = $1, category = $2,
+               shop_price = CASE WHEN $3 > 0 THEN $3 ELSE shop_price END,
+               online_price = CASE WHEN $3 > 0 THEN $3 ELSE online_price END,
+               store_price = CASE WHEN $4 > 0 THEN $4 ELSE store_price END
+           WHERE id = $5`,
+          [name, category, shopPrice, storePrice, productId]
         );
         results.updated += 1;
       }
@@ -102,7 +109,7 @@ const importCatalogRows = async (rows, { performedBy = null, date = new Date() }
         results.warnings.push(`${sku}: website SKU ${row.websiteSku} already linked elsewhere`);
       }
 
-      const levels = await setOpeningStock(client, productId, openingQty, storeQty, dateStr);
+      const levels = await setOpeningStock(client, productId, shopQty, storeQty, dateStr);
       results.products.push({
         sku,
         name,

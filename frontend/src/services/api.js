@@ -267,6 +267,8 @@ export const posAPI = {
 export const inventoryAPI = {
   stockIn: (body) => API.post('/inventory/stock-in', body),
   stockOut: (body) => API.post('/inventory/stock-out', body),
+  bulkStockIn: (body) => API.post('/inventory/stock-in/bulk', body),
+  bulkStockOut: (body) => API.post('/inventory/stock-out/bulk', body),
   receiveAtStore: (body) => API.post('/inventory/store-receive', body),
   closeDay: () => API.post('/inventory/close-day'),
   dailySheet: (date) => API.get('/inventory/daily-sheet', { params: { date } }),
@@ -278,6 +280,8 @@ export const inventoryAPI = {
   storeStockTake: (body) => API.post('/inventory/store-stock-take', body),
   exportStockTake: (params) =>
     API.get('/inventory/export-stock-take', { params, responseType: 'blob' }),
+  exportMasterStock: (params) =>
+    API.get('/inventory/export-master-stock', { params, responseType: 'blob' }),
   importStockTake: (file, { location = 'shop' } = {}) => {
     const form = new FormData();
     form.append('file', file);
@@ -286,8 +290,21 @@ export const inventoryAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  downloadStockTakeTemplate: (location) =>
-    API.get('/inventory/template', { params: { type: 'stock-take', location }, responseType: 'blob' }),
+  importMasterStock: (file, { date } = {}) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (date) form.append('date', date);
+    return API.post('/inventory/import-master-stock', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  downloadStockTakeTemplate: (location = 'both') =>
+    API.get('/inventory/template', {
+      params: { type: 'stock-take', ...(location === 'both' ? {} : { location }) },
+      responseType: 'blob',
+    }),
+  downloadMasterStockTemplate: () =>
+    API.get('/inventory/template', { params: { type: 'master' }, responseType: 'blob' }),
   updateThreshold: (id, body) => API.patch(`/inventory/products/${id}/threshold`, body),
   publishToWebsite: (id, body) => API.post(`/inventory/products/${id}/publish`, body),
   unpublishFromWebsite: (id) => API.post(`/inventory/products/${id}/unpublish`),

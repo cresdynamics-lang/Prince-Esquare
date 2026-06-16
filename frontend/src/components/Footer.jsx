@@ -11,7 +11,7 @@ const Footer = () => {
       <div className="absolute top-0 right-0 w-96 h-96 bg-gold-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
 
       <div className="container mx-auto px-6 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-16 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-20">
           {/* Brand Info */}
           <div className="space-y-8">
             <h2 className="text-3xl font-serif font-bold text-gradient-gold tracking-widest">PRINCE ESQUIRE</h2>
@@ -61,24 +61,6 @@ const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div className="space-y-8">
-            <h3 className="text-gold-400 font-serif text-xl mb-8 tracking-widest">The Inner Circle</h3>
-            <p className="text-navy-300 font-light text-sm">
-              Join our exclusive list for early access to new collections and private sales.
-            </p>
-            <div className="relative">
-              <input
-                type="email"
-                placeholder="Your email address"
-                className="w-full bg-navy-900/50 border border-gold-500/10 py-4 px-6 text-sm focus:border-gold-500 outline-none transition-all placeholder:text-navy-500 tracking-wider"
-              />
-              <button className="absolute right-2 top-2 bottom-2 bg-gold-600 px-6 text-navy-950 text-xs font-bold uppercase tracking-widest hover:bg-gold-500 transition-colors">
-                Join
-              </button>
-            </div>
           </div>
         </div>
 

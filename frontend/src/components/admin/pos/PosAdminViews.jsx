@@ -109,7 +109,7 @@ const IMPORT_MODES = [
   },
 ];
 
-const StockExcelToolbar = ({ onImported, sheetDate }) => {
+const StockExcelToolbar = ({ onImported, sheetDate, readOnly = false }) => {
   const [uploading, setUploading] = useState(false);
   const [date, setDate] = useState(sheetDate || format(new Date(), 'yyyy-MM-dd'));
   const [mode, setMode] = useState('opening_reset');
@@ -144,6 +144,8 @@ const StockExcelToolbar = ({ onImported, sheetDate }) => {
       <h3 className="text-gold-400 text-sm font-medium uppercase tracking-wider">Opening Stock — Excel Upload</h3>
       <div className="flex flex-wrap items-center gap-2">
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm" title="Sheet date" />
+        {!readOnly && (
+          <>
         <select value={mode} onChange={(e) => setMode(e.target.value)} className="bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm max-w-[220px]">
           {IMPORT_MODES.map((m) => (
             <option key={m.id} value={m.id}>{m.label}</option>
@@ -153,6 +155,8 @@ const StockExcelToolbar = ({ onImported, sheetDate }) => {
           {uploading ? 'Uploading…' : 'Upload Stock.xlsx'}
           <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
+          </>
+        )}
         <button
           type="button"
           onClick={async () => {
@@ -179,7 +183,103 @@ const StockExcelToolbar = ({ onImported, sheetDate }) => {
   );
 };
 
-const ProductCatalogToolbar = ({ category = '', onImported }) => {
+const UnifiedStockSheetToolbar = ({ category = '', onImported, readOnly = false }) => {
+  const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await inventoryAPI.exportMasterStock({
+        category: category || undefined,
+        date,
+      });
+      const suffix = category ? `-${category.replace(/\s+/g, '-')}` : '';
+      blobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `Stock${suffix}-${date}.xlsx`
+      );
+      toast.success('Stock sheet downloaded');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleTemplate = async () => {
+    try {
+      const res = await inventoryAPI.downloadMasterStockTemplate();
+      blobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        'Stock-Template.xlsx'
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Template download failed');
+    }
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await inventoryAPI.importMasterStock(file, { date });
+      if (res.data?.success) {
+        toast.success(res.data.message || 'Stock updated from Excel');
+        onImported?.();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-2 p-4 bg-navy-900/50 border border-gold-500/15 rounded-xl">
+      <h3 className="text-gold-400 text-sm font-medium uppercase tracking-wider">Stock sheet</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm"
+          title="Sheet date"
+        />
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="px-4 py-1.5 bg-gold-600 text-navy-950 rounded text-sm font-medium hover:bg-gold-500 disabled:opacity-50"
+        >
+          {downloading ? 'Generating…' : 'Download Stock.xlsx'}
+        </button>
+        {!readOnly && (
+          <label className="px-4 py-1.5 border border-gold-500/40 text-gold-300 rounded text-sm font-medium cursor-pointer hover:bg-gold-500/10">
+            {uploading ? 'Uploading…' : 'Upload Stock.xlsx'}
+            <input type="file" accept=".xlsx" className="hidden" onChange={handleUpload} disabled={uploading} />
+          </label>
+        )}
+        <button
+          type="button"
+          onClick={handleTemplate}
+          className="px-3 py-1.5 border border-gold-500/25 text-gold-500/60 rounded text-sm"
+        >
+          Template
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ProductCatalogToolbar = ({ category = '', onImported, readOnly = false }) => {
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -227,10 +327,12 @@ const ProductCatalogToolbar = ({ category = '', onImported }) => {
         >
           {downloading ? 'Generating…' : 'Download Product-Catalog.xlsx'}
         </button>
+        {!readOnly && (
         <label className="px-4 py-1.5 border border-sky-500/40 text-sky-200 rounded text-sm font-medium cursor-pointer hover:bg-sky-500/10">
           {uploading ? 'Uploading…' : 'Upload Product Catalog.xlsx'}
           <input type="file" accept=".xlsx" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
+        )}
         <button
           type="button"
           onClick={async () => {
@@ -246,7 +348,7 @@ const ProductCatalogToolbar = ({ category = '', onImported }) => {
   );
 };
 
-const VariantStockToolbar = ({ category = '', onImported }) => {
+const VariantStockToolbar = ({ category = '', onImported, readOnly = false }) => {
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -323,10 +425,12 @@ const VariantStockToolbar = ({ category = '', onImported }) => {
         >
           {downloading ? 'Generating…' : 'Download Variant-Stock.xlsx'}
         </button>
+        {!readOnly && (
         <label className="px-4 py-1.5 border border-emerald-500/40 text-emerald-300 rounded text-sm font-medium cursor-pointer hover:bg-emerald-500/10">
           {uploading ? 'Uploading…' : 'Upload updated Web Stock'}
           <input type="file" accept=".xlsx" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
+        )}
         <button
           type="button"
           onClick={async () => {
@@ -541,21 +645,14 @@ export const PosSalesView = ({ channel = 'POS', readOnly = false }) => {
   );
 };
 
-export const StockOverviewView = () => {
+export const StockOverviewView = ({ readOnly = false }) => {
   const [exportCategory, setExportCategory] = useState('');
   const reload = () => window.dispatchEvent(new Event('inventory:reload'));
 
   return (
     <div className="p-2 space-y-4">
-      <div className="rounded-xl border border-gold-500/15 bg-navy-900/40 px-4 py-3 text-xs text-gold-500/70 leading-relaxed">
-        <strong className="text-gold-400">Physical stock lives here.</strong> Shop floor and warehouse counts are managed in this tab.
-        Website stock mirrors shop floor automatically after transfers, sales, and stock takes.
-        Use <span className="text-gold-300">Sales &amp; Finance</span> for revenue — not for moving pieces between store and shop.
-      </div>
-      <VariantStockToolbar category={exportCategory} onImported={reload} />
-      <ProductCatalogToolbar category={exportCategory} onImported={reload} />
-      <StockExcelToolbar onImported={reload} />
-      <InventoryCatalogView onCategoryChange={setExportCategory} />
+      <UnifiedStockSheetToolbar category={exportCategory} onImported={reload} readOnly={readOnly} />
+      <InventoryCatalogView onCategoryChange={setExportCategory} readOnly={readOnly} />
     </div>
   );
 };
@@ -779,12 +876,6 @@ const StockSummaryCategoryRow = ({ row, expanded, onToggle, piecesState, onLoadM
             <span className="text-[10px] text-gold-500/40 font-normal ml-1">
               ({row.shop_piece_count ?? 0} shop
               {(row.warehouse_piece_count ?? 0) > 0 && ` + ${row.warehouse_piece_count} store`}
-              {row.target_qty != null && (
-                <span className={row.shop_tally_match && row.store_tally_match ? ' text-emerald-500/70' : ' text-amber-500/70'}>
-                  {' · '}
-                  {row.shop_tally_match && row.store_tally_match ? '✓' : '≠ sheet'}
-                </span>
-              )}
               )
             </span>
           </button>
@@ -794,11 +885,7 @@ const StockSummaryCategoryRow = ({ row, expanded, onToggle, piecesState, onLoadM
         <td className="p-2 text-center tabular-nums">{row.sales_qty}</td>
         <td className="p-2 text-center tabular-nums">{row.stock_out_qty}</td>
         <td className="p-2 text-center tabular-nums font-medium text-gold-300">{row.closing_qty}</td>
-        <td className="p-2 text-center tabular-nums text-gold-500/50">
-          {row.target_qty != null ? (
-            <span className={row.shop_tally_match ? 'text-emerald-400' : 'text-amber-400'}>{row.target_qty}</span>
-          ) : '—'}
-        </td>
+        <td className="p-2 text-center tabular-nums text-gold-300">{row.target_qty ?? row.closing_qty ?? '—'}</td>
         <td className="p-2 text-center tabular-nums text-violet-300/90">{row.store_qty ?? 0}</td>
       </tr>
 
@@ -1062,7 +1149,7 @@ export const DailyStockSheetView = () => {
                 <th className="p-2 text-center">Sales</th>
                 <th className="p-2 text-center">Out ↑</th>
                 <th className="p-2 text-center">Shop close</th>
-                <th className="p-2 text-center">Sheet target</th>
+                <th className="p-2 text-center">Live target</th>
                 <th className="p-2 text-center">In store</th>
               </tr>
             </thead>
@@ -1102,11 +1189,12 @@ export const DailyStockSheetView = () => {
   );
 };
 
-export const StockTakeView = () => {
+export const StockTakeView = ({ readOnly = false }) => {
   const [location, setLocation] = useState('shop');
   const [items, setItems] = useState([]);
   const [counts, setCounts] = useState({});
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [sheetDate, setSheetDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -1150,19 +1238,17 @@ export const StockTakeView = () => {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const res = await inventoryAPI.exportStockTake({
-        location,
+      const res = await inventoryAPI.exportMasterStock({
         category: categoryFilter || undefined,
+        date: sheetDate,
       });
-      const blob = new Blob([res.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Stock-Take-${location}-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      blobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `Stock-Take-${sheetDate}.xlsx`
+      );
+      toast.success('Stock sheet downloaded');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Download failed');
     } finally {
@@ -1172,16 +1258,13 @@ export const StockTakeView = () => {
 
   const handleTemplate = async () => {
     try {
-      const res = await inventoryAPI.downloadStockTakeTemplate(location);
-      const blob = new Blob([res.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Stock-Take-${location}-Template.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const res = await inventoryAPI.downloadMasterStockTemplate();
+      blobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        'Stock-Template.xlsx'
+      );
     } catch (err) {
       toast.error(err.response?.data?.message || 'Template download failed');
     }
@@ -1192,7 +1275,7 @@ export const StockTakeView = () => {
     if (!file) return;
     setUploading(true);
     try {
-      const res = await inventoryAPI.importStockTake(file, { location });
+      const res = await inventoryAPI.importMasterStock(file, { date: sheetDate });
       const d = res.data?.data || {};
       if (res.data?.success) {
         toast.success(
@@ -1233,10 +1316,13 @@ export const StockTakeView = () => {
 
   return (
     <div className="p-2 space-y-4">
-      <p className="text-xs text-gold-500/50">
-        Variance = Physical Count − System Qty (same as Excel). Download the sheet, fill Physical Count, upload to update shop, warehouse, and website stock automatically.
-      </p>
       <div className="flex flex-wrap gap-2 items-center">
+        <input
+          type="date"
+          value={sheetDate}
+          onChange={(e) => setSheetDate(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded-lg px-3 py-1.5 text-white text-sm"
+        />
         {[
           ['shop', 'Shop floor'],
           ['store', 'Warehouse'],
@@ -1268,16 +1354,20 @@ export const StockTakeView = () => {
         >
           {downloading ? 'Downloading…' : 'Download Excel'}
         </button>
+        {!readOnly && (
         <label className="px-3 py-1.5 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs cursor-pointer">
-          {uploading ? 'Uploading…' : 'Upload adjustments'}
+          {uploading ? 'Uploading…' : 'Upload sheet'}
           <input type="file" accept=".xlsx" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
+        )}
         <button type="button" onClick={handleTemplate} className="text-gold-500/50 text-xs underline">
-          Blank template
+          Template
         </button>
+        {!readOnly && (
         <button onClick={save} className="px-4 py-2 bg-gold-600 text-navy-950 rounded text-sm font-medium ml-auto">
           Save on screen
         </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -1310,11 +1400,18 @@ export const StockTakeView = () => {
               <tr>
                 <th className="p-2 text-left">Product</th>
                 <th className="p-2">SKU</th>
-                <th className="p-2">Web</th>
                 <th className="p-2">Cost</th>
                 <th className="p-2">Retail</th>
+                {location === 'shop' && (
+                  <>
+                    <th className="p-2">Opening</th>
+                    <th className="p-2">In</th>
+                    <th className="p-2">Out</th>
+                    <th className="p-2">Sales</th>
+                  </>
+                )}
                 <th className="p-2">System</th>
-                <th className="p-2">Physical</th>
+                <th className="p-2">{location === 'shop' ? 'Closing' : 'Store'}</th>
                 <th className="p-2">Variance</th>
                 <th className="p-2">Profit</th>
               </tr>
@@ -1324,24 +1421,32 @@ export const StockTakeView = () => {
                 const system = location === 'shop' ? p.currentQty : (p.storeQty ?? 0);
                 const physical = counts[p.id] ?? system;
                 const variance = physical - system;
-                const cost = p.costPrice ?? 0;
+                const cost = p.costPrice ?? p.cost_price ?? 0;
                 const retail = p.retailPrice ?? p.shop_price ?? 0;
                 const lineProfit = (retail - cost) * physical;
                 return (
                   <tr key={p.id} className="border-t border-gold-500/10">
                     <td className="p-2 max-w-[200px] truncate" title={p.name}>{p.name}</td>
                     <td className="p-2 text-gold-500/60 text-xs">{p.sku}</td>
-                    <td className="p-2 text-center">{p.on_website ? '✓' : '—'}</td>
                     <td className="p-2 text-right text-xs">{cost ? fmt(cost) : '—'}</td>
                     <td className="p-2 text-right text-xs">{fmt(retail)}</td>
+                    {location === 'shop' && (
+                      <>
+                        <td className="p-2 text-center text-gold-500/70">{p.shopOpening ?? system}</td>
+                        <td className="p-2 text-center text-green-400/80">{p.stockInQty ?? 0}</td>
+                        <td className="p-2 text-center text-orange-400/80">{p.stockOutQty ?? 0}</td>
+                        <td className="p-2 text-center text-red-400/80">{p.salesQty ?? 0}</td>
+                      </>
+                    )}
                     <td className="p-2 text-center">{system}</td>
                     <td className="p-2">
                       <input
                         type="number"
                         min={0}
                         value={physical}
+                        disabled={readOnly}
                         onChange={(e) => setCounts({ ...counts, [p.id]: Number(e.target.value) })}
-                        className="w-20 bg-navy-950 border border-gold-500/20 rounded px-2 py-1 text-white text-center"
+                        className="w-20 bg-navy-950 border border-gold-500/20 rounded px-2 py-1 text-white text-center disabled:opacity-60"
                       />
                     </td>
                     <td className={`p-2 text-center font-medium ${variance < 0 ? 'text-red-400' : variance > 0 ? 'text-green-400' : 'text-gray-400'}`}>

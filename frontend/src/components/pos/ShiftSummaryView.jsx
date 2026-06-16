@@ -21,6 +21,7 @@ const ShiftSummaryView = ({ summary, onDone, embedded = false }) => {
       <dl className="mt-8 space-y-4">
         <div className="flex justify-between"><dt>Cash</dt><dd>{formatKES(summary.total_cash)}</dd></div>
         <div className="flex justify-between"><dt>M-Pesa</dt><dd>{formatKES(summary.total_mpesa)}</dd></div>
+        <div className="flex justify-between"><dt>Card</dt><dd>{formatKES(summary.total_card)}</dd></div>
         <div className="flex justify-between font-bold text-gold-400"><dt>Total sales</dt><dd>{formatKES(summary.total_sales)}</dd></div>
         <div className="flex justify-between text-sm text-gold-500/50"><dt>Transactions</dt><dd>{summary.sales?.length || 0}</dd></div>
       </dl>

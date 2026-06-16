@@ -39,12 +39,13 @@ const ensurePosStockRow = async (posProductId, client = db) => {
 };
 
 const createPosInventoryItem = async (
-  { name, sku, category, shopPrice, onlinePrice, ecommerceProductId = null },
+  { name, sku, category, shopPrice, onlinePrice, storePrice = null, ecommerceProductId = null },
   client = db
 ) => {
+  const resolvedStorePrice = storePrice != null ? storePrice : shopPrice;
   const r = await client.query(
-    `INSERT INTO pos_products (name, sku, category, shop_price, online_price, ecommerce_product_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO pos_products (name, sku, category, shop_price, online_price, store_price, ecommerce_product_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
       name,
@@ -52,6 +53,7 @@ const createPosInventoryItem = async (
       category || 'General',
       shopPrice,
       onlinePrice ?? shopPrice,
+      resolvedStorePrice,
       ecommerceProductId,
     ]
   );
@@ -266,7 +268,7 @@ const publishPosToWebsite = async (posProductId, body = {}) => {
     if (variants.length) {
       await upsertWebsiteVariants(pos.ecommerce_product_id, variants, productSku);
     }
-    await db.query(`UPDATE pos_products SET online_price = $1 WHERE id = $2`, [webPrice, posProductId]);
+    await db.query(`UPDATE pos_products SET online_price = $1, shop_price = $1 WHERE id = $2`, [webPrice, posProductId]);
     return { product: upd.rows[0], posProductId, published: true, created: false };
   }
 
@@ -298,7 +300,7 @@ const publishPosToWebsite = async (posProductId, body = {}) => {
   }
 
   await linkProductPair(ins.rows[0].id, posProductId, { syncPrices: false });
-  await db.query(`UPDATE pos_products SET online_price = $1 WHERE id = $2`, [webPrice, posProductId]);
+  await db.query(`UPDATE pos_products SET online_price = $1, shop_price = $1 WHERE id = $2`, [webPrice, posProductId]);
 
   return { product: ins.rows[0], posProductId, published: true, created: true };
 };

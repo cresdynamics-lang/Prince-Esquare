@@ -3,7 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const inventoryController = require('../controllers/pos/inventoryController');
-const { requireAdmin } = require('../middleware/auth');
+const { requireInventoryView, requireInventoryManage } = require('../middleware/auth');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -17,35 +17,42 @@ const upload = multer({
   },
 });
 
-router.post('/import-excel', requireAdmin, upload.single('file'), inventoryController.importExcel);
-router.get('/export-stock', requireAdmin, inventoryController.exportStockSheet);
-router.get('/export-catalog', requireAdmin, inventoryController.exportProductCatalog);
-router.get('/export-variant-stock', requireAdmin, inventoryController.exportVariantStock);
-router.post('/import-variant-stock', requireAdmin, upload.single('file'), inventoryController.importVariantStock);
-router.get('/variant-stock-summary', requireAdmin, inventoryController.variantStockSummary);
-router.get('/template', requireAdmin, inventoryController.downloadTemplate);
-router.post('/products', requireAdmin, inventoryController.createInventoryItem);
-router.get('/products/:id', requireAdmin, inventoryController.getProductDetail);
-router.put('/products/:id/details', requireAdmin, inventoryController.saveProductDetail);
-router.post('/products/:id/sync-website', requireAdmin, inventoryController.syncFromWebsite);
-router.post('/stock-in', requireAdmin, inventoryController.stockIn);
-router.post('/stock-out', requireAdmin, inventoryController.stockOut);
-router.post('/store-receive', requireAdmin, inventoryController.receiveAtStore);
-router.post('/close-day', requireAdmin, inventoryController.closeDay);
-router.get('/daily-sheet', requireAdmin, inventoryController.dailySheet);
-router.get('/movements', requireAdmin, inventoryController.movements);
-router.get('/stock-levels', requireAdmin, inventoryController.stockLevels);
-router.get('/category-pieces', requireAdmin, inventoryController.categoryPieces);
-router.get('/category-summary', requireAdmin, inventoryController.categorySummary);
-router.post('/stock-take', requireAdmin, inventoryController.stockTake);
-router.post('/store-stock-take', requireAdmin, inventoryController.storeStockTake);
-router.get('/export-stock-take', requireAdmin, inventoryController.exportStockTake);
-router.post('/import-stock-take', requireAdmin, upload.single('file'), inventoryController.importStockTake);
-router.patch('/products/:id/threshold', requireAdmin, inventoryController.updateThreshold);
-router.post('/seed-demo', requireAdmin, inventoryController.seedDemo);
-router.post('/sync-alignment', requireAdmin, inventoryController.syncAlignment);
-router.post('/ensure-website-links', requireAdmin, inventoryController.ensureWebsiteLinks);
-router.post('/products/:id/publish', requireAdmin, inventoryController.publishToWebsite);
-router.post('/products/:id/unpublish', requireAdmin, inventoryController.unpublishFromWebsite);
+// Read-only (view + download)
+router.get('/export-stock', requireInventoryView, inventoryController.exportStockSheet);
+router.get('/export-catalog', requireInventoryView, inventoryController.exportProductCatalog);
+router.get('/export-variant-stock', requireInventoryView, inventoryController.exportVariantStock);
+router.get('/variant-stock-summary', requireInventoryView, inventoryController.variantStockSummary);
+router.get('/template', requireInventoryView, inventoryController.downloadTemplate);
+router.get('/products/:id', requireInventoryView, inventoryController.getProductDetail);
+router.get('/daily-sheet', requireInventoryView, inventoryController.dailySheet);
+router.get('/movements', requireInventoryView, inventoryController.movements);
+router.get('/stock-levels', requireInventoryView, inventoryController.stockLevels);
+router.get('/category-pieces', requireInventoryView, inventoryController.categoryPieces);
+router.get('/category-summary', requireInventoryView, inventoryController.categorySummary);
+router.get('/export-stock-take', requireInventoryView, inventoryController.exportStockTake);
+router.get('/export-master-stock', requireInventoryView, inventoryController.exportMasterStock);
+
+// Admin-only mutations (inventory manage)
+router.post('/import-excel', requireInventoryManage, upload.single('file'), inventoryController.importExcel);
+router.post('/import-variant-stock', requireInventoryManage, upload.single('file'), inventoryController.importVariantStock);
+router.post('/products', requireInventoryManage, inventoryController.createInventoryItem);
+router.put('/products/:id/details', requireInventoryManage, inventoryController.saveProductDetail);
+router.post('/products/:id/sync-website', requireInventoryManage, inventoryController.syncFromWebsite);
+router.post('/stock-in', requireInventoryManage, inventoryController.stockIn);
+router.post('/stock-in/bulk', requireInventoryManage, inventoryController.bulkStockIn);
+router.post('/stock-out', requireInventoryManage, inventoryController.stockOut);
+router.post('/stock-out/bulk', requireInventoryManage, inventoryController.bulkStockOut);
+router.post('/store-receive', requireInventoryManage, inventoryController.receiveAtStore);
+router.post('/close-day', requireInventoryManage, inventoryController.closeDay);
+router.post('/stock-take', requireInventoryManage, inventoryController.stockTake);
+router.post('/store-stock-take', requireInventoryManage, inventoryController.storeStockTake);
+router.post('/import-stock-take', requireInventoryManage, upload.single('file'), inventoryController.importStockTake);
+router.post('/import-master-stock', requireInventoryManage, upload.single('file'), inventoryController.importMasterStock);
+router.patch('/products/:id/threshold', requireInventoryManage, inventoryController.updateThreshold);
+router.post('/seed-demo', requireInventoryManage, inventoryController.seedDemo);
+router.post('/sync-alignment', requireInventoryManage, inventoryController.syncAlignment);
+router.post('/ensure-website-links', requireInventoryManage, inventoryController.ensureWebsiteLinks);
+router.post('/products/:id/publish', requireInventoryManage, inventoryController.publishToWebsite);
+router.post('/products/:id/unpublish', requireInventoryManage, inventoryController.unpublishFromWebsite);
 
 module.exports = router;

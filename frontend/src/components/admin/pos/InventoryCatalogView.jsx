@@ -11,17 +11,16 @@ const PAGE_SIZE = 50;
 
 const STATUS_FILTERS = [
   { id: 'all', label: 'All' },
-  { id: 'available', label: 'Available in shop' },
-  { id: 'empty', label: 'Shop empty' },
-  { id: 'live', label: 'Live on website' },
-  { id: 'inventory', label: 'Inventory only' },
+  { id: 'warehouse', label: 'In warehouse' },
+  { id: 'available', label: 'In shop' },
+  { id: 'inventory', label: 'Not on website' },
 ];
 
 const Empty = ({ message }) => (
   <p className="text-gold-500/40 text-sm text-center py-16">{message}</p>
 );
 
-const InventoryCatalogView = ({ onCategoryChange }) => {
+const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
   const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [categorySummary, setCategorySummary] = useState([]);
@@ -36,9 +35,9 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
   const [publishItem, setPublishItem] = useState(null);
   const [publishForm, setPublishForm] = useState({ price: '', category_id: '', stock_quantity: '' });
   const [publishBusy, setPublishBusy] = useState(false);
-  const [seeding, setSeeding] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     onCategoryChange?.(selectedCategory);
@@ -113,6 +112,7 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
 
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [selectedCategory, searchQuery, statusFilter]);
 
   const filteredProducts = useMemo(() => {
@@ -120,10 +120,10 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
     return items.filter((p) => {
       const live = p.on_website ?? (p.website_product_id && p.website_published);
       const inShop = (p.currentQty ?? 0) > 0;
+      const inStore = (p.storeQty ?? 0) > 0;
       let statusOk = true;
       if (statusFilter === 'available') statusOk = inShop;
-      else if (statusFilter === 'empty') statusOk = !inShop;
-      else if (statusFilter === 'live') statusOk = live;
+      else if (statusFilter === 'warehouse') statusOk = inStore;
       else if (statusFilter === 'inventory') statusOk = !live;
       if (!statusOk) return false;
       if (!q) return true;
@@ -178,61 +178,10 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
     }
   };
 
-  const handleSeedCatalog = async () => {
-    const ok = await confirm({
-      title: 'Build inventory catalog',
-      message:
-        'Build one inventory row per piece from the stock sheet?\n\n' +
-        'Example: 590 shirts → 590 shop rows + ~148 warehouse backup rows.\n' +
-        'Shop = sales floor (POS). Store = back warehouse.\n' +
-        'Nothing is published to the website — you choose which pieces to publish.',
-      confirmLabel: 'Build catalog',
-      variant: 'warning',
-    });
-    if (!ok) return;
-    setSeeding(true);
-    try {
-      const res = await inventoryAPI.seedDemo();
-      const data = res.data?.data || {};
-      const cats = data.categories || [];
-      const mismatches = cats.filter((c) => c.actualShopQty !== c.targetQty);
-      if (mismatches.length) {
-        toast.error(`${mismatches.length} category tally mismatch — check console`);
-        console.warn('Catalog seed tally mismatches:', mismatches);
-      } else {
-        toast.success(
-          `Built ${data.totalProducts || 0} pieces — ${data.totalShopQty || 0} shop, ${data.totalStoreQty || 0} warehouse`
-        );
-      }
-      reloadAll();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Build failed');
-    } finally {
-      setSeeding(false);
-    }
-  };
-
-  const handleSyncAlignment = async () => {
-    setSyncing(true);
-    try {
-      const res = await inventoryAPI.syncAlignment();
-      const w = res.data?.data?.warehouse?.created ?? 0;
-      const repaired = res.data?.data?.repaired?.repaired ?? 0;
-      const legacy = res.data?.data?.legacy?.updated ?? 0;
-      const web = res.data?.data?.website?.updated ?? 0;
-      const linked = res.data?.data?.websiteLinks?.linked ?? 0;
-      toast.success(
-        linked || w || repaired || legacy
-          ? `Synced — ${linked} website linked, ${w} warehouse added, ${legacy} buckets updated, ${web} listings refreshed`
-          : 'Inventory aligned (shop, warehouse, website)'
-      );
-      reloadAll();
-      window.dispatchEvent(new Event('inventory:reload'));
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Sync failed');
-    } finally {
-      setSyncing(false);
-    }
+  const categoryLabel = (cat) => {
+    const shopQty = cat.shop_qty ?? 0;
+    const storeQty = cat.store_qty ?? 0;
+    return `${cat.name} — shop ${shopQty}, store ${storeQty}`;
   };
 
   const panelProducts = panel === 'out'
@@ -241,41 +190,56 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
       ? filteredProducts.filter((p) => (p.storeQty ?? 0) > 0)
       : filteredProducts;
 
-  const categoryLabel = (cat) => {
-    const shopTarget = cat.target_qty ?? 0;
-    const storeTarget = cat.target_store_qty ?? 0;
-    const shopQty = cat.shop_qty ?? 0;
-    const storeQty = cat.store_qty ?? 0;
-    const tally = cat.tally_match ? '✓' : shopQty > 0 || storeQty > 0 ? '⚠' : '—';
-    return `${cat.name} — shop ${shopQty}/${shopTarget}, store ${storeQty}/${storeTarget} ${tally}`;
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = pagedProducts.map((p) => p.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const runBulkTransfer = async (direction) => {
+    const ids = [...selectedIds];
+    if (!ids.length) {
+      toast.error('Select at least one item');
+      return;
+    }
+    setBulkBusy(true);
+    try {
+      const api = direction === 'in' ? inventoryAPI.bulkStockIn : inventoryAPI.bulkStockOut;
+      const res = await api({ productIds: ids, qty: 1 });
+      const data = res.data?.data || {};
+      const moved = data.moved?.length ?? 0;
+      const failed = data.failed?.length ?? 0;
+      if (moved) toast.success(`${moved} item(s) moved${failed ? ` · ${failed} skipped` : ''}`);
+      else toast.error('No items could be moved');
+      setSelectedIds(new Set());
+      reloadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Bulk transfer failed');
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gold-500/50 px-1">
-        Every website product appears here automatically. Shop stock is the source of truth — when you sell or move stock in POS, the website updates itself.
-      </p>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleSyncAlignment}
-            disabled={syncing || seeding}
-            className="px-3 py-1.5 border border-emerald-500/40 text-emerald-300 rounded-lg text-xs"
-          >
-            {syncing ? 'Syncing…' : 'Sync warehouse'}
-          </button>
-          <button
-            type="button"
-            onClick={handleSeedCatalog}
-            disabled={seeding || syncing}
-            className="px-3 py-1.5 border border-violet-500/40 text-violet-300 rounded-lg text-xs"
-          >
-            {seeding ? 'Building…' : 'Build from stock sheet'}
-          </button>
-          <button type="button" onClick={() => setProductModal('new')} className="px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-medium">
-            + Add product
-          </button>
+          {!readOnly && (
+            <>
           <button type="button" onClick={() => openPanel('receive')} className="px-3 py-1.5 border border-sky-500/40 text-sky-300 rounded-lg text-xs">
             Receive at store
           </button>
@@ -285,6 +249,28 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
           <button type="button" onClick={() => openPanel('out')} className="px-3 py-1.5 border border-gold-500/30 text-gold-400 rounded-lg text-xs">
             Shop → Store
           </button>
+          {selectedIds.size > 0 && (
+            <>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => runBulkTransfer('in')}
+                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              >
+                Move {selectedIds.size} to shop
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => runBulkTransfer('out')}
+                className="px-3 py-1.5 border border-orange-500/40 text-orange-300 rounded-lg text-xs disabled:opacity-50"
+              >
+                Return {selectedIds.size} to store
+              </button>
+            </>
+          )}
+            </>
+          )}
         </div>
       </div>
 
@@ -312,18 +298,12 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
           {selectedSummary && (
             <div className="text-xs text-gold-500/60 sm:pb-1 space-y-0.5 shrink-0">
               <p>
-                Shop:{' '}
-                <span className={selectedSummary.shop_tally_match ? 'text-emerald-400' : 'text-amber-400'}>
-                  {selectedSummary.shop_qty} / {selectedSummary.target_qty}
-                </span>
+                Shop: <span className="text-gold-300">{selectedSummary.shop_qty}</span>
                 {' · '}
-                Warehouse:{' '}
-                <span className={selectedSummary.store_tally_match ? 'text-emerald-400' : 'text-amber-400'}>
-                  {selectedSummary.store_qty} / {selectedSummary.target_store_qty}
-                </span>
+                Warehouse: <span className="text-gold-300">{selectedSummary.store_qty}</span>
               </p>
               <p>
-                {selectedSummary.live_on_website} on website · {selectedSummary.inventory_only} inventory only
+                {selectedSummary.live_on_website} on website · {selectedSummary.inventory_only} not published
               </p>
             </div>
           )}
@@ -359,11 +339,22 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
               {searchQuery || statusFilter !== 'all' ? ` (filtered from ${items.length})` : ''}
             </span>
           </h3>
-          {filteredProducts.length > PAGE_SIZE && (
-            <p className="text-[10px] text-gold-500/40">
-              Page {page} of {totalPages}
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            {!readOnly && pagedProducts.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                className="text-[10px] text-gold-400 underline"
+              >
+                {pagedProducts.every((p) => selectedIds.has(p.id)) ? 'Deselect page' : 'Select page'}
+              </button>
+            )}
+            {filteredProducts.length > PAGE_SIZE && (
+              <p className="text-[10px] text-gold-500/40">
+                Page {page} of {totalPages}
+              </p>
+            )}
+          </div>
         </div>
 
         {loading && <Empty message="Loading inventory…" />}
@@ -372,8 +363,8 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
           <Empty
             message={
               selectedCategory
-                ? `No pieces in "${selectedCategory}". Click "Build from stock sheet" — e.g. 590 shirts creates 590 rows.`
-                : 'Select a category (e.g. Shirts) or build from stock sheet.'
+                ? `No pieces in "${selectedCategory}". Use the stock sheet above to update counts.`
+                : 'Select a category to browse inventory pieces.'
             }
           />
         )}
@@ -382,6 +373,9 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
           <InventoryProductCard
             key={p.id}
             product={p}
+            readOnly={readOnly}
+            selected={selectedIds.has(p.id)}
+            onSelectToggle={readOnly ? undefined : () => toggleSelect(p.id)}
             onEdit={(prod) => setProductModal(prod.id)}
             onPublish={(prod) => {
               setPublishItem(prod);
@@ -446,14 +440,9 @@ const InventoryCatalogView = ({ onCategoryChange }) => {
         )}
       </div>
 
-      {productModal && (
+      {productModal && productModal !== 'new' && (
         <InventoryProductModal
-          itemId={productModal === 'new' ? null : productModal}
-          defaultCategoryId={
-            productModal === 'new' && selectedCategory
-              ? categories.find((c) => c.name === selectedCategory)?.id
-              : undefined
-          }
+          itemId={productModal}
           onClose={() => setProductModal(null)}
           onSaved={() => { reloadAll(); setProductModal(null); }}
         />

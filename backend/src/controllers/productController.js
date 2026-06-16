@@ -200,44 +200,91 @@ exports.getProductBySlug = async (req, res, next) => {
     }
 };
 
-// @desc    Admin: Create product
+// @desc    Admin: Create product — inventory-first: record stock in Inventory before website listing
 // @route   POST /api/admin/products
 exports.createProduct = async (req, res, next) => {
     try {
-        const { name, slug, description, price, discount_price, pos_sell_price, inventory_opening_qty, category_id, brand_id, stock_quantity, is_featured, thumbnail, images, variants, sku } = req.body;
+        const {
+            name,
+            slug,
+            description,
+            price,
+            discount_price,
+            pos_sell_price,
+            inventory_opening_qty,
+            category_id,
+            brand_id,
+            stock_quantity,
+            is_featured,
+            is_active,
+            thumbnail,
+            images,
+            variants,
+            sku,
+        } = req.body;
         const productSku = generateProductSku({ name, slug, sku });
+        const isStaff = req.user?.role === 'staff';
+        const published = isStaff ? false : is_active !== false;
 
         const result = await db.query(
-            'INSERT INTO products (name, slug, sku, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images) ' +
-            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
-            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price || null, category_id || null, brand_id || null, stock_quantity || 0, is_featured || false, thumbnail || null, JSON.stringify(images || [])]
+            'INSERT INTO products (name, slug, sku, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images) ' +
+            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
+            [
+                name,
+                slug,
+                productSku,
+                description || null,
+                price || 0,
+                discount_price || null,
+                pos_sell_price || null,
+                category_id || null,
+                brand_id || null,
+                stock_quantity || 0,
+                is_featured || false,
+                published,
+                thumbnail || null,
+                JSON.stringify(images || []),
+            ]
         );
 
         const productId = result.rows[0].id;
-        
-        // Save variants
+
         if (variants && Array.isArray(variants)) {
             for (const v of variants) {
                 const value = `${v.size || ''} / ${v.color || ''}`;
                 const variantSku = generateVariantSku(productSku, v);
                 await db.query(
                     'INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, sku, stock_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                    [productId, 'Variant', value, v.price_override || 0, v.stock || 0, v.image_url || null, v.color || null, v.size || null, variantSku, variantSku]
+                    [
+                        productId,
+                        'Variant',
+                        value,
+                        v.price_override || 0,
+                        v.stock || 0,
+                        v.image_url || null,
+                        v.color || null,
+                        v.size || null,
+                        variantSku,
+                        variantSku,
+                    ]
                 );
             }
         }
 
-        const { ensurePosForEcommerceProduct, seedPosOpeningStockIfEmpty } = require('../services/inventoryChannel');
+        const { ensurePosForEcommerceProduct } = require('../services/inventoryChannel');
+        const { receiveAtStore } = require('../services/inventoryMovement');
         const posRow = await ensurePosForEcommerceProduct(result.rows[0]);
-        const openingQty =
-          parseInt(inventory_opening_qty, 10) || parseInt(stock_quantity, 10) || 0;
-        if (posRow?.id && openingQty > 0) {
-          await seedPosOpeningStockIfEmpty(posRow.id, openingQty);
+        const storeQty = Math.max(0, parseInt(inventory_opening_qty, 10) || parseInt(stock_quantity, 10) || 1);
+        if (posRow?.id && storeQty > 0) {
+            await receiveAtStore(posRow.id, storeQty, {
+                notes: 'Added from Products — warehouse intake',
+                recordedBy: req.user?.id || null,
+            });
         }
 
         const { invalidateCatalogueCache } = require('./catalogueController');
         invalidateCatalogueCache();
-        formatResponse(res, 201, true, 'Product created successfully', result.rows[0]);
+        formatResponse(res, 201, true, 'Product created — recorded in store inventory', result.rows[0]);
     } catch (error) {
         next(error);
     }
@@ -249,7 +296,23 @@ exports.updateProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { name, slug, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, sku } = req.body;
+        const isStaff = req.user?.role === 'staff';
         const productSku = generateProductSku({ name, slug, sku });
+
+        if (is_active === true) {
+            const linkR = await db.query('SELECT pos_stock_product_id FROM products WHERE id = $1', [id]);
+            if (!linkR.rows.length) {
+                return formatResponse(res, 404, false, 'Product not found');
+            }
+            if (!linkR.rows[0].pos_stock_product_id) {
+                return formatResponse(
+                    res,
+                    400,
+                    false,
+                    'Publish from Inventory after the item is recorded in stock. Products tab edits listing details only.'
+                );
+            }
+        }
 
         const result = await db.query(
             'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, price = $5, discount_price = $6, pos_sell_price = $7, category_id = $8, brand_id = $9, ' +
@@ -261,8 +324,8 @@ exports.updateProduct = async (req, res, next) => {
             return formatResponse(res, 404, false, 'Product not found');
         }
 
-        // Handle variants
-        if (variants && Array.isArray(variants)) {
+        // Handle variants (admin only — staff cannot change sizes)
+        if (variants && Array.isArray(variants) && !isStaff) {
             // Delete removed variants
             const incomingIds = variants.map(v => v.id).filter(Boolean);
             if (incomingIds.length > 0) {
@@ -335,10 +398,16 @@ exports.bulkProductAction = async (req, res, next) => {
             },
             publish: async () => {
                 const r = await db.query(
-                    'UPDATE products SET is_active = true, updated_at = NOW() WHERE id = ANY($1::uuid[]) RETURNING id',
+                    `UPDATE products SET is_active = true, updated_at = NOW()
+                     WHERE id = ANY($1::uuid[]) AND pos_stock_product_id IS NOT NULL
+                     RETURNING id`,
                     [uuidList]
                 );
-                return { updated: r.rows.length, is_active: true };
+                return {
+                    updated: r.rows.length,
+                    is_active: true,
+                    skipped: uuidList.length - r.rows.length,
+                };
             },
             unpublish: async () => {
                 const r = await db.query(
@@ -377,6 +446,20 @@ exports.patchProductFlags = async (req, res, next) => {
             values.push(Boolean(is_featured));
         }
         if (is_active !== undefined) {
+            if (Boolean(is_active)) {
+                const linkR = await db.query('SELECT pos_stock_product_id FROM products WHERE id = $1', [id]);
+                if (!linkR.rows.length) {
+                    return formatResponse(res, 404, false, 'Product not found');
+                }
+                if (!linkR.rows[0].pos_stock_product_id) {
+                    return formatResponse(
+                        res,
+                        400,
+                        false,
+                        'Item must exist in inventory before publishing. Use Inventory → Stock Management.'
+                    );
+                }
+            }
             updates.push(`is_active = $${idx++}`);
             values.push(Boolean(is_active));
         }

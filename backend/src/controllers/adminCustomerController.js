@@ -4,6 +4,25 @@ const db = require('../config/db');
 exports.getCustomers = async (req, res, next) => {
     const { role = 'customer' } = req.query;
     try {
+        const isAdmin = req.user?.role === 'admin';
+        if (!isAdmin) {
+            if (role !== 'customer') {
+                return formatResponse(res, 403, false, 'Only admins can view staff and admin accounts');
+            }
+            const perms = Array.isArray(req.user.permissions)
+                ? req.user.permissions
+                : (() => {
+                    try {
+                        return JSON.parse(req.user.permissions || '[]');
+                    } catch {
+                        return [];
+                    }
+                })();
+            if (!perms.includes('customers')) {
+                return formatResponse(res, 403, false, 'Customer directory access required');
+            }
+        }
+
         const result = await db.query(
             `SELECT 
                 u.id, u.name, u.email, u.phone, u.avatar, u.role,
@@ -85,7 +104,14 @@ exports.createStaff = async (req, res, next) => {
             [name, email, hashedPassword, 'staff', JSON.stringify(permissions)]
         );
 
-        formatResponse(res, 201, true, 'Staff created successfully', result.rows[0]);
+        const staff = result.rows[0];
+        const perms = Array.isArray(permissions) ? permissions : [];
+        if (perms.includes('pos-terminal')) {
+            const { ensurePosProfileForStaffUser } = require('../services/staffPosBridge');
+            await ensurePosProfileForStaffUser(staff, password);
+        }
+
+        formatResponse(res, 201, true, 'Staff created successfully', staff);
     } catch (error) {
         next(error);
     }

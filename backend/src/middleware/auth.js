@@ -4,6 +4,8 @@ const { verifyToken } = require('../utils/jwt');
 const db = require('../config/db');
 const posDb = require('../lib/posDb');
 const { isAdminRole, isSellerRole } = require('../utils/posHelpers');
+const { canViewInventory, canManageInventory, canUsePosTerminal } = require('../utils/permissions');
+const { resolvePosActorId } = require('../services/staffPosBridge');
 
 const loadUserFromToken = async (decoded) => {
   if (decoded.accountType === 'pos') {
@@ -21,13 +23,22 @@ const loadUserFromToken = async (decoded) => {
   }
 
   const result = await db.query(
-    'SELECT id, name, email, role, permissions FROM users WHERE id = $1',
+    'SELECT id, name, email, role, permissions, is_active FROM users WHERE id = $1',
     [decoded.id]
   );
   if (result.rows.length === 0) return null;
   const user = result.rows[0];
+  let permissions = user.permissions;
+  if (typeof permissions === 'string') {
+    try {
+      permissions = JSON.parse(permissions);
+    } catch {
+      permissions = [];
+    }
+  }
   return {
     ...user,
+    permissions,
     fullName: user.name,
     accountType: decoded.accountType || 'user',
   };
@@ -87,13 +98,25 @@ exports.requireAdmin = [
 exports.requireSeller = [
   exports.protect,
   async (req, res, next) => {
-    if (!isSellerRole(req.user)) {
-      return formatResponse(res, 403, false, 'Sellers only');
+    if (!canUsePosTerminal(req.user)) {
+      return formatResponse(res, 403, false, 'POS terminal access required');
     }
-    if (!req.user.is_active) {
+    if (req.user.accountType === 'pos' && !req.user.is_active) {
       return formatResponse(res, 403, false, 'Account deactivated');
     }
-    next();
+    if (req.user.accountType === 'user' && req.user.is_active === false) {
+      return formatResponse(res, 403, false, 'Account deactivated');
+    }
+    try {
+      const actorId = await resolvePosActorId(req.user);
+      if (!actorId) {
+        return formatResponse(res, 403, false, 'POS profile not available');
+      }
+      req.posActorId = actorId;
+      next();
+    } catch (e) {
+      next(e);
+    }
   },
 ];
 
@@ -112,18 +135,34 @@ exports.requireSellerOrAdmin = [
   },
 ];
 
-/** POS catalog: active sellers or admin/staff (for terminal preview) */
+/** POS catalog: staff with POS permission or legacy sellers */
 exports.requirePosCatalog = [
   exports.protect,
   async (req, res, next) => {
     if (isAdminRole(req.user)) return next();
-    if (isSellerRole(req.user)) {
-      if (!req.user.is_active) {
+    if (canUsePosTerminal(req.user)) {
+      if (req.user.accountType === 'pos' && !req.user.is_active) {
         return formatResponse(res, 403, false, 'Account deactivated');
       }
       return next();
     }
     return formatResponse(res, 403, false, 'POS catalog access required');
+  },
+];
+
+exports.requireInventoryView = [
+  exports.protect,
+  (req, res, next) => {
+    if (canViewInventory(req.user)) return next();
+    return formatResponse(res, 403, false, 'Inventory view access required');
+  },
+];
+
+exports.requireInventoryManage = [
+  exports.protect,
+  (req, res, next) => {
+    if (canManageInventory(req.user)) return next();
+    return formatResponse(res, 403, false, 'Inventory management requires admin permission');
   },
 ];
 

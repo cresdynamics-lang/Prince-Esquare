@@ -239,6 +239,13 @@ const deductCategoryShopPieces = async (
   return updates;
 };
 
+const shiftTotalField = (paymentMethod) => {
+  if (paymentMethod === 'CASH') return 'total_cash';
+  if (paymentMethod === 'MPESA') return 'total_mpesa';
+  if (paymentMethod === 'CARD') return 'total_card';
+  return null;
+};
+
 const processSale = async ({
   shiftId,
   sellerId,
@@ -384,7 +391,7 @@ const processSale = async ({
     }
 
     if (shiftId) {
-      const field = paymentMethod === 'CASH' ? 'total_cash' : paymentMethod === 'MPESA' ? 'total_mpesa' : null;
+      const field = shiftTotalField(paymentMethod);
       if (field) {
         await client.query(
           `UPDATE pos_shifts SET total_sales = total_sales + $1, ${field} = ${field} + $1 WHERE id = $2`,
@@ -512,7 +519,7 @@ const voidSale = async (saleId, voidReason, voidedById = null, voidedByName = nu
 
     if (sale.shift_id) {
       const amt = parseFloat(sale.total_amount);
-      const field = sale.payment_method === 'CASH' ? 'total_cash' : sale.payment_method === 'MPESA' ? 'total_mpesa' : null;
+      const field = shiftTotalField(sale.payment_method);
       if (field) {
         await client.query(
           `UPDATE pos_shifts SET total_sales = GREATEST(0, total_sales - $1), ${field} = GREATEST(0, ${field} - $1) WHERE id = $2`,

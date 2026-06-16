@@ -25,6 +25,7 @@ const mapProduct = (p) => {
     ...p,
     shop_price: parseFloat(p.shop_price),
     online_price: p.online_price != null ? parseFloat(p.online_price) : null,
+    store_price: p.store_price != null ? parseFloat(p.store_price) : null,
     website_price: p.website_price != null ? parseFloat(p.website_price) : null,
     website_discount_price:
       p.website_discount_price != null ? parseFloat(p.website_discount_price) : null,
@@ -107,8 +108,9 @@ const enrichStockRows = async (rows) => {
 };
 
 /** Excludes legacy Excel aggregate buckets (POS-SHIRTS etc.). */
-const MANAGED_INVENTORY_FILTER = `p.sku NOT LIKE 'POS-%'`;
+const MANAGED_INVENTORY_FILTER = `p.sku NOT LIKE 'POS-%' AND p.ecommerce_product_id IS NOT NULL`;
 const SHOP_FLOOR_INVENTORY_FILTER = `${MANAGED_INVENTORY_FILTER} AND p.sku NOT LIKE '%-W-%'`;
+const SHOP_FLOOR_PP_FILTER = `pp.sku NOT LIKE 'POS-%' AND pp.ecommerce_product_id IS NOT NULL AND pp.sku NOT LIKE '%-W-%'`;
 
 /** Lightweight low-stock list for dashboard overview (no variant enrichment). */
 const getLowStockSummary = async ({ limit = 25 } = {}) => {
@@ -145,7 +147,7 @@ const getStockLevels = async ({ category = null } = {}) => {
 
   const r = await db.query(`
     SELECT p.id, p.name, p.sku, p.category, p.low_stock_threshold, p.ecommerce_product_id,
-           p.shop_price, p.online_price, p.cost_price, p.created_at, p.website_details,
+           p.shop_price, p.online_price, p.store_price, p.cost_price, p.created_at, p.website_details,
            ec.id AS website_product_id,
            ec.is_active AS website_published,
            ec.price AS website_price,
@@ -158,12 +160,19 @@ const getStockLevels = async ({ category = null } = {}) => {
            (SELECT COUNT(*)::int FROM product_variants pv WHERE pv.product_id = ec.id) AS variant_count,
            s.current_qty,
            COALESCE(st.current_qty, 0) AS store_qty,
-           s.updated_at AS stock_updated_at
+           s.updated_at AS stock_updated_at,
+           COALESCE(snap.opening_qty, s.current_qty, 0)::int AS shop_opening,
+           COALESCE(snap.sales_qty, 0)::int AS sales_qty,
+           COALESCE(snap.stock_out_qty, 0)::int AS stock_out_qty,
+           COALESCE(snap.stock_in_qty, 0)::int AS stock_in_qty,
+           COALESCE(snap.closing_qty, s.current_qty, 0)::int AS shop_closing
     FROM pos_products p
     LEFT JOIN pos_stock_levels s ON s.product_id = p.id
     LEFT JOIN pos_store_stock_levels st ON st.product_id = p.id
     LEFT JOIN products ec ON ec.id = p.ecommerce_product_id
     LEFT JOIN categories cat ON cat.id = ec.category_id
+    LEFT JOIN pos_daily_stock_snapshots snap
+      ON snap.product_id = p.id AND snap.date = CURRENT_DATE
     ${where}
     ORDER BY p.category ASC, p.name ASC
   `, params);
@@ -184,6 +193,11 @@ const getStockLevels = async ({ category = null } = {}) => {
       data_source: p.website_product_id ? 'live' : (draftVariants ? 'draft' : 'basic'),
       on_website: Boolean(p.website_product_id && p.website_published),
       inventory_only: !p.website_product_id || !p.website_published,
+      shopOpening: p.shop_opening ?? p.current_qty ?? 0,
+      salesQty: p.sales_qty ?? 0,
+      stockOutQty: p.stock_out_qty ?? 0,
+      stockInQty: p.stock_in_qty ?? 0,
+      shopClosing: p.shop_closing ?? p.current_qty ?? 0,
     };
   });
 };
@@ -450,8 +464,7 @@ const loadSellerCatalogContext = async () => {
 const buildWebsiteLiveWhere = ({ q, category, inStockOnly, params }) => {
   let where = `WHERE p.is_active = true
     AND p.pos_stock_product_id IS NOT NULL
-    AND pp.sku NOT LIKE '%-W-%'
-    AND (pp.sku LIKE 'POS-%' OR pp.sku LIKE 'PE-CAT-%')`;
+    AND ${SHOP_FLOOR_PP_FILTER}`;
   if (inStockOnly) where += ' AND COALESCE(sl.current_qty, 0) > 0';
   where += appendSellerCategoryFilter(category, params, { ppAlias: 'pp', catAlias: 'c' });
   if (q) {
@@ -469,7 +482,7 @@ const buildWebsiteLiveWhere = ({ q, category, inStockOnly, params }) => {
 };
 
 const buildShopPiecesWhere = ({ q, category, inStockOnly, params, excludeWebsiteLinked = true }) => {
-  let where = `WHERE pp.sku LIKE 'PE-CAT-%' AND pp.sku NOT LIKE '%-W-%'`;
+  let where = `WHERE ${SHOP_FLOOR_PP_FILTER}`;
   if (excludeWebsiteLinked) {
     where += ` AND pp.id NOT IN (
       SELECT pos_stock_product_id FROM products
@@ -742,7 +755,7 @@ const getCategorySummary = async () => {
     LEFT JOIN pos_stock_levels s ON s.product_id = p.id
     LEFT JOIN pos_store_stock_levels st ON st.product_id = p.id
     LEFT JOIN products ec ON ec.id = p.ecommerce_product_id
-    WHERE p.sku NOT LIKE 'POS-%'
+    WHERE p.sku NOT LIKE 'POS-%' AND p.ecommerce_product_id IS NOT NULL
     GROUP BY p.category
     ORDER BY p.category ASC
   `);
@@ -1201,18 +1214,20 @@ const closeShift = async (sellerId) => {
 
   let totalCash = 0;
   let totalMpesa = 0;
+  let totalCard = 0;
   let totalSales = 0;
   for (const sale of salesR.rows) {
     const amt = parseFloat(sale.total_amount);
     totalSales += amt;
     if (sale.payment_method === 'CASH') totalCash += amt;
     if (sale.payment_method === 'MPESA') totalMpesa += amt;
+    if (sale.payment_method === 'CARD') totalCard += amt;
   }
 
   const upd = await db.query(
-    `UPDATE pos_shifts SET clock_out = NOW(), total_cash = $1, total_mpesa = $2, total_sales = $3
-     WHERE id = $4 RETURNING *`,
-    [totalCash, totalMpesa, totalSales, shift.id]
+    `UPDATE pos_shifts SET clock_out = NOW(), total_cash = $1, total_mpesa = $2, total_card = $3, total_sales = $4
+     WHERE id = $5 RETURNING *`,
+    [totalCash, totalMpesa, totalCard, totalSales, shift.id]
   );
 
   const sellerR = await db.query(`SELECT full_name, email FROM pos_profiles WHERE id = $1`, [sellerId]);

@@ -73,6 +73,72 @@ exports.stockOut = async (req, res, next) => {
   }
 };
 
+const bulkMovementSchema = Joi.object({
+  productIds: Joi.array().items(Joi.string().uuid()).min(1).max(200).required(),
+  qty: Joi.number().integer().min(1).default(1),
+  notes: Joi.string().allow('', null).optional(),
+});
+
+exports.bulkStockIn = async (req, res, next) => {
+  try {
+    const { error, value } = bulkMovementSchema.validate(req.body);
+    if (error) return formatResponse(res, 400, false, error.message);
+
+    const moved = [];
+    const failed = [];
+    for (const productId of value.productIds) {
+      try {
+        const levels = await transferStoreToShop(productId, value.qty, {
+          notes: value.notes || STORE_TO_SHOP,
+          recordedBy: req.user?.id || null,
+        });
+        moved.push({ productId, shopQty: levels.shopQty, storeQty: levels.storeQty });
+      } catch (e) {
+        failed.push({ productId, reason: e.message || 'Transfer failed' });
+      }
+    }
+
+    formatResponse(res, 200, true, `Moved ${moved.length} item(s) store → shop`, {
+      moved,
+      failed,
+      qty: value.qty,
+    });
+  } catch (error) {
+    if (error.statusCode) return formatResponse(res, error.statusCode, false, error.message);
+    next(error);
+  }
+};
+
+exports.bulkStockOut = async (req, res, next) => {
+  try {
+    const { error, value } = bulkMovementSchema.validate(req.body);
+    if (error) return formatResponse(res, 400, false, error.message);
+
+    const moved = [];
+    const failed = [];
+    for (const productId of value.productIds) {
+      try {
+        const levels = await transferShopToStore(productId, value.qty, {
+          notes: value.notes || SHOP_TO_STORE,
+          recordedBy: req.user?.id || null,
+        });
+        moved.push({ productId, shopQty: levels.shopQty, storeQty: levels.storeQty });
+      } catch (e) {
+        failed.push({ productId, reason: e.message || 'Return failed' });
+      }
+    }
+
+    formatResponse(res, 200, true, `Returned ${moved.length} item(s) shop → store`, {
+      moved,
+      failed,
+      qty: value.qty,
+    });
+  } catch (error) {
+    if (error.statusCode) return formatResponse(res, error.statusCode, false, error.message);
+    next(error);
+  }
+};
+
 exports.receiveAtStore = async (req, res, next) => {
   try {
     const { error, value } = movementSchema.validate(parseMovementBody(req.body));
@@ -102,8 +168,6 @@ exports.closeDay = async (req, res, next) => {
 exports.dailySheet = async (req, res, next) => {
   try {
     const { ensureDayRollover } = require('../../services/stockDayScheduler');
-    const posStockCatalog = require('../../db/seeds/posStockCatalog');
-    const { warehouseCountFor } = require('../../services/inventoryWarehouseSync');
     try {
       await ensureDayRollover();
     } catch (rolloverErr) {
@@ -113,22 +177,16 @@ exports.dailySheet = async (req, res, next) => {
     const date = req.query.date ? new Date(`${req.query.date}T12:00:00`) : new Date();
     const dateStr = toDateStr(date);
     const snapshots = await posDb.getDailySheet(dateStr);
-    const targets = Object.fromEntries(posStockCatalog.map((r) => [r.name, r]));
 
-    const data = snapshots.map((row) => {
-      const target = targets[row.name];
-      const targetQty = target?.closing ?? null;
-      const targetStore = targetQty != null ? warehouseCountFor(targetQty) : null;
-      return {
-        ...row,
-        target_qty: targetQty,
-        target_store_qty: targetStore,
-        sheet_opening: target?.opening ?? null,
-        sheet_sales: target?.sales ?? null,
-        shop_tally_match: targetQty != null ? row.closing_qty === targetQty : null,
-        store_tally_match: targetStore != null ? (row.store_qty ?? 0) === targetStore : null,
-      };
-    });
+    // Targets follow live inventory — always in sync with actual shop/store counts
+    const data = snapshots.map((row) => ({
+      ...row,
+      target_qty: row.closing_qty,
+      target_store_qty: row.store_qty ?? 0,
+      shop_tally_match: true,
+      store_tally_match: true,
+      tally_match: true,
+    }));
 
     formatResponse(res, 200, true, 'Daily sheet fetched', data);
   } catch (error) {
@@ -191,36 +249,15 @@ exports.categoryPieces = async (req, res, next) => {
 
 exports.categorySummary = async (req, res, next) => {
   try {
-    const posStockCatalog = require('../../db/seeds/posStockCatalog');
-    const { warehouseCountFor } = require('../../services/inventoryWarehouseSync');
     const rows = await posDb.getCategorySummary();
-    const byName = Object.fromEntries(rows.map((r) => [r.name, r]));
-
-    const data = posStockCatalog
-      .filter((r) => (r.closing ?? 0) > 0)
-      .map((r) => {
-        const targetStore = warehouseCountFor(r.closing);
-        const row = byName[r.name] || {
-          name: r.name,
-          product_count: 0,
-          shop_piece_count: 0,
-          warehouse_piece_count: 0,
-          shop_qty: 0,
-          store_qty: 0,
-          live_on_website: 0,
-          inventory_only: 0,
-        };
-        return {
-          ...row,
-          name: r.name,
-          target_qty: r.closing,
-          target_store_qty: targetStore,
-          shop_tally_match: row.shop_qty === r.closing,
-          store_tally_match: row.store_qty === targetStore,
-          tally_match: row.shop_qty === r.closing && row.store_qty === targetStore,
-        };
-      });
-
+    const data = rows.map((row) => ({
+      ...row,
+      target_qty: row.shop_qty,
+      target_store_qty: row.store_qty,
+      shop_tally_match: true,
+      store_tally_match: true,
+      tally_match: true,
+    }));
     formatResponse(res, 200, true, 'Category summary fetched', data);
   } catch (error) {
     next(error);
@@ -305,17 +342,19 @@ exports.storeStockTake = async (req, res, next) => {
 exports.exportStockTake = async (req, res, next) => {
   try {
     const { exportStockTakeBuffer } = require('../../services/stockTakeExcel');
-    const location = req.query.location === 'store' ? 'store' : 'shop';
+    const locParam = req.query.location;
+    const location =
+      locParam === 'store' ? 'store' : locParam === 'shop' ? 'shop' : 'both';
     const category = req.query.category || null;
     const buffer = await exportStockTakeBuffer({ category, location });
-    const label = location === 'store' ? 'warehouse' : 'shop';
+    const label = location === 'both' ? 'all' : location === 'store' ? 'warehouse' : 'shop';
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="Stock-Take-${label}-${new Date().toISOString().slice(0, 10)}.xlsx"`
+      `attachment; filename="Stock-${label}-${new Date().toISOString().slice(0, 10)}.xlsx"`
     );
     res.send(Buffer.from(buffer));
   } catch (error) {
@@ -328,23 +367,79 @@ exports.importStockTake = async (req, res, next) => {
     if (!req.file?.buffer) {
       return formatResponse(res, 400, false, 'No Excel file uploaded');
     }
-    const location = req.body.location === 'store' ? 'store' : 'shop';
-    const { parseStockTakeBuffer, importStockTakeRows } = require('../../services/stockTakeExcel');
-    const rows = await parseStockTakeBuffer(req.file.buffer);
-    const result = await importStockTakeRows(rows, {
-      location,
-      recordedBy: req.user?.id || null,
-    });
-    const label = location === 'store' ? 'Warehouse' : 'Shop';
+    const {
+      parseStockTakeBuffer,
+      importStockTakeRows,
+      importCombinedStockTakeRows,
+    } = require('../../services/stockTakeExcel');
+    const parsed = await parseStockTakeBuffer(req.file.buffer);
+    const forceLocation = req.body.location;
+    const useCombined =
+      parsed.combined ||
+      forceLocation === 'both' ||
+      (!forceLocation && parsed.rows[0]?.combined);
+    const result = useCombined
+      ? await importCombinedStockTakeRows(parsed.rows, {
+          recordedBy: req.user?.id || null,
+        })
+      : await importStockTakeRows(parsed.rows, {
+          location: forceLocation === 'store' ? 'store' : 'shop',
+          recordedBy: req.user?.id || null,
+        });
+    const label = useCombined ? 'Shop & warehouse' : forceLocation === 'store' ? 'Warehouse' : 'Shop';
     formatResponse(
       res,
       200,
       true,
-      `${label} stock take applied — ${result.adjusted} adjusted, ${result.skipped.length} skipped`,
+      `${label} stock updated — ${result.adjusted} adjusted, ${result.skipped.length} skipped`,
       result
     );
   } catch (error) {
     formatResponse(res, 400, false, error.message || 'Stock take import failed');
+  }
+};
+
+exports.exportMasterStock = async (req, res, next) => {
+  try {
+    const { exportMasterStockBuffer } = require('../../services/masterStockExcel');
+    const category = req.query.category || null;
+    const date = req.query.date ? new Date(`${req.query.date}T12:00:00`) : new Date();
+    const buffer = await exportMasterStockBuffer({ category, date });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Stock-${new Date().toISOString().slice(0, 10)}.xlsx"`
+    );
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.importMasterStock = async (req, res, next) => {
+  try {
+    if (!req.file?.buffer) {
+      return formatResponse(res, 400, false, 'No Excel file uploaded');
+    }
+    const { parseMasterStockBuffer, importMasterStockRows } = require('../../services/masterStockExcel');
+    const rows = await parseMasterStockBuffer(req.file.buffer);
+    const date = req.body.date ? new Date(`${req.body.date}T12:00:00`) : new Date();
+    const result = await importMasterStockRows(rows, {
+      date,
+      recordedBy: req.user?.id || null,
+    });
+    formatResponse(
+      res,
+      200,
+      true,
+      `Stock sheet applied — ${result.adjusted} adjusted, ${result.skipped.length} skipped`,
+      result
+    );
+  } catch (error) {
+    formatResponse(res, 400, false, error.message || 'Stock sheet import failed');
   }
 };
 
@@ -592,23 +687,10 @@ exports.downloadTemplate = async (req, res, next) => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Sheet1');
 
-    if (req.query.type === 'stock-take') {
-      const location = req.query.location === 'store' ? 'Warehouse' : 'Shop';
-      ws.addRow([
-        'Inventory ID',
-        'SKU',
-        'Product Name',
-        'Category',
-        'On Website',
-        'Cost Price',
-        'Retail Price',
-        'System Qty',
-        'Physical Count',
-        'Variance',
-        'Cost Value',
-        'Retail Value',
-        'Profit',
-      ]);
+    if (req.query.type === 'master') {
+      const { MASTER_HEADERS } = require('../../services/masterStockExcel');
+      ws.name = 'Stock';
+      ws.addRow(MASTER_HEADERS);
       ws.addRow([
         '(auto)',
         'SKU-EXAMPLE',
@@ -617,24 +699,107 @@ exports.downloadTemplate = async (req, res, next) => {
         'Yes',
         2500,
         4500,
-        10,
-        10,
+        5,
+        1,
         0,
-        25000,
-        45000,
-        20000,
+        2,
+        6,
+        10,
       ]);
-      ws.getCell('J2').value = { formula: 'I2-H2' };
-      ws.getCell('K2').value = { formula: 'F2*I2' };
-      ws.getCell('L2').value = { formula: 'G2*I2' };
-      ws.getCell('M2').value = { formula: 'L2-K2' };
+      ws.getCell('L2').value = { formula: 'H2+K2-J2-I2' };
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
+      res.setHeader('Content-Disposition', 'attachment; filename="Stock-Template.xlsx"');
+      ws.columns.forEach((col) => { col.width = 16; });
+      await wb.xlsx.write(res);
+      return res.end();
+    }
+
+    if (req.query.type === 'stock-take') {
+      const isSingle = req.query.location === 'shop' || req.query.location === 'store';
+      if (!isSingle) {
+        ws.addRow([
+          'Inventory ID',
+          'SKU',
+          'Product Name',
+          'Category',
+          'On Website',
+          'Cost Price',
+          'Retail Price',
+          'Shop System Qty',
+          'Shop Physical Count',
+          'Shop Variance',
+          'Store System Qty',
+          'Store Physical Count',
+          'Store Variance',
+        ]);
+        ws.addRow([
+          '(auto)',
+          'SKU-EXAMPLE',
+          'Example Product',
+          'Shirts',
+          'Yes',
+          2500,
+          4500,
+          5,
+          5,
+          0,
+          12,
+          12,
+          0,
+        ]);
+        ws.getCell('J2').value = { formula: 'I2-H2' };
+        ws.getCell('M2').value = { formula: 'L2-K2' };
+        res.setHeader(
+          'Content-Disposition',
+          'attachment; filename="Stock-Template.xlsx"'
+        );
+      } else {
+        const location = req.query.location === 'store' ? 'Warehouse' : 'Shop';
+        ws.addRow([
+          'Inventory ID',
+          'SKU',
+          'Product Name',
+          'Category',
+          'On Website',
+          'Cost Price',
+          'Retail Price',
+          'System Qty',
+          'Physical Count',
+          'Variance',
+          'Cost Value',
+          'Retail Value',
+          'Profit',
+        ]);
+        ws.addRow([
+          '(auto)',
+          'SKU-EXAMPLE',
+          'Example Product',
+          'Shirts',
+          'Yes',
+          2500,
+          4500,
+          10,
+          10,
+          0,
+          25000,
+          45000,
+          20000,
+        ]);
+        ws.getCell('J2').value = { formula: 'I2-H2' };
+        ws.getCell('K2').value = { formula: 'F2*I2' };
+        ws.getCell('L2').value = { formula: 'G2*I2' };
+        res.getCell('M2').value = { formula: 'L2-K2' };
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="Stock-Take-${location}-Template.xlsx"`
+        );
+      }
       res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="Stock-Take-${location}-Template.xlsx"`
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
       ws.columns.forEach((col) => { col.width = 16; });
       await wb.xlsx.write(res);

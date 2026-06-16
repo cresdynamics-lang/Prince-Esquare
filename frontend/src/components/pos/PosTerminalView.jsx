@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Minus, Plus, Trash2, LogOut, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Minus, Plus, Trash2, LogOut, Search, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePosStore } from '../../store/usePosStore';
@@ -75,6 +75,104 @@ const sortProducts = (list) =>
     return (a.name || '').localeCompare(b.name || '');
   });
 
+const PAYMENT_METHODS = [
+  { id: 'CASH', label: 'Cash' },
+  { id: 'MPESA', label: 'M-Pesa' },
+  { id: 'CARD', label: 'Card' },
+];
+
+const categoryOptionLabel = (c) => {
+  const shop = c.shopTotal ?? c.shop_qty ?? 0;
+  let label = `${c.name} — shop ${shop}`;
+  if (c.websitePool != null) label += ` / web ${c.websitePool}${c.balanced ? ' ✓' : ''}`;
+  return label;
+};
+
+const PosCategoryDropdown = ({ value, onChange, options }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const update = () => {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuStyle({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
+  const selected = options.find((c) => c.name === value);
+  const buttonLabel = selected ? categoryOptionLabel(selected) : 'All categories (shop floor)';
+
+  return (
+    <div ref={ref} className="relative min-w-[12rem] max-w-full">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className="w-full flex items-center justify-between gap-2 bg-navy-950 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs text-left hover:border-gold-500/40"
+      >
+        <span className="truncate">{buttonLabel}</span>
+        <ChevronDown size={14} className={`shrink-0 text-white/50 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && menuStyle && (
+        <ul
+          role="listbox"
+          style={menuStyle}
+          className="fixed z-[100] max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-white/10 bg-navy-950 shadow-xl shadow-black/50 py-1"
+        >
+          <li role="option" aria-selected={!value}>
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false); }}
+              className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 ${!value ? 'text-gold-400 bg-white/5' : 'text-white/90'}`}
+            >
+              All categories (shop floor)
+            </button>
+          </li>
+          {options.map((c) => (
+            <li key={c.name} role="option" aria-selected={value === c.name}>
+              <button
+                type="button"
+                onClick={() => { onChange(c.name); setOpen(false); }}
+                className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 ${value === c.name ? 'text-gold-400 bg-white/5' : 'text-white/90'}`}
+              >
+                {categoryOptionLabel(c)}
+              </button>
+            </li>
+          ))}
+          {options.length === 0 && (
+            <li className="px-3 py-2 text-xs text-white/40">No categories with shop stock</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 const PosCartPanel = ({
   cart,
   canDiscount,
@@ -90,10 +188,18 @@ const PosCartPanel = ({
   removeFromCart,
   updateQty,
   confirmSale,
+  onClose,
 }) => (
-  <div className="flex flex-col h-full">
-    <h2 className="text-lg font-semibold text-white mb-4">Cart</h2>
-    <div className="flex-1 overflow-y-auto space-y-3">
+  <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="shrink-0 flex items-center justify-between mb-3">
+      <h2 className="text-lg font-semibold text-white">Cart</h2>
+      {onClose && (
+        <button type="button" onClick={onClose} className="text-white/50 hover:text-white text-sm">
+          Close
+        </button>
+      )}
+    </div>
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 pr-0.5 -mr-0.5">
       {cart.length === 0 && <p className="text-white/40 text-sm">Cart is empty</p>}
       {cart.map((item) => (
         <div key={item.key} className="bg-white/5 rounded-lg p-3 text-white text-sm">
@@ -122,37 +228,46 @@ const PosCartPanel = ({
         </div>
       ))}
     </div>
-    {canDiscount && (
-      <div className="mt-4">
-        <label className="text-white/60 text-xs">Discount (KES)</label>
-        <input type="number" min={0} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="w-full mt-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-white" />
+    <div className="shrink-0 border-t border-white/10 pt-3 mt-2 space-y-3 bg-navy-950 shadow-[0_-12px_32px_rgba(0,0,0,0.45)]">
+      {canDiscount && (
+        <div>
+          <label className="text-white/60 text-xs">Discount (KES)</label>
+          <input type="number" min={0} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="w-full mt-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-white" />
+        </div>
+      )}
+      <div className="space-y-1 text-white">
+        <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatKES(subtotal)}</span></div>
+        {canDiscount && discount > 0 && <div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-{formatKES(discount)}</span></div>}
+        <div className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-gold-400">{formatKES(grandTotal)}</span></div>
       </div>
-    )}
-    <div className="mt-4 space-y-1 text-white border-t border-white/10 pt-4">
-      <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatKES(subtotal)}</span></div>
-      {canDiscount && discount > 0 && <div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-{formatKES(discount)}</span></div>}
-      <div className="flex justify-between text-lg font-bold"><span>Total</span><span className="text-gold-400">{formatKES(grandTotal)}</span></div>
+      <div className="grid grid-cols-3 gap-2">
+        {PAYMENT_METHODS.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setPaymentMethod(m.id)}
+            className={`py-2 rounded text-xs sm:text-sm font-medium ${paymentMethod === m.id ? 'bg-gold-600 text-navy-950' : 'bg-white/10 text-white'}`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {paymentMethod === 'MPESA' && (
+        <input placeholder="M-Pesa ref (8–12 chars)" value={mpesaRef} onChange={(e) => setMpesaRef(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" />
+      )}
+      <button
+        type="button"
+        disabled={cart.length === 0 || busy}
+        onClick={confirmSale}
+        className="w-full bg-gold-600 text-navy-950 font-bold py-3.5 rounded-lg disabled:opacity-40"
+      >
+        Confirm Sale
+      </button>
     </div>
-    <div className="mt-4 flex gap-2">
-      {['CASH', 'MPESA'].map((m) => (
-        <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 py-2 rounded text-sm font-medium ${paymentMethod === m ? 'bg-gold-600 text-navy-950' : 'bg-white/10 text-white'}`}>{m}</button>
-      ))}
-    </div>
-    {paymentMethod === 'MPESA' && (
-      <input placeholder="M-Pesa ref (8–12 chars)" value={mpesaRef} onChange={(e) => setMpesaRef(e.target.value)} className="w-full mt-3 bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" />
-    )}
-    <button
-      type="button"
-      disabled={cart.length === 0 || busy}
-      onClick={confirmSale}
-      className="mt-4 w-full bg-gold-600 text-navy-950 font-bold py-4 rounded-lg disabled:opacity-40"
-    >
-      Confirm Sale
-    </button>
   </div>
 );
 
-const PosTerminalView = ({ embedded = false, onClockOut }) => {
+const PosTerminalView = ({ embedded = false, embeddedLayout = 'direct', onClockOut }) => {
   const { user, logout } = useAuthStore();
   const {
     cart, activeShift, addToCart, removeFromCart, updateQty, clearCart, setShift, clearShift,
@@ -179,8 +294,10 @@ const PosTerminalView = ({ embedded = false, onClockOut }) => {
   const [showClockOut, setShowClockOut] = useState(false);
 
   const shellClass = embedded
-    ? 'min-h-[70vh] bg-navy-950 border border-gold-500/10 rounded-2xl overflow-hidden flex flex-col'
-    : 'min-h-screen bg-[#0a0f1e] flex flex-col';
+    ? embeddedLayout === 'finance'
+      ? 'h-[calc(100dvh-12.5rem)] min-h-[420px] flex flex-col overflow-hidden bg-navy-950 border border-gold-500/10 rounded-2xl'
+      : 'h-[calc(100dvh-9.5rem)] min-h-[420px] flex flex-col overflow-hidden bg-navy-950 border border-gold-500/10 rounded-2xl'
+    : 'h-dvh max-h-dvh flex flex-col overflow-hidden bg-[#0a0f1e]';
 
   const loadShift = useCallback(async () => {
     const res = await posAPI.getCurrentShift();
@@ -422,15 +539,15 @@ const PosTerminalView = ({ embedded = false, onClockOut }) => {
 
   return (
     <div className={shellClass}>
-      <header className="bg-navy-950 border-b border-gold-500/20 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-white text-sm">
+      <header className="shrink-0 bg-navy-950 border-b border-gold-500/20 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-white text-sm">
         <span>{user?.fullName || user?.name}</span>
         <span>Shift: {new Date(activeShift.clock_in).toLocaleTimeString()}</span>
-        <span>Cash: {formatKES(activeShift.total_cash || 0)} | M-Pesa: {formatKES(activeShift.total_mpesa || 0)}</span>
+        <span>Cash: {formatKES(activeShift.total_cash || 0)} | M-Pesa: {formatKES(activeShift.total_mpesa || 0)} | Card: {formatKES(activeShift.total_card || 0)}</span>
         <button type="button" onClick={() => setShowClockOut(true)} className="flex items-center gap-1 text-red-400"><LogOut size={16} /> Clock Out</button>
       </header>
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 p-4 overflow-y-auto overscroll-contain">
           <div className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/50">
             <p>
               <strong className="text-gold-400">{totalInStock.toLocaleString()}</strong> on floor
@@ -468,20 +585,11 @@ const PosTerminalView = ({ embedded = false, onClockOut }) => {
             />
           </div>
           <div className="flex flex-wrap gap-2 mb-3 items-center">
-            <select
+            <PosCategoryDropdown
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs"
-            >
-              <option value="">All categories (shop floor)</option>
-              {categoryOptions.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                  {` — shop ${c.shopTotal ?? c.shop_qty ?? 0}`}
-                  {c.websitePool != null ? ` / web ${c.websitePool}${c.balanced ? ' ✓' : ''}` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={setCategoryFilter}
+              options={categoryOptions}
+            />
             <button
               type="button"
               onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
@@ -534,10 +642,10 @@ const PosTerminalView = ({ embedded = false, onClockOut }) => {
           )}
           {filteredProducts.length === 0 ? (
             <div className="text-center py-16 text-white/50">
-              <p className="text-lg">{products.length === 0 ? 'No products found' : 'No items in this filter'}</p>
+              <p className="text-lg">{products.length === 0 ? 'Nothing on the shop floor' : 'No items in this filter'}</p>
               <p className="text-sm mt-2">
                 {products.length === 0
-                  ? 'Check your connection or try a different search.'
+                  ? 'POS only sells from shop stock. Move items from store to shop in Inventory, or check that products are linked to inventory.'
                   : 'Try another tab — inventory-only items and website listings are listed separately.'}
               </p>
               <button
@@ -656,27 +764,32 @@ const PosTerminalView = ({ embedded = false, onClockOut }) => {
             </div>
           )}
         </div>
-        <aside className="hidden lg:block w-96 border-l border-white/10 p-4">
+        <aside className="hidden lg:flex lg:flex-col w-96 shrink-0 border-l border-white/10 p-4 min-h-0 overflow-hidden bg-navy-950/80">
           <PosCartPanel {...cartPanelProps} />
         </aside>
       </div>
 
-      {!embedded && (
-        <button type="button" onClick={() => setShowCart(true)} className="lg:hidden fixed bottom-4 right-4 bg-gold-600 text-navy-950 px-6 py-3 rounded-full font-bold shadow-lg">
-          Cart ({cart.length})
-        </button>
-      )}
-
-      {embedded && (
-        <button type="button" onClick={() => setShowCart(true)} className="lg:hidden m-4 bg-gold-600 text-navy-950 px-6 py-3 rounded-full font-bold shadow-lg self-end">
-          Cart ({cart.length})
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setShowCart(true)}
+        className="lg:hidden shrink-0 border-t border-gold-500/20 bg-navy-950/95 backdrop-blur px-4 py-3 flex items-center justify-between font-bold"
+      >
+        <span className="text-white/80 text-sm font-medium">Cart ({cart.length}) · {formatKES(grandTotal)}</span>
+        <span className="bg-gold-600 text-navy-950 px-4 py-2 rounded-lg text-sm">{cart.length ? 'Checkout' : 'Open cart'}</span>
+      </button>
 
       {showCart && (
-        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowCart(false)}>
-          <div className="absolute bottom-0 left-0 right-0 bg-navy-950 rounded-t-2xl p-6 max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <PosCartPanel {...cartPanelProps} />
+        <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end" onClick={() => setShowCart(false)}>
+          <div
+            className="bg-navy-950 rounded-t-2xl flex flex-col h-[min(92dvh,720px)] max-h-[92dvh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 flex justify-center pt-2 pb-1">
+              <span className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col px-4 pb-4 overflow-hidden">
+              <PosCartPanel {...cartPanelProps} onClose={() => setShowCart(false)} />
+            </div>
           </div>
         </div>
       )}

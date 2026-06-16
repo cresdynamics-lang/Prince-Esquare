@@ -4,10 +4,11 @@ const { formatResponse } = require('../../utils/responseFormatter');
 
 exports.clockIn = async (req, res, next) => {
   try {
-    const open = await posDb.getOpenShift(req.user.id);
+    const actorId = req.posActorId || req.user.id;
+    const open = await posDb.getOpenShift(actorId);
     if (open) return formatResponse(res, 400, false, 'You already have an open shift');
 
-    const shift = await posDb.createShift(req.user.id);
+    const shift = await posDb.createShift(actorId);
     formatResponse(res, 201, true, 'Clocked in', { shiftId: shift.id, shift });
   } catch (error) {
     next(error);
@@ -16,7 +17,8 @@ exports.clockIn = async (req, res, next) => {
 
 exports.clockOut = async (req, res, next) => {
   try {
-    const updated = await posDb.closeShift(req.user.id);
+    const actorId = req.posActorId || req.user.id;
+    const updated = await posDb.closeShift(actorId);
     if (!updated) return formatResponse(res, 404, false, 'No open shift found');
     formatResponse(res, 200, true, 'Clocked out', updated);
   } catch (error) {
@@ -61,7 +63,8 @@ exports.getShift = async (req, res, next) => {
 
 exports.myCurrentShift = async (req, res, next) => {
   try {
-    const shift = await posDb.getOpenShift(req.user.id);
+    const actorId = req.posActorId || req.user.id;
+    const shift = await posDb.getOpenShift(actorId);
     formatResponse(res, 200, true, 'Current shift', shift);
   } catch (error) {
     next(error);
@@ -70,7 +73,8 @@ exports.myCurrentShift = async (req, res, next) => {
 
 exports.myShiftSummary = async (req, res, next) => {
   try {
-    const shift = await posDb.getOpenShift(req.user.id);
+    const actorId = req.posActorId || req.user.id;
+    const shift = await posDb.getOpenShift(actorId);
     if (!shift) return formatResponse(res, 200, true, 'No open shift', null);
 
     const db = require('../../config/db');
