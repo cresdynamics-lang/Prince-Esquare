@@ -238,7 +238,7 @@ const saveInventoryProductDetail = async (posProductId, body = {}) => {
         category_id = COALESCE($6, category_id),
         brand_id = COALESCE($7, brand_id),
         thumbnail = COALESCE($8, thumbnail),
-        images = CASE WHEN $9 IS NOT NULL THEN $9::jsonb ELSE images END,
+        images = COALESCE($9::jsonb, images),
         updated_at = NOW()
        WHERE id = $10`,
       [

@@ -241,7 +241,7 @@ const publishPosToWebsite = async (posProductId, body = {}) => {
       `UPDATE products SET
         is_active = $1,
         thumbnail = COALESCE($2, thumbnail),
-        images = CASE WHEN $3 IS NOT NULL THEN $3::jsonb ELSE images END,
+        images = COALESCE($3::jsonb, images),
         price = $4,
         discount_price = $5,
         description = COALESCE($6, description),
