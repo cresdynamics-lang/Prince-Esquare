@@ -75,17 +75,6 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
   }, [loadSummary]);
 
   useEffect(() => {
-    if (!selectedCategory && categorySummary.length > 0) {
-      setSelectedCategory(categorySummary[0].name);
-    }
-  }, [categorySummary, selectedCategory]);
-
-  useEffect(() => {
-    if (!selectedCategory) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
     loadStock(selectedCategory);
   }, [selectedCategory, loadStock]);
 
@@ -295,7 +284,7 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="w-full appearance-none bg-navy-950 border border-gold-500/20 rounded-lg px-3 py-2.5 pr-10 text-white text-sm focus:border-gold-500/40 outline-none"
               >
-                <option value="">All categories — pick one to browse pieces</option>
+                <option value="">All categories</option>
                 {categorySummary.map((cat) => (
                   <option key={cat.name} value={cat.name}>
                     {categoryLabel(cat)}
@@ -375,7 +364,7 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
             message={
               selectedCategory
                 ? `No pieces in "${selectedCategory}". Use the stock sheet above to update counts.`
-                : 'Select a category to browse inventory pieces.'
+                : 'No inventory pieces found. Add products or sync from the website catalog.'
             }
           />
         )}
