@@ -1,5 +1,6 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
+const { normalizeStaffPermissions } = require('../utils/permissions');
 
 exports.getCustomers = async (req, res, next) => {
     const { role = 'customer' } = req.query;
@@ -98,15 +99,15 @@ exports.createStaff = async (req, res, next) => {
         const bcrypt = require('bcryptjs');
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        const normalizedPermissions = normalizeStaffPermissions(permissions);
 
         const result = await db.query(
             'INSERT INTO users (name, email, password, role, permissions) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, permissions',
-            [name, email, hashedPassword, 'staff', JSON.stringify(permissions)]
+            [name, email, hashedPassword, 'staff', JSON.stringify(normalizedPermissions)]
         );
 
         const staff = result.rows[0];
-        const perms = Array.isArray(permissions) ? permissions : [];
-        if (perms.includes('pos-terminal')) {
+        if (normalizedPermissions.includes('pos-terminal')) {
             const { ensurePosProfileForStaffUser } = require('../services/staffPosBridge');
             await ensurePosProfileForStaffUser(staff, password);
         }
@@ -121,9 +122,10 @@ exports.updateStaffPermissions = async (req, res, next) => {
     const { id } = req.params;
     const { permissions } = req.body;
     try {
+        const normalizedPermissions = normalizeStaffPermissions(permissions);
         const result = await db.query(
             'UPDATE users SET permissions = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND role = $3 RETURNING id, name, email, role, permissions',
-            [JSON.stringify(permissions), id, 'staff']
+            [JSON.stringify(normalizedPermissions), id, 'staff']
         );
 
         if (result.rows.length === 0) {
@@ -131,10 +133,9 @@ exports.updateStaffPermissions = async (req, res, next) => {
         }
 
         const staff = result.rows[0];
-        const perms = Array.isArray(permissions) ? permissions : [];
         const profileR = await db.query('SELECT id FROM pos_profiles WHERE LOWER(email) = LOWER($1) LIMIT 1', [staff.email]);
 
-        if (perms.includes('pos-terminal')) {
+        if (normalizedPermissions.includes('pos-terminal')) {
             const { ensurePosProfileForStaffUser } = require('../services/staffPosBridge');
             await ensurePosProfileForStaffUser(staff);
             if (profileR.rows[0]) {
@@ -172,8 +173,9 @@ exports.updateStaff = async (req, res, next) => {
             params.push(name.trim());
         }
         if (Array.isArray(permissions)) {
+            const normalizedPermissions = normalizeStaffPermissions(permissions);
             updates.push(`permissions = $${i++}`);
-            params.push(JSON.stringify(permissions));
+            params.push(JSON.stringify(normalizedPermissions));
         }
 
         if (!updates.length) {
@@ -191,8 +193,9 @@ exports.updateStaff = async (req, res, next) => {
 
         const staff = result.rows[0];
         if (Array.isArray(permissions)) {
+            const normalizedPermissions = normalizeStaffPermissions(permissions);
             const profileR = await db.query('SELECT id FROM pos_profiles WHERE LOWER(email) = LOWER($1) LIMIT 1', [staff.email]);
-            if (permissions.includes('pos-terminal')) {
+            if (normalizedPermissions.includes('pos-terminal')) {
                 const { ensurePosProfileForStaffUser } = require('../services/staffPosBridge');
                 await ensurePosProfileForStaffUser(staff);
                 if (profileR.rows[0]) {

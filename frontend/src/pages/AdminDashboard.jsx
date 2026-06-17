@@ -58,13 +58,19 @@ import { ConfirmProvider, useConfirm } from '../components/admin/ConfirmDialog';
 import {
   canViewInventory,
   canManageInventory,
+  canAccessProducts,
   canUsePosTerminal,
   canViewCustomers,
   canManageUsers,
   canAccessFinance,
   isFullAdmin,
+  hasPermission,
   parsePermissions,
+  STAFF_ACCESS_PRESETS,
   STAFF_PERMISSION_GROUPS,
+  detectStaffPreset,
+  applyPermissionToggle,
+  normalizeStaffPermissions,
 } from '../utils/staffPermissions';
 
 /** Scrollable table wrapper for mobile */
@@ -138,20 +144,21 @@ const AdminDashboard = () => {
       (user?.role === 'staff' &&
         canUsePosTerminal(user, { isSeller }) &&
         !canViewInventory(user) &&
-        !['dashboard', 'orders', 'products', 'customers', 'users'].some((p) =>
-          (Array.isArray(user.permissions) ? user.permissions : []).includes(p)
-        ));
+        !canAccessProducts(user) &&
+        !canViewCustomers(user) &&
+        !hasPermission(user, 'dashboard') &&
+        !hasPermission(user, 'orders'));
 
     const items = posOnly ? posOnlySidebarItems : allSidebarItems;
     return items.filter((item) => {
       if (posOnly) return item.id !== 'finance' || canAccessFinance(user);
       if (user?.role === 'admin') return true;
       if (user?.role === 'staff') {
-        const perms = Array.isArray(user.permissions) ? user.permissions : [];
         if (item.id === 'inventory') return canViewInventory(user);
         if (item.id === 'finance') return canAccessFinance(user);
         if (item.id === 'users') return canViewCustomers(user);
-        return perms.includes(item.id) || (item.id === 'users' && perms.includes('customers'));
+        if (item.id === 'products') return canAccessProducts(user);
+        return hasPermission(user, item.id) || (item.id === 'users' && hasPermission(user, 'customers'));
       }
       return false;
     });
@@ -192,10 +199,10 @@ const AdminDashboard = () => {
 
   const renderContent = () => {
     if (user?.role === 'staff') {
-      const perms = Array.isArray(user.permissions) ? user.permissions : [];
       const allowed =
-        perms.includes(activeSection) ||
+        hasPermission(user, activeSection) ||
         (activeSection === 'users' && canViewCustomers(user)) ||
+        (activeSection === 'products' && canAccessProducts(user)) ||
         (activeSection === 'inventory' && canViewInventory(user)) ||
         (activeSection === 'finance' && canAccessFinance(user)) ||
         (activeSection === 'pos-terminal' && canUsePosTerminal(user, { isSeller }));
@@ -3758,7 +3765,8 @@ const AdminsView = ({ roleFilter = null }) => {
     name: '',
     email: '',
     password: '',
-    permissions: ['products', 'orders']
+    accessPreset: 'pos-only',
+    permissions: ['pos-terminal'],
   });
 
   const fetchAdmins = async () => {
@@ -3787,20 +3795,41 @@ const AdminsView = ({ roleFilter = null }) => {
       name: '',
       email: '',
       password: '',
-      permissions: ['products', 'orders']
+      accessPreset: 'pos-only',
+      permissions: ['pos-terminal'],
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (staff) => {
+    const permissions = parsePermissions(staff.permissions);
     setEditingStaff(staff);
     setFormData({
       name: staff.name || '',
       email: staff.email || '',
       password: '',
-      permissions: parsePermissions(staff.permissions),
+      accessPreset: detectStaffPreset(permissions),
+      permissions,
     });
     setIsModalOpen(true);
+  };
+
+  const handlePresetChange = (presetId) => {
+    const preset = STAFF_ACCESS_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setFormData({
+      ...formData,
+      accessPreset: presetId,
+      permissions: preset.id === 'custom' ? formData.permissions : [...preset.permissions],
+    });
+  };
+
+  const handlePermissionToggle = (permission, checked) => {
+    setFormData({
+      ...formData,
+      accessPreset: 'custom',
+      permissions: applyPermissionToggle(formData.permissions, permission, checked),
+    });
   };
 
   const handleCloseModal = () => {
@@ -3815,11 +3844,14 @@ const AdminsView = ({ roleFilter = null }) => {
       if (editingStaff) {
         await adminCustomerAPI.updateStaff(editingStaff.id, {
           name: formData.name,
-          permissions: formData.permissions,
+          permissions: normalizeStaffPermissions(formData.permissions),
         });
         adminToast.success('Staff duties updated');
       } else {
-        await adminCustomerAPI.createStaff(formData);
+        await adminCustomerAPI.createStaff({
+          ...formData,
+          permissions: normalizeStaffPermissions(formData.permissions),
+        });
         adminToast.success('Staff account created');
       }
       setIsModalOpen(false);
@@ -3892,40 +3924,32 @@ const AdminsView = ({ roleFilter = null }) => {
                     {admin.is_active === false && <span className="w-2 h-2 rounded-full bg-red-500"></span>}
                   </div>
                   <div className="text-xs text-gold-500/40">{admin.email}</div>
+                  {admin.role === 'staff' && (
+                    <span className={`inline-block mt-2 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${
+                      admin.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
+                    }`}>
+                      {admin.is_active !== false ? 'Active' : 'Suspended'}
+                    </span>
+                  )}
                 </div>
                 <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10 ${admin.role === 'admin' ? 'text-gold-400' : 'text-blue-400'}`}>
                   {admin.role}
                 </span>
               </div>
-              {admin.role === 'staff' && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {parsePermissions(admin.permissions).length > 0 ? (
-                    parsePermissions(admin.permissions).map((perm) => (
-                      <span
-                        key={perm}
-                        className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-navy-950/60 border border-gold-500/10 text-gold-500/70"
-                      >
-                        {perm.replace(/-/g, ' ')}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-[9px] uppercase tracking-wider text-gold-500/30">No duties assigned</span>
-                  )}
-                </div>
-              )}
               <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
                 <span className="text-gold-500/30 uppercase">ID: {admin.id.substring(0, 8)}</span>
                 <div className="flex gap-2">
                   {admin.role === 'staff' && (
                     <>
                       <button
+                        type="button"
                         onClick={() => handleOpenEdit(admin)}
-                        className="p-1.5 rounded-lg text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 transition-all"
-                        title="Edit duties"
+                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-gold-500/70 hover:text-gold-400 hover:bg-navy-800 transition-all flex items-center gap-1"
                       >
-                        <Edit size={14} />
+                        <Eye size={14} /> View staff
                       </button>
                       <button 
+                        type="button"
                         onClick={() => handleDeleteStaff(admin.id)}
                         className="p-1.5 rounded-lg text-red-400/40 hover:text-red-400 hover:bg-red-400/5 transition-all"
                         title="Remove Staff"
@@ -3968,7 +3992,7 @@ const AdminsView = ({ roleFilter = null }) => {
             >
               <div className="flex shrink-0 justify-between items-center p-6 border-b border-gold-500/10 bg-navy-900/50">
                 <h3 className="font-serif font-bold text-gold-100 text-xl">
-                  {editingStaff ? 'Edit staff duties' : 'Add staff'}
+                  {editingStaff ? 'View staff & re-assign duties' : 'Add staff'}
                 </h3>
                 <button type="button" onClick={handleCloseModal} className="text-gold-500/40 hover:text-gold-500 transition-colors">
                   <X size={20} />
@@ -4018,27 +4042,55 @@ const AdminsView = ({ roleFilter = null }) => {
                 )}
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access Permissions</label>
+                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access role</label>
+                  <div className="space-y-2">
+                    {STAFF_ACCESS_PRESETS.map((preset) => (
+                      <label
+                        key={preset.id}
+                        className={`block p-3 rounded-xl border cursor-pointer transition-all ${
+                          formData.accessPreset === preset.id
+                            ? 'border-gold-500/50 bg-gold-500/10'
+                            : 'border-gold-500/15 bg-navy-950/40 hover:border-gold-500/30'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="accessPreset"
+                            checked={formData.accessPreset === preset.id}
+                            onChange={() => handlePresetChange(preset.id)}
+                            className="mt-1"
+                          />
+                          <div>
+                            <p className="text-sm font-bold text-gold-100">{preset.label}</p>
+                            <p className="text-[11px] text-gold-500/50 mt-0.5">{preset.description}</p>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {(formData.accessPreset === 'custom' || editingStaff) && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">
+                    {editingStaff ? 'Assigned duties' : 'Custom duties'}
+                  </label>
                   <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
                     {STAFF_PERMISSION_GROUPS.map((group) => (
                       <div key={group.label}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-gold-500/40 mb-2">{group.label}</p>
-                        <div className="grid grid-cols-2 gap-2">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-gold-500/40 mb-1">{group.label}</p>
+                        {group.hint && (
+                          <p className="text-[10px] text-gold-500/30 mb-2">{group.hint}</p>
+                        )}
+                        <div className="grid grid-cols-1 gap-2">
                           {group.permissions.map((perm) => (
                             <label key={perm} className="flex items-center gap-2 cursor-pointer group">
                               <input
                                 type="checkbox"
                                 checked={formData.permissions.includes(perm)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setFormData({ ...formData, permissions: [...formData.permissions, perm] });
-                                  } else {
-                                    setFormData({
-                                      ...formData,
-                                      permissions: formData.permissions.filter((p) => p !== perm),
-                                    });
-                                  }
-                                }}
+                                onChange={(e) => handlePermissionToggle(perm, e.target.checked)}
+                                disabled={perm === 'inventory-manage' && !formData.permissions.includes('inventory-view')}
                                 className="w-3.5 h-3.5 rounded border-gold-500/20 bg-navy-900 text-gold-600 focus:ring-0 focus:ring-offset-0"
                               />
                               <span className="text-[10px] uppercase font-bold text-gold-100 group-hover:text-gold-500 transition-colors">
@@ -4051,9 +4103,10 @@ const AdminsView = ({ roleFilter = null }) => {
                     ))}
                   </div>
                   <p className="text-[10px] text-gold-500/40 mt-2">
-                    Inventory view: browse and download only. Inventory manage: update stock (admin-level). POS terminal: checkout access.
+                    POS only: checkout without inventory. Inventory view: add products and browse stock read-only. Inventory manage: update stock (admin grants only).
                   </p>
                 </div>
+                )}
                 </div>
                 </div>
 
@@ -4063,7 +4116,7 @@ const AdminsView = ({ roleFilter = null }) => {
                     disabled={submitting}
                     className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
                   >
-                    {submitting ? (editingStaff ? 'SAVING...' : 'CREATING...') : (editingStaff ? 'SAVE DUTIES' : 'CREATE STAFF ACCOUNT')}
+                    {submitting ? (editingStaff ? 'SAVING...' : 'CREATING...') : (editingStaff ? 'SAVE CHANGES' : 'CREATE STAFF ACCOUNT')}
                   </button>
                 </div>
               </form>

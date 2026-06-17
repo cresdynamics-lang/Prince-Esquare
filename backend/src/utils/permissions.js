@@ -32,6 +32,25 @@ const canViewInventory = (user) =>
 const canManageInventory = (user) =>
   isFullAdmin(user) || hasPermission(user, 'inventory-manage');
 
+const canAccessProducts = (user) =>
+  isFullAdmin(user) ||
+  hasPermission(user, 'products') ||
+  hasPermission(user, 'inventory-view') ||
+  hasPermission(user, 'inventory-manage');
+
+const normalizeStaffPermissions = (permissions = []) => {
+  const perms = [...new Set(parsePermissions(permissions))];
+  const hasManage = perms.includes('inventory-manage');
+  const hasView = perms.includes('inventory-view');
+
+  if (hasView || hasManage) {
+    if (!perms.includes('products')) perms.push('products');
+  }
+  if (hasManage && !hasView) perms.push('inventory-view');
+
+  return perms;
+};
+
 const canUsePosTerminal = (user) => {
   if (!user) return false;
   if (isFullAdmin(user)) return true;
@@ -48,5 +67,7 @@ module.exports = {
   hasPermission,
   canViewInventory,
   canManageInventory,
+  canAccessProducts,
   canUsePosTerminal,
+  normalizeStaffPermissions,
 };
