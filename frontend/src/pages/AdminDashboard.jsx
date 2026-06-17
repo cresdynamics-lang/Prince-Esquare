@@ -20,6 +20,7 @@ import { posAdminAPI } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore, isStaffSession } from '../store/useAuthStore';
 import { userInitials } from '../lib/format';
+import { adminToast, apiErrorMessage } from '../lib/adminToast';
 import { 
   adminAnalyticsAPI, 
   adminOrderAPI, 
@@ -1695,6 +1696,7 @@ const ProductsView = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [deletingIds, setDeletingIds] = useState(() => new Set());
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -1794,7 +1796,7 @@ const ProductsView = () => {
         }
       } catch (error) {
         console.error('Thumbnail upload failed:', error);
-        alert('Image could not be uploaded to the server. You can still save the product — add the image later or configure Cloudinary.');
+        adminToast.info('Image could not be uploaded. You can still save the product — add the image later or configure Cloudinary.');
       } finally {
         setUploading(false);
       }
@@ -1857,7 +1859,7 @@ const ProductsView = () => {
       }
     } catch (error) {
       console.error('Gallery upload failed:', error);
-      alert('Gallery images could not be uploaded. You can still save the product without them.');
+      adminToast.info('Gallery images could not be uploaded. You can still save the product without them.');
       setFormData((prev) => {
         prev.gallery.forEach((item) => {
           if (item.isUploading) revokeBlobUrl(item.preview);
@@ -1951,7 +1953,7 @@ const ProductsView = () => {
         }));
       }
     } catch {
-      alert('Color image upload failed.');
+      adminToast.error('Color image upload failed.');
     }
   };
 
@@ -1994,35 +1996,8 @@ const ProductsView = () => {
     if (stockFilter === 'out_of_stock' && stock > 0) return false;
     if (statusFilter === 'active' && !p.is_active) return false;
     if (statusFilter === 'inactive' && p.is_active) return false;
-    if (statusFilter === 'featured' && !p.is_featured) return false;
-    if (statusFilter === 'not_featured' && p.is_featured) return false;
     return true;
   });
-
-  const handleToggleFeatured = async (product) => {
-    const next = !product.is_featured;
-    try {
-      await adminProductAPI.patchFlags(product.id, { is_featured: next });
-      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_featured: next } : p)));
-    } catch {
-      alert('Could not update featured status');
-    }
-  };
-
-  const handleTogglePublished = async (product) => {
-    const next = !product.is_active;
-    if (next && !product.pos_stock_product_id) {
-      alert('Record this item in Inventory first, then publish from Stock Management with images.');
-      onOpenInventory?.();
-      return;
-    }
-    try {
-      await adminProductAPI.patchFlags(product.id, { is_active: next });
-      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, is_active: next } : p)));
-    } catch {
-      alert('Could not update publish status');
-    }
-  };
 
   const selectedCount = selectedIds.size;
   const allFilteredSelected =
@@ -2071,21 +2046,21 @@ const ProductsView = () => {
       await adminProductAPI.bulkAction({ ids, action });
       if (action === 'delete') {
         setProducts((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+        adminToast.success(`${ids.length} product${ids.length === 1 ? '' : 's'} removed`);
       } else {
         const patchByAction = {
-          feature: { is_featured: true },
-          unfeature: { is_featured: false },
           publish: { is_active: true },
           unpublish: { is_active: false },
         };
         const patch = patchByAction[action];
         if (patch) {
           setProducts((prev) => prev.map((p) => (selectedIds.has(p.id) ? { ...p, ...patch } : p)));
+          adminToast.success('Products updated');
         }
       }
       clearSelection();
-    } catch {
-      alert('Bulk action failed');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Bulk action failed'));
     } finally {
       setBulkBusy(false);
     }
@@ -2182,18 +2157,32 @@ const ProductsView = () => {
       variant: 'danger',
     });
     if (!ok) return;
+
+    setDeletingIds((prev) => new Set(prev).add(id));
     try {
       await adminProductAPI.remove(id);
-      fetchData();
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      adminToast.success('Product removed');
     } catch (error) {
-      alert('Error deleting product');
+      adminToast.error(apiErrorMessage(error, 'Could not delete this product'));
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.category_id) {
-      alert('Please select a category before saving this product.');
+      adminToast.error('Please select a category before saving this product.');
       return;
     }
     setSubmitting(true);
@@ -2234,10 +2223,10 @@ const ProductsView = () => {
       }
       closeProductModal();
       fetchData();
+      adminToast.success(currentProduct ? 'Product updated' : 'Product added');
     } catch (error) {
       console.error('Error saving product:', error);
-      const msg = error.response?.data?.message || error.userMessage || error.message;
-      alert(msg ? `Error saving product: ${msg}` : 'Error saving product');
+      adminToast.error(apiErrorMessage(error, 'Error saving product'));
     } finally {
       setSubmitting(false);
     }
@@ -2306,8 +2295,6 @@ const ProductsView = () => {
           <option value="all">All status</option>
           <option value="active">Published</option>
           <option value="inactive">Unpublished</option>
-          <option value="featured">Featured</option>
-          <option value="not_featured">Not featured</option>
         </select>
       </div>
 
@@ -2316,23 +2303,6 @@ const ProductsView = () => {
           <span className="text-sm font-bold text-gold-200">
             {selectedCount} selected
           </span>
-          <button
-            type="button"
-            disabled={bulkBusy}
-            onClick={() => runBulkAction('feature')}
-            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-gold-500/30 text-gold-300 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
-          >
-            <Star size={12} className="inline mr-1 -mt-0.5" />
-            Mark featured
-          </button>
-          <button
-            type="button"
-            disabled={bulkBusy}
-            onClick={() => runBulkAction('unfeature')}
-            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-gold-500/20 text-gold-500/60 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
-          >
-            Unmark featured
-          </button>
           <button
             type="button"
             disabled={bulkBusy}
@@ -2393,7 +2363,6 @@ const ProductsView = () => {
                 <th className="px-6 py-4">Category</th>
                 <th className="px-6 py-4">Price</th>
                 <th className="px-6 py-4">Stock</th>
-                <th className="px-6 py-4">Marks</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -2431,14 +2400,7 @@ const ProductsView = () => {
                         )}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
-                          {p.is_featured && (
-                            <span className="bg-gold-600/15 text-gold-400 text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-widest border border-gold-500/20">
-                              Featured
-                            </span>
-                          )}
-                        </div>
+                        <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
                         <div className="text-[10px] font-mono text-gold-500/40 uppercase mt-1">{p.slug}</div>
                       </div>
                     </div>
@@ -2457,34 +2419,6 @@ const ProductsView = () => {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFeatured(p)}
-                        title={p.is_featured ? 'Remove from featured' : 'Mark as featured (homepage carousel)'}
-                        className={`p-2 rounded-lg transition-all ${
-                          p.is_featured
-                            ? 'text-gold-400 bg-gold-600/15 hover:bg-gold-600/25'
-                            : 'text-gold-500/30 hover:text-gold-400 hover:bg-navy-800'
-                        }`}
-                      >
-                        <Star size={16} className={p.is_featured ? 'fill-current' : ''} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePublished(p)}
-                        title={p.is_active ? 'Unpublish' : 'Publish on website'}
-                        className={`p-2 rounded-lg transition-all ${
-                          p.is_active
-                            ? 'text-green-400/70 hover:text-green-400 hover:bg-green-400/10'
-                            : 'text-gold-500/30 hover:text-gold-400 hover:bg-navy-800'
-                        }`}
-                      >
-                        <Eye size={16} />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
                     <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${p.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'}`}>
                       {p.is_active ? 'Active' : 'Hidden'}
                     </span>
@@ -2499,9 +2433,14 @@ const ProductsView = () => {
                       </button>
                       <button 
                         onClick={() => handleDelete(p.id)}
-                        className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                        disabled={deletingIds.has(p.id)}
+                        className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all disabled:opacity-40"
                       >
-                        <Trash2 size={16} />
+                        {deletingIds.has(p.id) ? (
+                          <span className="inline-block w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
                       </button>
                     </div>
                   </td>

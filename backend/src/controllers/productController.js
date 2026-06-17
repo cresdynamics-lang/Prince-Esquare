@@ -1,3 +1,4 @@
+const { deleteProductsByIds } = require('../services/productDelete');
 const { formatResponse } = require('../utils/responseFormatter');
 const { applyProductImageOptimization, optimizeCloudinaryUrl } = require('../utils/cloudinaryImage');
 const db = require('../config/db');
@@ -392,11 +393,8 @@ exports.bulkProductAction = async (req, res, next) => {
 
         const handlers = {
             delete: async () => {
-                const r = await db.query(
-                    'DELETE FROM products WHERE id = ANY($1::uuid[]) RETURNING id',
-                    [uuidList]
-                );
-                return { deleted: r.rows.length };
+                const deleted = await deleteProductsByIds(uuidList);
+                return { deleted };
             },
             feature: async () => {
                 const r = await db.query(
@@ -506,9 +504,8 @@ exports.patchProductFlags = async (req, res, next) => {
 exports.deleteProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const result = await db.query('DELETE FROM products WHERE id = $1 RETURNING id', [id]);
-
-        if (result.rows.length === 0) {
+        const deleted = await deleteProductsByIds([id]);
+        if (!deleted) {
             return formatResponse(res, 404, false, 'Product not found');
         }
 
