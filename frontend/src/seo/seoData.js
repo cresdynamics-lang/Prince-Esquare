@@ -3,6 +3,7 @@ export const SITE_NAME = 'Prince Esquire';
 export const DEFAULT_IMAGE = `${SITE_URL}/LOGO.jpeg`;
 export const CONTACT_PHONE = '+254724494089';
 export const CONTACT_EMAIL = 'prince.esquire.staff@gmail.com';
+export const SOCIAL_INSTAGRAM = 'https://www.instagram.com/prince_esquire.1/';
 
 export const routeSeo = {
   home: {
@@ -86,7 +87,7 @@ export const organizationSchema = {
     addressCountry: 'KE',
   },
   sameAs: [
-    'https://www.instagram.com/prince_esquire',
+    SOCIAL_INSTAGRAM,
     'https://www.facebook.com/princeesquire',
     'https://www.tiktok.com/@princeesquire',
   ],

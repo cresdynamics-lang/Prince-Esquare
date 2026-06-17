@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { Globe, Compass, MessageSquare, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { Globe, MessageSquare, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { SITE_URL, SOCIAL_INSTAGRAM } from '../seo/seoData';
 
 const Footer = () => {
   const [whatsappOpen, setWhatsappOpen] = React.useState(false);
@@ -20,7 +21,14 @@ const Footer = () => {
               Quality craftsmanship meets timeless elegance.
             </p>
             <div className="flex space-x-6">
-              <motion.a href="#" whileHover={{ y: -5, color: '#c58a3d' }} className="text-navy-400 hover:text-gold-500 transition-colors">
+              <motion.a
+                href={SOCIAL_INSTAGRAM}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow Prince Esquire on Instagram"
+                whileHover={{ y: -5, color: '#c58a3d' }}
+                className="text-navy-400 hover:text-gold-500 transition-colors"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
               </motion.a>
               <motion.a href="#" whileHover={{ y: -5, color: '#c58a3d' }} className="text-navy-400 hover:text-gold-500 transition-colors">
@@ -78,10 +86,22 @@ const Footer = () => {
             <Mail size={18} className="text-gold-600" />
             <span className="text-xs tracking-widest uppercase">prince.esquire.staff@gmail.com</span>
           </div>
-          <div className="flex items-center space-x-4 text-navy-400">
+          <a
+            href={SITE_URL}
+            className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors"
+          >
             <Globe size={18} className="text-gold-600" />
             <span className="text-xs tracking-widest uppercase">prince-esquire.co.ke</span>
-          </div>
+          </a>
+          <a
+            href={SOCIAL_INSTAGRAM}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            <span className="text-xs tracking-widest uppercase">@prince_esquire.1</span>
+          </a>
         </div>
 
         <div className="text-center pt-12">
