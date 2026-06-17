@@ -4,6 +4,7 @@ export const DEFAULT_IMAGE = `${SITE_URL}/LOGO.jpeg`;
 export const CONTACT_PHONE = '+254724494089';
 export const CONTACT_EMAIL = 'prince.esquire.staff@gmail.com';
 export const SOCIAL_INSTAGRAM = 'https://www.instagram.com/prince_esquire.1/';
+export const SOCIAL_FACEBOOK = 'https://www.facebook.com/prince.esquire254';
 
 export const routeSeo = {
   home: {
@@ -88,7 +89,7 @@ export const organizationSchema = {
   },
   sameAs: [
     SOCIAL_INSTAGRAM,
-    'https://www.facebook.com/princeesquire',
+    SOCIAL_FACEBOOK,
     'https://www.tiktok.com/@princeesquire',
   ],
 };
