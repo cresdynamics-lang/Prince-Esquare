@@ -554,7 +554,7 @@ exports.adminGetProducts = async (req, res, next) => {
             where = ` WHERE (p.name ILIKE $1 OR p.sku ILIKE $1 OR p.slug ILIKE $1) `;
         }
         const productCols = lite
-            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.category_id, p.brand_id, p.created_at`
+            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.cost_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.category_id, p.brand_id, p.created_at`
             : 'p.*';
         const result = await db.query(
             `SELECT ${productCols}, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.created_at DESC`,

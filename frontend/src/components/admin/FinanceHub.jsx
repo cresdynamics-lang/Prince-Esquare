@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import PosTerminalView from '../pos/PosTerminalView';
-import { FinanceOverview } from '../../pages/AdminDashboard';
+import FinanceOverview from './FinanceOverview';
 import { canUsePosTerminal } from '../../utils/staffPermissions';
 import { AdminPosTerminalInfo, PosOverviewView, PosSalesView } from './pos/PosAdminViews';
 

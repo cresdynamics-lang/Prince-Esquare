@@ -75,6 +75,17 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
   }, [loadSummary]);
 
   useEffect(() => {
+    if (!selectedCategory && categorySummary.length > 0) {
+      setSelectedCategory(categorySummary[0].name);
+    }
+  }, [categorySummary, selectedCategory]);
+
+  useEffect(() => {
+    if (!selectedCategory) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     loadStock(selectedCategory);
   }, [selectedCategory, loadStock]);
 

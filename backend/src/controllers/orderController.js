@@ -211,15 +211,55 @@ exports.getOrderDetail = async (req, res, next) => {
 // @route   GET /api/admin/orders
 exports.adminGetOrders = async (req, res, next) => {
     try {
+        const clauses = ['1=1'];
+        const params = [];
+        let i = 1;
+
+        if (req.query.from) {
+            clauses.push(`o.created_at >= $${i++}`);
+            params.push(req.query.from);
+        }
+        if (req.query.to) {
+            const to = new Date(req.query.to);
+            if (!Number.isNaN(to.getTime())) {
+                to.setHours(23, 59, 59, 999);
+                clauses.push(`o.created_at <= $${i++}`);
+                params.push(to.toISOString());
+            }
+        }
+
         const result = await db.query(
             `SELECT o.*,
               ${guestNameSql} AS customer_name,
               COALESCE(u.email, o.shipping_address->>'email') AS customer_email
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
-             ORDER BY o.created_at DESC`
+             WHERE ${clauses.join(' AND ')}
+             ORDER BY o.created_at DESC`,
+            params
         );
-        formatResponse(res, 200, true, 'All orders fetched', result.rows);
+
+        const orders = result.rows;
+        const includeItems = req.query.include_items === '1' || req.query.include_items === 'true';
+        if (includeItems && orders.length > 0) {
+            const orderIds = orders.map((o) => o.id);
+            const itemsResult = await db.query(
+                'SELECT oi.*, p.name, p.sku AS product_sku, COALESCE(v.sku, v.stock_id) AS variant_sku, v.size AS variant_size ' +
+                'FROM order_items oi JOIN products p ON oi.product_id = p.id ' +
+                'LEFT JOIN product_variants v ON oi.variant_id = v.id WHERE oi.order_id = ANY($1::uuid[])',
+                [orderIds]
+            );
+            const itemsByOrder = {};
+            for (const item of itemsResult.rows) {
+                if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+                itemsByOrder[item.order_id].push(item);
+            }
+            for (const order of orders) {
+                order.items = itemsByOrder[order.id] || [];
+            }
+        }
+
+        formatResponse(res, 200, true, 'All orders fetched', orders);
     } catch (error) {
         next(error);
     }
