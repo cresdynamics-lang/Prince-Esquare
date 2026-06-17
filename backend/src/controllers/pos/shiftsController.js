@@ -71,6 +71,18 @@ exports.myCurrentShift = async (req, res, next) => {
   }
 };
 
+exports.forceCloseShift = async (req, res, next) => {
+  try {
+    const closed = await posDb.forceCloseShiftById(req.params.id);
+    if (!closed) return formatResponse(res, 404, false, 'Open shift not found');
+    const { invalidateOverviewCache } = require('./overviewController');
+    invalidateOverviewCache();
+    formatResponse(res, 200, true, 'Shift closed', closed);
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.myShiftSummary = async (req, res, next) => {
   try {
     const actorId = req.posActorId || req.user.id;

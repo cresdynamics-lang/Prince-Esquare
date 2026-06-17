@@ -25,7 +25,7 @@ exports.getCustomers = async (req, res, next) => {
 
         const result = await db.query(
             `SELECT 
-                u.id, u.name, u.email, u.phone, u.avatar, u.role,
+                u.id, u.name, u.email, u.phone, u.avatar, u.role, u.permissions,
                 u.is_verified, COALESCE(u.is_active, true) AS is_active, u.created_at,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE user_id = u.id AND status != 'cancelled') as total_spent
              FROM users u
@@ -122,7 +122,7 @@ exports.updateStaffPermissions = async (req, res, next) => {
     const { permissions } = req.body;
     try {
         const result = await db.query(
-            'UPDATE users SET permissions = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND role = $3 RETURNING id, name, permissions',
+            'UPDATE users SET permissions = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND role = $3 RETURNING id, name, email, role, permissions',
             [JSON.stringify(permissions), id, 'staff']
         );
 
@@ -130,7 +130,97 @@ exports.updateStaffPermissions = async (req, res, next) => {
             return formatResponse(res, 404, false, 'Staff not found');
         }
 
-        formatResponse(res, 200, true, 'Staff permissions updated', result.rows[0]);
+        const staff = result.rows[0];
+        const perms = Array.isArray(permissions) ? permissions : [];
+        const profileR = await db.query('SELECT id FROM pos_profiles WHERE LOWER(email) = LOWER($1) LIMIT 1', [staff.email]);
+
+        if (perms.includes('pos-terminal')) {
+            const { ensurePosProfileForStaffUser } = require('../services/staffPosBridge');
+            await ensurePosProfileForStaffUser(staff);
+            if (profileR.rows[0]) {
+                await db.query('UPDATE pos_profiles SET is_active = true WHERE id = $1', [profileR.rows[0].id]);
+            }
+        } else if (profileR.rows[0]) {
+            await db.query(
+                `UPDATE pos_shifts SET clock_out = NOW() WHERE seller_id = $1 AND clock_out IS NULL`,
+                [profileR.rows[0].id]
+            );
+            await db.query('UPDATE pos_profiles SET is_active = false WHERE id = $1', [profileR.rows[0].id]);
+        }
+
+        formatResponse(res, 200, true, 'Staff permissions updated', staff);
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateStaff = async (req, res, next) => {
+    const { id } = req.params;
+    const { name, permissions } = req.body;
+    try {
+        const existing = await db.query('SELECT id, name, email FROM users WHERE id = $1 AND role = $2', [id, 'staff']);
+        if (!existing.rows.length) {
+            return formatResponse(res, 404, false, 'Staff not found');
+        }
+
+        const updates = [];
+        const params = [];
+        let i = 1;
+
+        if (typeof name === 'string' && name.trim()) {
+            updates.push(`name = $${i++}`);
+            params.push(name.trim());
+        }
+        if (Array.isArray(permissions)) {
+            updates.push(`permissions = $${i++}`);
+            params.push(JSON.stringify(permissions));
+        }
+
+        if (!updates.length) {
+            return formatResponse(res, 400, false, 'Nothing to update');
+        }
+
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(id);
+
+        const result = await db.query(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} AND role = 'staff'
+             RETURNING id, name, email, role, permissions, COALESCE(is_active, true) AS is_active`,
+            params
+        );
+
+        const staff = result.rows[0];
+        if (Array.isArray(permissions)) {
+            const profileR = await db.query('SELECT id FROM pos_profiles WHERE LOWER(email) = LOWER($1) LIMIT 1', [staff.email]);
+            if (permissions.includes('pos-terminal')) {
+                const { ensurePosProfileForStaffUser } = require('../services/staffPosBridge');
+                await ensurePosProfileForStaffUser(staff);
+                if (profileR.rows[0]) {
+                    await db.query('UPDATE pos_profiles SET is_active = true, full_name = $1 WHERE id = $2', [
+                        staff.name,
+                        profileR.rows[0].id,
+                    ]);
+                }
+            } else if (profileR.rows[0]) {
+                await db.query(
+                    `UPDATE pos_shifts SET clock_out = NOW() WHERE seller_id = $1 AND clock_out IS NULL`,
+                    [profileR.rows[0].id]
+                );
+                await db.query('UPDATE pos_profiles SET is_active = false WHERE id = $1', [profileR.rows[0].id]);
+            } else if (typeof name === 'string' && name.trim()) {
+                await db.query('UPDATE pos_profiles SET full_name = $1 WHERE LOWER(email) = LOWER($2)', [
+                    staff.name,
+                    staff.email,
+                ]);
+            }
+        } else if (typeof name === 'string' && name.trim()) {
+            await db.query('UPDATE pos_profiles SET full_name = $1 WHERE LOWER(email) = LOWER($2)', [
+                staff.name,
+                staff.email,
+            ]);
+        }
+
+        formatResponse(res, 200, true, 'Staff updated', staff);
     } catch (error) {
         next(error);
     }
@@ -139,15 +229,24 @@ exports.updateStaffPermissions = async (req, res, next) => {
 exports.deleteStaff = async (req, res, next) => {
     const { id } = req.params;
     try {
-        const result = await db.query(
-            'DELETE FROM users WHERE id = $1 AND role = $2 RETURNING id, name',
-            [id, 'staff']
-        );
-
-        if (result.rows.length === 0) {
+        const staffR = await db.query('SELECT id, name, email FROM users WHERE id = $1 AND role = $2', [id, 'staff']);
+        if (!staffR.rows.length) {
             return formatResponse(res, 404, false, 'Staff not found');
         }
 
+        const staff = staffR.rows[0];
+        const profileR = await db.query('SELECT id FROM pos_profiles WHERE LOWER(email) = LOWER($1) LIMIT 1', [
+            staff.email,
+        ]);
+        if (profileR.rows[0]) {
+            await db.query(
+                `UPDATE pos_shifts SET clock_out = NOW() WHERE seller_id = $1 AND clock_out IS NULL`,
+                [profileR.rows[0].id]
+            );
+            await db.query('UPDATE pos_profiles SET is_active = false WHERE id = $1', [profileR.rows[0].id]);
+        }
+
+        const result = await db.query('DELETE FROM users WHERE id = $1 AND role = $2 RETURNING id, name', [id, 'staff']);
         formatResponse(res, 200, true, 'Staff deleted successfully', result.rows[0]);
     } catch (error) {
         next(error);

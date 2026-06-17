@@ -60,7 +60,16 @@ const getOverviewPayload = async () => {
 
     ),
 
-    db.query(`SELECT COUNT(*)::int AS c FROM pos_shifts WHERE clock_out IS NULL`),
+    db.query(
+      `SELECT s.id AS shift_id, s.seller_id, s.clock_in,
+              pr.full_name AS seller_name, pr.email AS seller_email,
+              u.role AS user_role
+       FROM pos_shifts s
+       LEFT JOIN pos_profiles pr ON pr.id = s.seller_id
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(pr.email)
+       WHERE s.clock_out IS NULL
+       ORDER BY s.clock_in DESC`
+    ),
 
     db.query(
 
@@ -120,7 +129,15 @@ const getOverviewPayload = async () => {
 
       monthRevenue: monthR.rows[0].revenue,
 
-      activeSellers: activeR.rows[0].c,
+      activeSellers: activeR.rows.length,
+      openShifts: activeR.rows.map((row) => ({
+        shiftId: row.shift_id,
+        sellerId: row.seller_id,
+        sellerName: row.seller_name || 'Unknown seller',
+        sellerEmail: row.seller_email || null,
+        userRole: row.user_role || null,
+        clockIn: row.clock_in,
+      })),
 
     },
 

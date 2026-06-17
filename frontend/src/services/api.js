@@ -173,6 +173,9 @@ export const adminCustomerAPI = {
   getOne: (id) => API.get(`/admin/customers/${id}`),
   updateStatus: (id, status) => API.patch(`/admin/customers/${id}/status`, { is_active: status }),
   createStaff: (data) => API.post('/admin/customers/staff', data),
+  updateStaff: (id, data) => API.patch(`/admin/customers/staff/${id}`, data),
+  updateStaffPermissions: (id, permissions) =>
+    API.patch(`/admin/customers/staff/${id}/permissions`, { permissions }),
   deleteStaff: (id) => API.delete(`/admin/customers/staff/${id}`),
 };
 
@@ -387,7 +390,8 @@ export const posSettingsAPI = {
 };
 
 export const posAdminAPI = {
-  getOverview: () => API.get('/pos-admin/overview'),
+  getOverview: (config) => API.get('/pos-admin/overview', config),
+  forceCloseShift: (shiftId) => API.post(`/shifts/${shiftId}/force-close`),
   auditLog: (params) => API.get('/pos-admin/audit-log', { params }),
 };
 

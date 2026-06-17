@@ -63,6 +63,7 @@ import {
   canManageUsers,
   canAccessFinance,
   isFullAdmin,
+  parsePermissions,
   STAFF_PERMISSION_GROUPS,
 } from '../utils/staffPermissions';
 
@@ -411,10 +412,17 @@ const AdminDashboard = () => {
 // --- Sub-views ---
 
 const DashboardView = ({ onOpenPos }) => {
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
   const [stats, setStats] = useState(null);
   const [salesData, setSalesData] = useState([]);
   const [posOverview, setPosOverview] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [closingShiftId, setClosingShiftId] = useState(null);
+
+  const loadPosOverview = async () => {
+    const posRes = await posAdminAPI.getOverview({ params: { refresh: '1' } }).catch(() => null);
+    if (posRes?.data?.data) setPosOverview(posRes.data.data);
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -437,6 +445,19 @@ const DashboardView = ({ onOpenPos }) => {
 
     fetchDashboardData();
   }, []);
+
+  const handleForceCloseShift = async (shiftId) => {
+    setClosingShiftId(shiftId);
+    try {
+      await posAdminAPI.forceCloseShift(shiftId);
+      await loadPosOverview();
+      adminToast.success('Open shift closed');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not close shift'));
+    } finally {
+      setClosingShiftId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -493,7 +514,7 @@ const DashboardView = ({ onOpenPos }) => {
             {[
               ['Today (shop)', `KSh ${Number(posOverview.kpis?.todayRevenue || 0).toLocaleString()}`],
               ['This week', `KSh ${Number(posOverview.kpis?.weekRevenue || 0).toLocaleString()}`],
-              ['Active sellers', posOverview.kpis?.activeSellers ?? 0],
+              ['Open shifts', posOverview.kpis?.activeSellers ?? 0],
               ['Low stock items', posOverview.lowStockItems?.length ?? 0],
             ].map(([label, value]) => (
               <div key={label} className="bg-navy-950/50 border border-gold-500/10 rounded-xl p-4">
@@ -502,6 +523,53 @@ const DashboardView = ({ onOpenPos }) => {
               </div>
             ))}
           </div>
+          {posOverview.kpis?.openShifts?.length > 0 && (
+            <div className="mt-4 rounded-xl border border-gold-500/10 bg-navy-950/40 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gold-500/50 mb-3">
+                Clocked in now (POS shifts not yet closed)
+              </p>
+              <div className="space-y-2">
+                {posOverview.kpis.openShifts.map((shift) => (
+                  <div
+                    key={shift.shiftId}
+                    className="flex flex-wrap items-center justify-between gap-3 text-sm text-gold-100/90"
+                  >
+                    <div>
+                      <span className="font-semibold">{shift.sellerName}</span>
+                      {shift.sellerEmail && (
+                        <span className="text-gold-500/50 text-xs ml-2">{shift.sellerEmail}</span>
+                      )}
+                      {shift.userRole && (
+                        <span className="text-[9px] uppercase tracking-widest text-gold-500/40 ml-2">
+                          {shift.userRole}
+                        </span>
+                      )}
+                      {!shift.userRole && (
+                        <span className="text-[9px] uppercase tracking-widest text-amber-400/70 ml-2">
+                          legacy POS profile
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-gold-500/40">
+                        since {new Date(shift.clockIn).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleForceCloseShift(shift.shiftId)}
+                          disabled={closingShiftId === shift.shiftId}
+                          className="text-[10px] font-bold uppercase tracking-widest text-red-300/80 hover:text-red-300 disabled:opacity-50"
+                        >
+                          {closingShiftId === shift.shiftId ? 'Closing…' : 'Close shift'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3684,6 +3752,7 @@ const AdminsView = ({ roleFilter = null }) => {
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -3713,6 +3782,7 @@ const AdminsView = ({ roleFilter = null }) => {
   }, []);
 
   const handleOpenModal = () => {
+    setEditingStaff(null);
     setFormData({
       name: '',
       email: '',
@@ -3722,20 +3792,41 @@ const AdminsView = ({ roleFilter = null }) => {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (staff) => {
+    setEditingStaff(staff);
+    setFormData({
+      name: staff.name || '',
+      email: staff.email || '',
+      password: '',
+      permissions: parsePermissions(staff.permissions),
+    });
+    setIsModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingStaff(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await adminCustomerAPI.createStaff(formData);
+      if (editingStaff) {
+        await adminCustomerAPI.updateStaff(editingStaff.id, {
+          name: formData.name,
+          permissions: formData.permissions,
+        });
+        adminToast.success('Staff duties updated');
+      } else {
+        await adminCustomerAPI.createStaff(formData);
+        adminToast.success('Staff account created');
+      }
       setIsModalOpen(false);
+      setEditingStaff(null);
       fetchAdmins();
     } catch (error) {
-      console.error('Error creating staff:', error);
-      alert('Error creating staff member.');
+      adminToast.error(apiErrorMessage(error, editingStaff ? 'Could not update staff' : 'Could not create staff'));
     } finally {
       setSubmitting(false);
     }
@@ -3760,10 +3851,10 @@ const AdminsView = ({ roleFilter = null }) => {
     if (!ok) return;
     try {
       await adminCustomerAPI.deleteStaff(id);
+      adminToast.success('Staff removed');
       fetchAdmins();
     } catch (error) {
-      console.error('Error deleting staff:', error);
-      alert('Error deleting staff member.');
+      adminToast.error(apiErrorMessage(error, 'Could not remove staff'));
     }
   };
 
@@ -3806,17 +3897,42 @@ const AdminsView = ({ roleFilter = null }) => {
                   {admin.role}
                 </span>
               </div>
+              {admin.role === 'staff' && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {parsePermissions(admin.permissions).length > 0 ? (
+                    parsePermissions(admin.permissions).map((perm) => (
+                      <span
+                        key={perm}
+                        className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-navy-950/60 border border-gold-500/10 text-gold-500/70"
+                      >
+                        {perm.replace(/-/g, ' ')}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[9px] uppercase tracking-wider text-gold-500/30">No duties assigned</span>
+                  )}
+                </div>
+              )}
               <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
                 <span className="text-gold-500/30 uppercase">ID: {admin.id.substring(0, 8)}</span>
                 <div className="flex gap-2">
                   {admin.role === 'staff' && (
-                    <button 
-                      onClick={() => handleDeleteStaff(admin.id)}
-                      className="p-1.5 rounded-lg text-red-400/40 hover:text-red-400 hover:bg-red-400/5 transition-all"
-                      title="Remove Staff"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleOpenEdit(admin)}
+                        className="p-1.5 rounded-lg text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 transition-all"
+                        title="Edit duties"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteStaff(admin.id)}
+                        className="p-1.5 rounded-lg text-red-400/40 hover:text-red-400 hover:bg-red-400/5 transition-all"
+                        title="Remove Staff"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
                   )}
                   <button 
                     onClick={() => handleToggleStatus(admin.id, admin.is_active !== false)}
@@ -3851,7 +3967,9 @@ const AdminsView = ({ roleFilter = null }) => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex shrink-0 justify-between items-center p-6 border-b border-gold-500/10 bg-navy-900/50">
-                <h3 className="font-serif font-bold text-gold-100 text-xl">Add staff</h3>
+                <h3 className="font-serif font-bold text-gold-100 text-xl">
+                  {editingStaff ? 'Edit staff duties' : 'Add staff'}
+                </h3>
                 <button type="button" onClick={handleCloseModal} className="text-gold-500/40 hover:text-gold-500 transition-colors">
                   <X size={20} />
                 </button>
@@ -3877,13 +3995,15 @@ const AdminsView = ({ roleFilter = null }) => {
                   <input 
                     type="email" 
                     required
+                    readOnly={Boolean(editingStaff)}
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
+                    className={`w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20 ${editingStaff ? 'opacity-60 cursor-not-allowed' : ''}`}
                     placeholder="staff@prince-esquare.com"
                   />
                 </div>
 
+                {!editingStaff && (
                 <div>
                   <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Temporary Password</label>
                   <input 
@@ -3895,6 +4015,7 @@ const AdminsView = ({ roleFilter = null }) => {
                     placeholder="••••••••"
                   />
                 </div>
+                )}
 
                 <div>
                   <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access Permissions</label>
@@ -3942,7 +4063,7 @@ const AdminsView = ({ roleFilter = null }) => {
                     disabled={submitting}
                     className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
                   >
-                    {submitting ? 'CREATING...' : 'CREATE STAFF ACCOUNT'}
+                    {submitting ? (editingStaff ? 'SAVING...' : 'CREATING...') : (editingStaff ? 'SAVE DUTIES' : 'CREATE STAFF ACCOUNT')}
                   </button>
                 </div>
               </form>

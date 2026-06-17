@@ -476,7 +476,7 @@ export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory, onEnableT
           {[
             ['Today (POS)', data.kpis.todayRevenue],
             ['This week', data.kpis.weekRevenue],
-            ['Active sellers now', data.kpis.activeSellers],
+            ['Open shifts', data.kpis.activeSellers],
             ['This month', data.kpis.monthRevenue],
           ].map(([label, val]) => (
             <div key={label} className="bg-navy-900/50 border border-gold-500/10 rounded-xl p-4">

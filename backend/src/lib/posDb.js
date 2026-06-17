@@ -1203,9 +1203,7 @@ const createShift = async (sellerId) => {
   return r.rows[0];
 };
 
-const closeShift = async (sellerId) => {
-  const shift = await getOpenShift(sellerId);
-  if (!shift) return null;
+const finalizeShiftClose = async (shift, sellerId) => {
 
   const salesR = await db.query(
     `SELECT * FROM pos_sales WHERE shift_id = $1 AND is_voided = false`,
@@ -1250,6 +1248,19 @@ const closeShift = async (sellerId) => {
       })),
     })),
   };
+};
+
+const closeShift = async (sellerId) => {
+  const shift = await getOpenShift(sellerId);
+  if (!shift) return null;
+  return finalizeShiftClose(shift, sellerId);
+};
+
+const forceCloseShiftById = async (shiftId) => {
+  const r = await db.query(`SELECT * FROM pos_shifts WHERE id = $1 AND clock_out IS NULL`, [shiftId]);
+  if (!r.rows.length) return null;
+  const shift = r.rows[0];
+  return finalizeShiftClose(shift, shift.seller_id);
 };
 
 const listShifts = async ({ sellerId, from, to, limit, skip }) => {
@@ -1378,6 +1389,7 @@ module.exports = {
   getOpenShift,
   createShift,
   closeShift,
+  forceCloseShiftById,
   listShifts,
   getShiftById,
   listAuditLogs,
