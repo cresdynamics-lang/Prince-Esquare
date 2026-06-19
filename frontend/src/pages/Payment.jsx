@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Smartphone, CreditCard } from 'lucide-react';
+import { ChevronLeft, Smartphone, CreditCard, MessageCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuthStore } from '../store/useAuthStore';
 import { orderAPI, paymentAPI } from '../services/api';
+import { buildWhatsAppCheckoutLink } from '../utils/whatsapp';
 
 const isCustomerSession = () => {
   const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
@@ -89,6 +90,31 @@ const Payment = () => {
     }
   };
 
+  const handleWhatsAppCheckout = () => {
+    // Build order summary for WhatsApp
+    const customerName = order?.shipping_address?.first_name || 'Valued Customer';
+    const orderItems = order?.line_items || [];
+    
+    // Format items for message
+    const items = orderItems.map(item => ({
+      name: item.product_name || item.name || 'Item',
+      quantity: item.quantity || 1,
+      price: parseFloat(item.unit_price || item.price || 0),
+    }));
+
+    const totals = {
+      subtotal: Math.round(total * (100 / 116)), // Reverse calculate from total
+      tax: Math.round(total * (16 / 116)),
+      shipping: 250,
+      total: Math.round(total),
+    };
+
+    const waLink = buildWhatsAppCheckoutLink(items, totals, customerName);
+    window.open(waLink, '_blank', 'noopener,noreferrer');
+    setDone(true);
+    sessionStorage.removeItem('checkout-email');
+  };
+
   return (
     <div className="bg-navy-950 min-h-screen">
       <Navbar />
@@ -157,6 +183,21 @@ const Payment = () => {
                 </button>
               </div>
             )}
+
+            {/* WhatsApp Payment Option */}
+            <div className="border-t border-gold-500/10 pt-6 space-y-4">
+              <p className="text-center text-[10px] text-gold-500/70 uppercase tracking-widest font-bold">Alternative Payment</p>
+              <button
+                type="button"
+                onClick={handleWhatsAppCheckout}
+                disabled={busy}
+                className="w-full bg-green-600 text-white py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+              >
+                <MessageCircle size={16} />
+                <span>Send Order via WhatsApp</span>
+              </button>
+              <p className="text-[9px] text-navy-400 text-center italic">Click to send your order details to WhatsApp and confirm payment</p>
+            </div>
           </div>
         )}
       </main>
