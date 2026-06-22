@@ -277,7 +277,7 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
       <div className="bg-navy-900/50 border border-gold-500/10 rounded-xl p-4 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end gap-3">
           <label className="flex-1 space-y-1.5">
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/60 font-bold">Category</span>
+            <span className="text-[10px]   text-gold-500/60 font-bold">Category</span>
             <div className="relative">
               <select
                 value={selectedCategory}

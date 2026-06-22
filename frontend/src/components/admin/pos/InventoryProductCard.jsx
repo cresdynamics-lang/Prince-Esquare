@@ -77,7 +77,7 @@ const InventoryProductCard = ({
           <div className="shrink-0 w-full sm:w-44 min-h-[7rem] bg-navy-900/80 rounded-lg border border-gold-500/10 p-3 flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5 text-gold-500/50">
               <FileText size={12} />
-              <span className="text-[10px] uppercase tracking-widest font-bold">Inventory record</span>
+              <span className="text-[10px]   font-bold">Inventory record</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed flex-1">
               {product.description ||
@@ -131,7 +131,7 @@ const InventoryProductCard = ({
 
           {onThresholdChange && !readOnly && (
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="text-gold-500/50 uppercase tracking-widest">Low at</span>
+              <span className="text-gold-500/50  ">Low at</span>
               <input
                 type="number"
                 min={0}
@@ -157,7 +157,7 @@ const InventoryProductCard = ({
 
       {hasVariants && (
         <div className="px-4 pb-4 space-y-3 border-t border-gold-500/10 pt-3 mx-4">
-          <p className="text-[10px] uppercase tracking-widest text-gold-500/50">
+          <p className="text-[10px]   text-gold-500/50">
             {liveOnWeb ? 'Colors & sizes (shop floor count)' : 'Colors & sizes (draft — publish to go live)'}
           </p>
           {colorGroups.map((group) => {

@@ -69,10 +69,10 @@ const Profile = () => {
               </div>
               
               <div className="text-center md:text-left space-y-2">
-                <h1 className="text-4xl text-white uppercase tracking-widest">{user?.name}</h1>
+                <h1 className="text-4xl text-white  ">{user?.name}</h1>
                 <p className="text-gold-500/60 font-light italic">{user?.email}</p>
                 <div className="flex items-center gap-4 pt-2">
-                  <span className="text-[10px] bg-gold-600/10 text-gold-500 border border-gold-600/20 px-3 py-1 uppercase tracking-widest font-bold">
+                  <span className="text-[10px] bg-gold-600/10 text-gold-500 border border-gold-600/20 px-3 py-1   font-bold">
                     Member Since {new Date(user?.created_at).getFullYear() || 2024}
                   </span>
                 </div>
@@ -83,7 +83,7 @@ const Profile = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleLogout}
-                  className="flex items-center gap-3 text-red-500/70 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest border border-red-500/20 px-6 py-3 transition-all"
+                  className="flex items-center gap-3 text-red-500/70 hover:text-red-400 text-[10px] font-bold   border border-red-500/20 px-6 py-3 transition-all"
                 >
                   <LogOut size={14} />
                   Sign Out
@@ -99,7 +99,7 @@ const Profile = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center justify-between p-5 text-[11px] font-bold uppercase tracking-[0.2em] transition-all border ${
+                  className={`w-full flex items-center justify-between p-5 text-[11px] font-bold  tracking-[0.2em] transition-all border ${
                     activeTab === tab.id 
                       ? 'bg-gold-600 text-navy-950 border-gold-600' 
                       : 'text-gold-500/50 border-gold-600/10 hover:border-gold-600/40 hover:text-gold-500'
@@ -127,25 +127,25 @@ const Profile = () => {
                   {activeTab === 'orders' && (
                     <div className="space-y-8">
                       <div className="flex justify-between items-end border-b border-gold-600/10 pb-6">
-                        <h2 className="text-2xl text-white uppercase tracking-widest">Recent Orders</h2>
-                        <span className="text-[10px] text-gold-600/50 uppercase tracking-widest">{orders.length} total</span>
+                        <h2 className="text-2xl text-white  ">Recent Orders</h2>
+                        <span className="text-[10px] text-gold-600/50  ">{orders.length} total</span>
                       </div>
 
                       {loading ? (
                         <div className="flex flex-col items-center justify-center py-24 space-y-4">
                           <div className="w-12 h-12 border-2 border-gold-600 border-t-transparent animate-spin" />
-                          <p className="text-gold-600/50 text-[10px] uppercase tracking-widest">Loading orders...</p>
+                          <p className="text-gold-600/50 text-[10px]  ">Loading orders...</p>
                         </div>
                       ) : orders.length === 0 ? (
                         <div className="text-center py-24 border border-dashed border-gold-600/20 space-y-6">
                           <ShoppingBag size={48} className="mx-auto text-gold-600/20" />
                           <div className="space-y-2">
                             <p className="text-white text-lg italic">Your collection is empty.</p>
-                            <p className="text-gold-600/50 text-[10px] uppercase tracking-widest">Begin your bespoke journey today.</p>
+                            <p className="text-gold-600/50 text-[10px]  ">Begin your bespoke journey today.</p>
                           </div>
                           <button 
                             onClick={() => navigate('/products')}
-                            className="bg-gold-600 text-navy-950 px-8 py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 transition-all"
+                            className="bg-gold-600 text-navy-950 px-8 py-4 text-[10px] font-bold   hover:bg-gold-500 transition-all"
                           >
                             Explore Collection
                           </button>
@@ -160,8 +160,8 @@ const Profile = () => {
                               <div className="flex flex-col md:flex-row justify-between gap-6">
                                 <div className="space-y-4">
                                   <div className="flex items-center gap-4">
-                                    <span className="text-gold-500 text-[10px] font-bold uppercase tracking-widest">Order #{order.id.slice(-8).toUpperCase()}</span>
-                                    <span className={`text-[9px] px-3 py-1 uppercase tracking-widest font-bold ${
+                                    <span className="text-gold-500 text-[10px] font-bold  ">Order #{order.id.slice(-8).toUpperCase()}</span>
+                                    <span className={`text-[9px] px-3 py-1   font-bold ${
                                       order.status === 'completed' ? 'bg-green-500/10 text-green-500' :
                                       order.status === 'cancelled' ? 'bg-red-500/10 text-red-500' :
                                       'bg-gold-600/10 text-gold-500'
@@ -182,7 +182,7 @@ const Profile = () => {
                                 <div className="flex items-center">
                                   <button 
                                     onClick={() => navigate(`/payment/${order.id}`)}
-                                    className="text-gold-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 group-hover:gap-4 transition-all"
+                                    className="text-gold-500 text-[10px] font-bold   flex items-center gap-2 group-hover:gap-4 transition-all"
                                   >
                                     View Details <ChevronRight size={14} />
                                   </button>
@@ -197,27 +197,27 @@ const Profile = () => {
 
                   {activeTab === 'details' && (
                     <div className="space-y-8 bg-navy-900/30 border border-gold-600/10 p-12">
-                       <h2 className="text-2xl text-white uppercase tracking-widest border-b border-gold-600/10 pb-6">Personal Details</h2>
+                       <h2 className="text-2xl text-white   border-b border-gold-600/10 pb-6">Personal Details</h2>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                           <div className="space-y-2">
-                            <label className="text-[10px] text-gold-600/50 uppercase tracking-[0.2em] font-bold">Full Name</label>
+                            <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Full Name</label>
                             <p className="text-white text-lg font-serif border-b border-gold-600/10 pb-2">{user?.name}</p>
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[10px] text-gold-600/50 uppercase tracking-[0.2em] font-bold">Email Address</label>
+                            <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Email Address</label>
                             <p className="text-white text-lg font-serif border-b border-gold-600/10 pb-2">{user?.email}</p>
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[10px] text-gold-600/50 uppercase tracking-[0.2em] font-bold">Phone Number</label>
+                            <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Phone Number</label>
                             <p className="text-white text-lg font-serif border-b border-gold-600/10 pb-2">{user?.phone || 'Not set'}</p>
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[10px] text-gold-600/50 uppercase tracking-[0.2em] font-bold">Preferred Style</label>
+                            <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Preferred Style</label>
                             <p className="text-gold-500 text-lg font-serif border-b border-gold-600/10 pb-2 italic">Bespoke Tailoring</p>
                           </div>
                        </div>
                        <div className="pt-8">
-                         <button className="bg-transparent border border-gold-600/30 text-gold-500 px-8 py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-600 hover:text-navy-950 transition-all">
+                         <button className="bg-transparent border border-gold-600/30 text-gold-500 px-8 py-4 text-[10px] font-bold   hover:bg-gold-600 hover:text-navy-950 transition-all">
                            Update Profile
                          </button>
                        </div>
@@ -227,23 +227,23 @@ const Profile = () => {
                   {activeTab === 'addresses' && (
                     <div className="space-y-8">
                       <div className="flex justify-between items-end border-b border-gold-600/10 pb-6">
-                        <h2 className="text-2xl text-white uppercase tracking-widest">Saved Addresses</h2>
-                        <button className="text-gold-500 text-[10px] font-bold uppercase tracking-widest">+ Add New</button>
+                        <h2 className="text-2xl text-white  ">Saved Addresses</h2>
+                        <button className="text-gold-500 text-[10px] font-bold  ">+ Add New</button>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-navy-900/50 border border-gold-600/10 p-8 space-y-4 relative group">
                           <div className="absolute top-4 right-4">
-                            <span className="text-[8px] border border-gold-600/30 text-gold-600 px-2 py-1 uppercase font-bold tracking-widest">Default</span>
+                            <span className="text-[8px] border border-gold-600/30 text-gold-600 px-2 py-1  font-bold ">Default</span>
                           </div>
-                          <h3 className="text-white uppercase tracking-widest text-sm font-bold">Primary Residence</h3>
+                          <h3 className="text-white   text-sm font-bold">Primary Residence</h3>
                           <div className="text-navy-400 text-xs space-y-1 font-light">
                             <p>Luxury Avenue, Garden Chambers</p>
                             <p>Apartment 4B, 3rd Floor</p>
                             <p>Nairobi, Kenya</p>
                           </div>
                           <div className="pt-4 flex gap-6">
-                            <button className="text-[9px] text-gold-600/50 hover:text-gold-500 uppercase tracking-widest font-bold">Edit</button>
-                            <button className="text-[9px] text-red-500/50 hover:text-red-400 uppercase tracking-widest font-bold">Remove</button>
+                            <button className="text-[9px] text-gold-600/50 hover:text-gold-500   font-bold">Edit</button>
+                            <button className="text-[9px] text-red-500/50 hover:text-red-400   font-bold">Remove</button>
                           </div>
                         </div>
                       </div>
@@ -252,11 +252,11 @@ const Profile = () => {
 
                   {activeTab === 'security' && (
                     <div className="space-y-8 bg-navy-900/30 border border-gold-600/10 p-12">
-                      <h2 className="text-2xl text-white uppercase tracking-widest border-b border-gold-600/10 pb-6">Security Settings</h2>
+                      <h2 className="text-2xl text-white   border-b border-gold-600/10 pb-6">Security Settings</h2>
                       <div className="max-w-md space-y-8">
                         <div className="space-y-6">
                           <div className="space-y-2">
-                            <label className="text-[10px] text-gold-600/50 uppercase tracking-[0.2em] font-bold ml-1">Current Password</label>
+                            <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold ml-1">Current Password</label>
                             <input 
                               type="password"
                               className="w-full bg-navy-950 border border-gold-600/10 py-4 px-6 text-white text-sm outline-none focus:border-gold-500"
@@ -264,7 +264,7 @@ const Profile = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[10px] text-gold-600/50 uppercase tracking-[0.2em] font-bold ml-1">New Password</label>
+                            <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold ml-1">New Password</label>
                             <input 
                               type="password"
                               className="w-full bg-navy-950 border border-gold-600/10 py-4 px-6 text-white text-sm outline-none focus:border-gold-500"
@@ -272,7 +272,7 @@ const Profile = () => {
                             />
                           </div>
                         </div>
-                        <button className="w-full bg-gold-600 text-navy-950 py-5 text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all">
+                        <button className="w-full bg-gold-600 text-navy-950 py-5 text-[10px] font-bold   shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all">
                           Change Password
                         </button>
                       </div>

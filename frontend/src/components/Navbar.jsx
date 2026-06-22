@@ -157,7 +157,7 @@ const Navbar = () => {
             <div key={item.name} className="relative group">
               <button 
                 onClick={() => handleCategoryClick(item.category)}
-                className="text-[9px] 2xl:text-[10px] font-bold tracking-[0.18em] 2xl:tracking-[0.24em] uppercase text-white hover:text-gold-400 transition-colors duration-300"
+                className="text-[9px] 2xl:text-[10px] font-bold tracking-[0.18em] 2xl:tracking-[0.24em]  text-white hover:text-gold-400 transition-colors duration-300"
               >
                 {item.name}
               </button>
@@ -174,7 +174,7 @@ const Navbar = () => {
                         <button
                           key={sub}
                           onClick={() => moreTarget ? handleCategoryClick(moreTarget.category) : handleCategoryClick(item.category, sub)}
-                          className="block w-full text-left text-[9px] font-bold uppercase tracking-[0.2em] text-navy-200 hover:text-gold-400 transition-colors"
+                          className="block w-full text-left text-[9px] font-bold  tracking-[0.2em] text-navy-200 hover:text-gold-400 transition-colors"
                         >
                           {sub}
                         </button>
@@ -182,7 +182,7 @@ const Navbar = () => {
                       <div className="pt-2 border-t border-gold-500/10">
                         <button 
                           onClick={() => handleCategoryClick(item.category)}
-                          className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold-500 hover:text-white transition-colors"
+                          className="text-[9px] font-bold  tracking-[0.2em] text-gold-500 hover:text-white transition-colors"
                         >
                           Shop All
                         </button>
@@ -215,12 +215,12 @@ const Navbar = () => {
             {isAuthenticated && (
               <div className="absolute top-full right-0 mt-6 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
                 <div className="bg-navy-950/95 border border-gold-500/20 p-6 min-w-[180px] shadow-2xl">
-                  <p className="text-[10px] text-gold-500 mb-4 uppercase tracking-[0.2em] font-bold border-b border-gold-500/10 pb-2">{user?.name}</p>
+                  <p className="text-[10px] text-gold-500 mb-4  tracking-[0.2em] font-bold border-b border-gold-500/10 pb-2">{user?.name}</p>
                   <div className="space-y-3">
-                    <Link to="/profile" className="block text-[10px] font-bold uppercase tracking-widest text-navy-200 hover:text-gold-400">My Account</Link>
+                    <Link to="/profile" className="block text-[10px] font-bold   text-navy-200 hover:text-gold-400">My Account</Link>
                     <button 
                       onClick={logout}
-                      className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-red-400/70 hover:text-red-400 transition-colors"
+                      className="flex items-center space-x-2 text-[10px] font-bold   text-red-400/70 hover:text-red-400 transition-colors"
                     >
                       <LogOut size={12} />
                       <span>Sign Out</span>
@@ -272,7 +272,7 @@ const Navbar = () => {
                       onClick={() => item.sub.length ? toggleMobileCategory(item.category) : handleCategoryClick(item.category)}
                       className="flex w-full items-center justify-between gap-4 text-left"
                     >
-                      <span className="text-xl font-serif text-white uppercase tracking-[0.08em]">
+                      <span className="text-xl font-serif text-white  tracking-[0.08em]">
                         {item.name}
                       </span>
                       {item.sub.length > 0 && (
@@ -295,7 +295,7 @@ const Navbar = () => {
                             <button
                               type="button"
                               onClick={() => handleCategoryClick(item.category)}
-                              className="text-left text-[10px] font-black uppercase tracking-widest text-gold-400 hover:text-gold-200"
+                              className="text-left text-[10px] font-black   text-gold-400 hover:text-gold-200"
                             >
                               Shop All {item.name}
                             </button>
@@ -304,7 +304,7 @@ const Navbar = () => {
                                 key={sub}
                                 type="button"
                                 onClick={() => handleCategoryClick(item.category, sub)}
-                                className="text-left text-[10px] font-bold uppercase tracking-widest text-navy-300 hover:text-gold-400"
+                                className="text-left text-[10px] font-bold   text-navy-300 hover:text-gold-400"
                               >
                                 {sub}
                               </button>
@@ -317,7 +317,7 @@ const Navbar = () => {
                 ))}
                 
                 <div className="pt-10 border-t border-gold-500/10">
-                  <Link to="/products" className="text-xl font-serif text-gold-500 uppercase tracking-widest">Shop All</Link>
+                  <Link to="/products" className="text-xl font-serif text-gold-500  ">Shop All</Link>
                 </div>
               </div>
             </motion.div>

@@ -92,7 +92,7 @@ export function ConfirmProvider({ children }) {
                   <div className="flex-1 min-w-0 pt-1">
                     <h3
                       id="confirm-dialog-title"
-                      className="text-lg font-serif font-bold text-gold-100 uppercase tracking-wide"
+                      className="text-lg font-serif font-bold text-gold-100  tracking-wide"
                     >
                       {state.title}
                     </h3>
@@ -114,14 +114,14 @@ export function ConfirmProvider({ children }) {
                   <button
                     type="button"
                     onClick={() => close(false)}
-                    className="w-full sm:w-auto px-6 py-3 rounded-xl border border-gold-500/20 text-gold-500/80 text-[10px] font-black uppercase tracking-[0.2em] hover:border-gold-500/40 hover:text-gold-500 transition-all"
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl border border-gold-500/20 text-gold-500/80 text-[10px] font-black  tracking-[0.2em] hover:border-gold-500/40 hover:text-gold-500 transition-all"
                   >
                     {state.cancelLabel}
                   </button>
                   <button
                     type="button"
                     onClick={() => close(true)}
-                    className={`w-full sm:w-auto px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-lg ${styles.button}`}
+                    className={`w-full sm:w-auto px-6 py-3 rounded-xl text-[10px] font-black  tracking-[0.2em] transition-all shadow-lg ${styles.button}`}
                   >
                     {state.confirmLabel}
                   </button>

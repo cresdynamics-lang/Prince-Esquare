@@ -356,7 +356,7 @@ const FinanceOverview = () => {
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Shop + online — one view</span>
+          <span className="text-[10px] font-black  tracking-[0.3em] text-gold-500/40">Shop + online — one view</span>
           <h3 className="text-3xl font-serif font-bold text-gold-100 mt-2">Finance</h3>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -365,7 +365,7 @@ const FinanceOverview = () => {
               key={p}
               type="button"
               onClick={() => setPeriod(p)}
-              className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+              className={`px-5 py-3 rounded-xl text-[10px] font-black   border transition-all ${
                 period === p
                   ? 'bg-gold-600 text-navy-950 border-gold-600'
                   : 'bg-navy-900/50 text-gold-500/70 border-gold-500/10 hover:border-gold-500/40'
@@ -399,9 +399,9 @@ const FinanceOverview = () => {
               <div className="w-11 h-11 rounded-xl bg-gold-600/10 border border-gold-500/10 flex items-center justify-center text-gold-500">
                 <card.icon size={20} />
               </div>
-              <span className="text-[10px] text-green-400 font-black uppercase tracking-widest">Live</span>
+              <span className="text-[10px] text-green-400 font-black  ">Live</span>
             </div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/40 font-black">{card.label}</p>
+            <p className="text-[10px]  tracking-[0.2em] text-gold-500/40 font-black">{card.label}</p>
             <h4 className="text-2xl font-serif font-bold text-gold-100 mt-2">{card.value}</h4>
             <p className="text-xs text-gold-500/40 mt-2">{card.detail}</p>
           </button>
@@ -412,11 +412,11 @@ const FinanceOverview = () => {
         <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
           <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
             <h4 className="font-serif font-bold text-xl text-gold-100">Opening &amp; Closing Stock (today)</h4>
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">By category — from POS inventory</span>
+            <span className="text-[10px]   text-gold-500/40">By category — from POS inventory</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-navy-800/50 text-gold-500/50 text-xs uppercase">
+              <thead className="bg-navy-800/50 text-gold-500/50 text-xs ">
                 <tr>
                   <th className="p-3">Category</th>
                   <th className="p-3 text-center">Opening</th>
@@ -449,7 +449,7 @@ const FinanceOverview = () => {
         <div className="xl:col-span-2 bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-8">
             <h4 className="font-serif font-bold text-xl text-gold-100">Revenue Graph</h4>
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">{getPeriodLabel(period)}</span>
+            <span className="text-[10px]   text-gold-500/40">{getPeriodLabel(period)}</span>
           </div>
           <div className="h-72 flex items-end gap-3">
             {chartData.map((item) => (
@@ -461,7 +461,7 @@ const FinanceOverview = () => {
                     style={{ height: `${Math.max(5, (item.total / maxChart) * 100)}%` }}
                   />
                 </div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-gold-500/40 text-center">{item.label}</div>
+                <div className="text-[10px] font-black   text-gold-500/40 text-center">{item.label}</div>
               </div>
             ))}
           </div>
@@ -474,7 +474,7 @@ const FinanceOverview = () => {
               <div key={item.id || item.name} className="flex items-center justify-between p-4 rounded-xl bg-navy-950/50 border border-gold-500/5">
                 <div>
                   <p className="text-sm font-bold text-gold-100">{item.name}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40">Rank #{index + 1}</p>
+                  <p className="text-[10px]   text-gold-500/40">Rank #{index + 1}</p>
                 </div>
                 <span className="text-gold-500 font-black">{item.quantity || item.sales || 0}</span>
               </div>
@@ -487,12 +487,12 @@ const FinanceOverview = () => {
         <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
           <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
             <h4 className="font-serif font-bold text-xl text-gold-100">Products Sold - {getPeriodLabel(period)}</h4>
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">{soldProducts.length} products</span>
+            <span className="text-[10px]   text-gold-500/40">{soldProducts.length} products</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-navy-800/50">
-                <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+                <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                   <th className="px-6 py-4">Product</th>
                   <th className="px-6 py-4">Sold</th>
                   <th className="px-6 py-4">Revenue</th>
@@ -520,7 +520,7 @@ const FinanceOverview = () => {
         <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
           <div className="p-6 border-b border-gold-500/10 flex items-center justify-between">
             <h4 className="font-serif font-bold text-xl text-gold-100">Stock Manager</h4>
-            <span className="text-[10px] uppercase tracking-widest text-gold-500/40">Website stock · {totalStock.toLocaleString()} pieces</span>
+            <span className="text-[10px]   text-gold-500/40">Website stock · {totalStock.toLocaleString()} pieces</span>
           </div>
           <div className="max-h-[520px] overflow-y-auto custom-scrollbar divide-y divide-gold-500/5">
             {products.slice(0, 18).map((product) => (
@@ -542,13 +542,13 @@ const FinanceOverview = () => {
                       )}
                     </div>
                     <div className="min-w-0">
-                    <p className="text-sm font-bold text-gold-100 uppercase">{product.name}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40">
+                    <p className="text-sm font-bold text-gold-100 ">{product.name}</p>
+                    <p className="text-[10px]   text-gold-500/40">
                       {product.category_name || 'Uncategorized'} - {formatMoney(product.price)} - Total stock {getProductStockTotal(product)}
                     </p>
                   </div>
                 </div>
-                  <span className="px-4 py-2 border border-gold-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold-500">
+                  <span className="px-4 py-2 border border-gold-500/20 rounded-xl text-[10px] font-black   text-gold-500">
                     Manage
                   </span>
                   </div>
@@ -573,8 +573,8 @@ const FinanceOverview = () => {
                   )}
                 </div>
                 <div>
-                  <p className="text-xl font-serif font-bold text-gold-100 uppercase">{stockModalProduct.name}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mt-1">
+                  <p className="text-xl font-serif font-bold text-gold-100 ">{stockModalProduct.name}</p>
+                  <p className="text-[10px]   text-gold-500/40 mt-1">
                     {stockModalProduct.category_name || 'Uncategorized'} - {formatMoney(stockModalProduct.price)}
                   </p>
                 </div>
@@ -588,10 +588,10 @@ const FinanceOverview = () => {
               {getVariantRows(stockModalProduct).length > 0 ? getVariantRows(stockModalProduct).map((variant) => (
                 <div key={stockKey(stockModalProduct, variant)} className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center bg-navy-950/60 border border-gold-500/5 rounded-2xl p-4">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-gold-100">
+                    <p className="text-[11px] font-black   text-gold-100">
                       Size {variant.size || 'Standard'}{variant.color ? ` - ${variant.color}` : ''}
                     </p>
-                    <p className="text-[9px] uppercase tracking-widest text-gold-500/30 mt-1">
+                    <p className="text-[9px]   text-gold-500/30 mt-1">
                       SKU: {variant.sku || variant.stock_id || 'Not set'}
                     </p>
                   </div>
@@ -628,8 +628,8 @@ const FinanceOverview = () => {
               )) : (
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-center bg-navy-950/60 border border-gold-500/5 rounded-2xl p-4">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-gold-100">Product total stock</p>
-                    <p className="text-[9px] uppercase tracking-widest text-gold-500/30 mt-1">No size variants saved</p>
+                    <p className="text-[11px] font-black   text-gold-100">Product total stock</p>
+                    <p className="text-[9px]   text-gold-500/30 mt-1">No size variants saved</p>
                   </div>
                   <input
                     type="number"
@@ -643,14 +643,14 @@ const FinanceOverview = () => {
             </div>
 
             <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gold-500/10">
-              <button type="button" onClick={() => setStockModalProduct(null)} className="px-6 py-3 rounded-xl bg-navy-800 text-gold-500/70 text-[10px] font-black uppercase tracking-widest">
+              <button type="button" onClick={() => setStockModalProduct(null)} className="px-6 py-3 rounded-xl bg-navy-800 text-gold-500/70 text-[10px] font-black  ">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleStockSave(stockModalProduct)}
                 disabled={savingStockId === stockModalProduct.id}
-                className="px-6 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                className="px-6 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-black   disabled:opacity-50"
               >
                 {savingStockId === stockModalProduct.id ? 'Updating' : 'Update Stock'}
               </button>
@@ -663,7 +663,7 @@ const FinanceOverview = () => {
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
           <div className="bg-navy-900 border border-gold-500/20 rounded-3xl p-6 w-full max-w-3xl max-h-[88vh] overflow-y-auto custom-scrollbar shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">Low Stock Sizes</h4>
+              <h4 className="text-2xl font-serif font-bold text-gold-100  ">Low Stock Sizes</h4>
               <button type="button" onClick={() => setIsLowStockOpen(false)} className="text-gold-500/40 hover:text-gold-500">
                 <X size={22} />
               </button>
@@ -686,8 +686,8 @@ const FinanceOverview = () => {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gold-100 uppercase">{row.name}</p>
-                      <p className="text-[10px] uppercase tracking-widest text-gold-500/40">
+                      <p className="text-sm font-bold text-gold-100 ">{row.name}</p>
+                      <p className="text-[10px]   text-gold-500/40">
                         Size {row.size}{row.color ? ` - ${row.color}` : ''} - {row.stockId || 'No stock ID'}
                       </p>
                     </div>

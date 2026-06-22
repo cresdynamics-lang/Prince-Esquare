@@ -591,13 +591,13 @@ const ProductsView = () => {
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">
+        <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100  ">
           Products ({filteredProducts.length}{filteredProducts.length !== products.length ? ` of ${products.length}` : ''})
         </h3>
         <button 
           type="button"
           onClick={() => handleOpenModal()}
-          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-xs sm:text-sm"
+          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black  tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-xs sm:text-sm"
         >
           <Plus size={20} /> Add Product
         </button>
@@ -663,7 +663,7 @@ const ProductsView = () => {
             type="button"
             disabled={bulkBusy}
             onClick={() => runBulkAction('publish')}
-            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-green-500/30 text-green-400 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-black   border border-green-500/30 text-green-400 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
           >
             Publish
           </button>
@@ -671,7 +671,7 @@ const ProductsView = () => {
             type="button"
             disabled={bulkBusy}
             onClick={() => runBulkAction('unpublish')}
-            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-gold-500/20 text-gold-500/60 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-black   border border-gold-500/20 text-gold-500/60 rounded-lg hover:bg-navy-800/50 disabled:opacity-50"
           >
             Unpublish
           </button>
@@ -679,7 +679,7 @@ const ProductsView = () => {
             type="button"
             disabled={bulkBusy}
             onClick={() => runBulkAction('delete')}
-            className="px-3 py-1.5 text-xs font-black uppercase tracking-widest border border-red-500/40 text-red-400 rounded-lg hover:bg-red-400/10 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-black   border border-red-500/40 text-red-400 rounded-lg hover:bg-red-400/10 disabled:opacity-50"
           >
             <Trash2 size={12} className="inline mr-1 -mt-0.5" />
             Delete selected
@@ -704,7 +704,7 @@ const ProductsView = () => {
           <AdminTable>
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+              <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                 <th className="px-4 py-4 w-12">
                   <input
                     type="checkbox"
@@ -756,26 +756,26 @@ const ProductsView = () => {
                         )}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
-                        <div className="text-[10px] font-mono text-gold-500/40 uppercase mt-1">{p.slug}</div>
+                        <div className="text-sm font-bold text-gold-100 ">{p.name}</div>
+                        <div className="text-[10px] font-mono text-gold-500/40  mt-1">{p.slug}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono text-[10px] text-gold-500/70 uppercase">{p.sku || '—'}</td>
-                  <td className="px-6 py-4 text-[10px] font-bold text-gold-500/60 uppercase">{p.category_name || 'Uncategorized'}</td>
+                  <td className="px-6 py-4 font-mono text-[10px] text-gold-500/70 ">{p.sku || '—'}</td>
+                  <td className="px-6 py-4 text-[10px] font-bold text-gold-500/60 ">{p.category_name || 'Uncategorized'}</td>
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.price).toLocaleString()}</td>
                   <td className="px-6 py-4">
-                    <div className={`text-[10px] font-black uppercase ${p.stock_quantity === 0 ? 'text-red-400' : p.stock_quantity < 10 ? 'text-gold-500' : 'text-green-400'}`}>
+                    <div className={`text-[10px] font-black  ${p.stock_quantity === 0 ? 'text-red-400' : p.stock_quantity < 10 ? 'text-gold-500' : 'text-green-400'}`}>
                       {p.stock_quantity === 0 ? 'Out of Stock' : `${p.stock_quantity} units`}
                     </div>
                     {variantColors.length > 0 && (
-                      <p className="text-[9px] text-gold-500/40 mt-1 uppercase tracking-wider">
+                      <p className="text-[9px] text-gold-500/40 mt-1  tracking-wider">
                         {variantColors.length} color{variantColors.length !== 1 ? 's' : ''}
                       </p>
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${p.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'}`}>
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${p.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'}`}>
                       {p.is_active ? 'Active' : 'Hidden'}
                     </span>
                   </td>
@@ -807,7 +807,7 @@ const ProductsView = () => {
           </table>
           </AdminTable>
         ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm uppercase tracking-widest">
+          <div className="py-24 text-center text-gold-500/40 text-sm  ">
             No products match your filters.
           </div>
         )}
@@ -822,7 +822,7 @@ const ProductsView = () => {
             className="bg-navy-900 border border-gold-500/20 rounded-t-3xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl custom-scrollbar"
           >
             <div className="flex items-center justify-between mb-8">
-              <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">
+              <h4 className="text-2xl font-serif font-bold text-gold-100  ">
                 {currentProduct ? 'Edit Product' : 'Add New Product'}
               </h4>
               <button type="button" onClick={closeProductModal} className="text-gold-500/40 hover:text-gold-500">
@@ -833,11 +833,11 @@ const ProductsView = () => {
             <form onSubmit={handleSubmit} className="space-y-10">
               {/* Basic Info */}
               <div className="space-y-6">
-                <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">General Information</h5>
+                <h5 className="text-xs font-black text-gold-500  tracking-[0.3em] border-b border-gold-500/10 pb-2">General Information</h5>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Product Name</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Product Name</label>
                     <input 
                       type="text" 
                       required
@@ -851,11 +851,11 @@ const ProductsView = () => {
                           sku: formData.sku ? formData.sku : buildProductSku(val),
                         });
                       }}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Slug</label>
                     <input 
                       type="text" 
                       required
@@ -868,7 +868,7 @@ const ProductsView = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Website Price (KSh)</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Website Price (KSh)</label>
                     <input 
                       type="number" 
                       required
@@ -878,7 +878,7 @@ const ProductsView = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">POS / Shop Price (KSh)</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">POS / Shop Price (KSh)</label>
                     <input
                       type="number"
                       min="0"
@@ -890,7 +890,7 @@ const ProductsView = () => {
                     <p className="text-[9px] text-gold-500/35">In-store price for this product — not the category bucket average.</p>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Store intake qty</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Store intake qty</label>
                     <input
                       type="number"
                       min="0"
@@ -906,8 +906,8 @@ const ProductsView = () => {
                 <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gold-400">Offers</p>
-                      <p className="text-[9px] uppercase tracking-wider text-gold-500/35 mt-1">Enable when this product has a sale or special price.</p>
+                      <p className="text-[10px] font-black  tracking-[0.25em] text-gold-400">Offers</p>
+                      <p className="text-[9px]  tracking-wider text-gold-500/35 mt-1">Enable when this product has a sale or special price.</p>
                     </div>
                     <button
                       type="button"
@@ -925,7 +925,7 @@ const ProductsView = () => {
 
                   {formData.show_offer && (
                     <div className="space-y-2">
-                      <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Offer Price (KSh)</label>
+                      <label className="text-[10px] text-gold-500/40   font-black">Offer Price (KSh)</label>
                       <input
                         type="number"
                         min="0"
@@ -939,8 +939,8 @@ const ProductsView = () => {
 
                 <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-5">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gold-400">Category</p>
-                    <p className="text-[9px] uppercase tracking-wider text-gold-500/35 mt-1">Tick the main category first, then tick a subcategory when it applies.</p>
+                    <p className="text-[10px] font-black  tracking-[0.25em] text-gold-400">Category</p>
+                    <p className="text-[9px]  tracking-wider text-gold-500/35 mt-1">Tick the main category first, then tick a subcategory when it applies.</p>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -959,14 +959,14 @@ const ProductsView = () => {
                           onChange={() => handleCategorySelect(category)}
                           className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
                         />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{category.name}</span>
+                        <span className="text-[10px] font-black  ">{category.name}</span>
                       </label>
                     ))}
                   </div>
 
                   {subCategories.length > 0 && (
                     <div className="space-y-3 pt-4 border-t border-gold-500/10">
-                      <p className="text-[9px] font-black uppercase tracking-[0.25em] text-gold-500/50">Subcategory</p>
+                      <p className="text-[9px] font-black  tracking-[0.25em] text-gold-500/50">Subcategory</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {subCategories.map((category) => (
                           <label
@@ -983,7 +983,7 @@ const ProductsView = () => {
                               onChange={() => handleSubCategorySelect(category)}
                               className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
                             />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{category.name}</span>
+                            <span className="text-[10px] font-black  ">{category.name}</span>
                           </label>
                         ))}
                       </div>
@@ -992,27 +992,27 @@ const ProductsView = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                  <label className="text-[10px] text-gold-500/40   font-black">Description</label>
                   <textarea 
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
-                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold "
                   />
                 </div>
               </div>
 
               {/* Media Section */}
               <div className="space-y-6">
-                <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">Product Media</h5>
+                <h5 className="text-xs font-black text-gold-500  tracking-[0.3em] border-b border-gold-500/10 pb-2">Product Media</h5>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Main Thumbnail</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Main Thumbnail</label>
                     <div className="flex items-center gap-6 p-6 bg-navy-950 border-2 border-dashed border-gold-500/10 rounded-2xl group hover:border-gold-500/30 transition-all relative">
                       {uploading && (
                         <div className="absolute inset-0 bg-navy-950/60 backdrop-blur-[2px] z-20 flex items-center justify-center rounded-2xl">
                           <div className="flex flex-col items-center gap-2">
                              <div className="w-6 h-6 border-2 border-gold-500 border-t-transparent animate-spin rounded-full" />
-                             <span className="text-[8px] font-black uppercase text-gold-500 tracking-widest">Uploading to Cloudinary...</span>
+                             <span className="text-[8px] font-black  text-gold-500 ">Uploading to Cloudinary...</span>
                           </div>
                         </div>
                       )}
@@ -1041,10 +1041,10 @@ const ProductsView = () => {
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <p className="text-[10px] font-black text-gold-100 uppercase tracking-widest">
+                        <p className="text-[10px] font-black text-gold-100  ">
                           {formData.thumbnailPreview ? 'Current Thumbnail' : 'Select Thumbnail'}
                         </p>
-                        <p className="text-[9px] text-gold-500/40 uppercase tracking-wider">
+                        <p className="text-[9px] text-gold-500/40  tracking-wider">
                           {formData.thumbnailPreview ? 'Hover to remove and select a different one' : 'Drag and drop or click to upload'}
                         </p>
                       </div>
@@ -1053,9 +1053,9 @@ const ProductsView = () => {
                   
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Additional Gallery Images</label>
+                      <label className="text-[10px] text-gold-500/40   font-black">Additional Gallery Images</label>
                       <div className="relative">
-                        <button type="button" className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
+                        <button type="button" className="text-[10px] text-gold-500 hover:text-gold-300 font-black  flex items-center gap-2 transition-colors">
                           <Plus size={14} /> {uploading ? 'Processing...' : 'Attach Photos'}
                         </button>
                         <input 
@@ -1096,8 +1096,8 @@ const ProductsView = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
                   <div>
-                    <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Colors & Sizes</h5>
-                    <p className="text-[9px] text-gold-500/40 uppercase tracking-wider mt-1">
+                    <h5 className="text-xs font-black text-gold-500  tracking-[0.3em]">Colors & Sizes</h5>
+                    <p className="text-[9px] text-gold-500/40  tracking-wider mt-1">
                       Choose which sizes exist for each color. Admin sets website stock in Inventory — not here.
                     </p>
                   </div>
@@ -1107,7 +1107,7 @@ const ProductsView = () => {
                       ...prev,
                       color_groups: [...prev.color_groups, newColorGroup('')],
                     }))}
-                    className="flex items-center gap-1 text-[10px] text-gold-400 hover:text-gold-300 font-black uppercase tracking-widest"
+                    className="flex items-center gap-1 text-[10px] text-gold-400 hover:text-gold-300 font-black  "
                   >
                     <Plus size={14} /> Add color
                   </button>
@@ -1115,14 +1115,14 @@ const ProductsView = () => {
 
                 <div className="bg-navy-950/50 border border-gold-500/15 rounded-2xl p-6 space-y-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Base SKU</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Base SKU</label>
                     <input
                       type="text"
                       required
                       placeholder="E.G. CLARKS-TAN-WINGTIP"
                       value={formData.sku}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                      className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold uppercase font-mono"
+                      className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-3 px-4 text-gold-100 text-[11px] outline-none focus:border-gold-500/20 font-bold  font-mono"
                     />
                   </div>
 
@@ -1130,7 +1130,7 @@ const ProductsView = () => {
                     <div key={group._key} className="border border-gold-500/15 rounded-xl p-4 space-y-4 bg-navy-900/40">
                       <div className="flex flex-wrap gap-3 items-start">
                         <div className="flex-1 min-w-[160px] space-y-1">
-                          <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Color name</label>
+                          <label className="text-[10px] text-gold-500/40   font-black">Color name</label>
                           <input
                             type="text"
                             placeholder="e.g. Black, Navy, Tan"
@@ -1145,7 +1145,7 @@ const ProductsView = () => {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Color image</label>
+                          <label className="text-[10px] text-gold-500/40   font-black">Color image</label>
                           <div className="flex items-center gap-2">
                             {group.imagePreview && (
                               <img src={group.imagePreview} alt="" className="w-12 h-12 object-cover rounded border border-gold-500/20" />
@@ -1171,7 +1171,7 @@ const ProductsView = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Sizes for this color</label>
+                        <label className="text-[10px] text-gold-500/40   font-black">Sizes for this color</label>
                         <div className="flex flex-wrap gap-1.5">
                           {sizeOptions.map((sz) => (
                             <button
@@ -1247,7 +1247,7 @@ const ProductsView = () => {
                       onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
                       className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
                     />
-                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured (homepage carousel)</span>
+                    <span className="text-[10px] font-black  text-gold-100  group-hover:text-gold-500 transition-colors">Featured (homepage carousel)</span>
                   </label>
                   {canPublish && (
                   <label className="flex items-center gap-3 cursor-pointer group">
@@ -1257,7 +1257,7 @@ const ProductsView = () => {
                       onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
                       className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
                     />
-                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Active / Published</span>
+                    <span className="text-[10px] font-black  text-gold-100  group-hover:text-gold-500 transition-colors">Active / Published</span>
                   </label>
                   )}
                 </div>
@@ -1266,14 +1266,14 @@ const ProductsView = () => {
                   <button 
                     type="button"
                     onClick={closeProductModal}
-                    className="px-8 py-4 bg-navy-800 text-gold-500/60 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-navy-700 hover:text-gold-500 transition-all border border-gold-500/10"
+                    className="px-8 py-4 bg-navy-800 text-gold-500/60 rounded-xl font-black  tracking-[0.2em] hover:bg-navy-700 hover:text-gold-500 transition-all border border-gold-500/10"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
                     disabled={submitting}
-                    className="px-12 py-4 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all disabled:opacity-50 shadow-xl shadow-gold-600/20"
+                    className="px-12 py-4 bg-gold-600 text-navy-950 rounded-xl font-black  tracking-[0.2em] hover:bg-gold-500 transition-all disabled:opacity-50 shadow-xl shadow-gold-600/20"
                   >
                     {submitting ? 'COMMITTING...' : 'SAVE PRODUCT'}
                   </button>

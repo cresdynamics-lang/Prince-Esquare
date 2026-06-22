@@ -141,7 +141,7 @@ const StockExcelToolbar = ({ onImported, sheetDate, readOnly = false }) => {
 
   return (
     <div className="space-y-3 p-4 bg-navy-900/50 border border-gold-500/10 rounded-xl">
-      <h3 className="text-gold-400 text-sm font-medium uppercase tracking-wider">Opening Stock — Excel Upload</h3>
+      <h3 className="text-gold-400 text-sm font-medium  tracking-wider">Opening Stock — Excel Upload</h3>
       <div className="flex flex-wrap items-center gap-2">
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm" title="Sheet date" />
         {!readOnly && (
@@ -244,7 +244,7 @@ const UnifiedStockSheetToolbar = ({ category = '', onImported, readOnly = false 
 
   return (
     <div className="space-y-2 p-4 bg-navy-900/50 border border-gold-500/15 rounded-xl">
-      <h3 className="text-gold-400 text-sm font-medium uppercase tracking-wider">Stock sheet</h3>
+      <h3 className="text-gold-400 text-sm font-medium  tracking-wider">Stock sheet</h3>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="date"
@@ -317,7 +317,7 @@ const ProductCatalogToolbar = ({ category = '', onImported, readOnly = false }) 
 
   return (
     <div className="space-y-2 p-4 bg-navy-900/50 border border-sky-500/15 rounded-xl">
-      <h3 className="text-sky-300 text-sm font-medium uppercase tracking-wider">Product Catalog</h3>
+      <h3 className="text-sky-300 text-sm font-medium  tracking-wider">Product Catalog</h3>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -405,7 +405,7 @@ const VariantStockToolbar = ({ category = '', onImported, readOnly = false }) =>
 
   return (
     <div className="space-y-2 p-4 bg-navy-900/50 border border-emerald-500/20 rounded-xl">
-      <h3 className="text-emerald-300 text-sm font-medium uppercase tracking-wider">Variant Stock</h3>
+      <h3 className="text-emerald-300 text-sm font-medium  tracking-wider">Variant Stock</h3>
       {summary && (transferNeeded > 0 || outCount > 0) && (
         <p className="text-[11px] text-gold-500/60">
           {transferNeeded > 0 && (
@@ -480,7 +480,7 @@ export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory, onEnableT
             ['This month', data.kpis.monthRevenue],
           ].map(([label, val]) => (
             <div key={label} className="bg-navy-900/50 border border-gold-500/10 rounded-xl p-4">
-              <p className="text-gold-500/50 text-[10px] uppercase tracking-wider">{label}</p>
+              <p className="text-gold-500/50 text-[10px]  tracking-wider">{label}</p>
               <p className="text-xl font-bold text-gold-400 mt-1">
                 {typeof val === 'number' && !String(label).includes('seller')
                   ? formatKES(val)
@@ -496,7 +496,7 @@ export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory, onEnableT
           <button
             type="button"
             onClick={onEnableTestPos}
-            className="px-5 py-3 rounded-xl bg-sky-600 text-white text-[10px] font-black uppercase tracking-widest"
+            className="px-5 py-3 rounded-xl bg-sky-600 text-white text-[10px] font-black  "
           >
             Open test checkout
           </button>
@@ -504,14 +504,14 @@ export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory, onEnableT
         <button
           type="button"
           onClick={() => go('pos-sales')}
-          className="px-5 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-black uppercase tracking-widest"
+          className="px-5 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-black  "
         >
           View POS Sales
         </button>
         <button
           type="button"
           onClick={() => go('sellers')}
-          className="px-5 py-3 rounded-xl border border-gold-500/30 text-gold-400 text-[10px] font-black uppercase tracking-widest hover:bg-navy-800/50"
+          className="px-5 py-3 rounded-xl border border-gold-500/30 text-gold-400 text-[10px] font-black   hover:bg-navy-800/50"
         >
           <Users size={14} className="inline mr-2 -mt-0.5" />
           Manage Sellers
@@ -519,7 +519,7 @@ export const AdminPosTerminalInfo = ({ onNavigateTab, onOpenInventory, onEnableT
         <button
           type="button"
           onClick={() => go('overview')}
-          className="px-5 py-3 rounded-xl border border-gold-500/30 text-gold-400 text-[10px] font-black uppercase tracking-widest hover:bg-navy-800/50"
+          className="px-5 py-3 rounded-xl border border-gold-500/30 text-gold-400 text-[10px] font-black   hover:bg-navy-800/50"
         >
           POS Overview
         </button>
@@ -554,7 +554,7 @@ export const PosOverviewView = () => {
           ['Low stock items', data.lowStockItems?.length ?? 0],
         ].map(([label, val]) => (
           <div key={label} className="bg-navy-900/50 border border-gold-500/10 rounded-xl p-4">
-            <p className="text-gold-500/50 text-xs uppercase">{label}</p>
+            <p className="text-gold-500/50 text-xs ">{label}</p>
             <p className="text-2xl font-bold text-gold-400 mt-1">
               {typeof val === 'number' && label !== 'Active sellers' && label !== 'Low stock items'
                 ? formatKES(val)
@@ -607,7 +607,7 @@ export const PosSalesView = ({ channel = 'POS', readOnly = false }) => {
       {loading ? <TableSkeleton /> : sales.length === 0 ? <Empty message="No sales" /> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-gold-500/50 text-xs uppercase">
+            <thead className="text-gold-500/50 text-xs ">
               <tr><th className="p-2">Receipt</th><th>Date</th><th>Seller</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
@@ -899,7 +899,7 @@ const StockSummaryCategoryRow = ({ row, expanded, onToggle, piecesState, onLoadM
                     type="button"
                     disabled={transferBusy}
                     onClick={() => onBulkToShop(category)}
-                    className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded border border-gold-500/30 text-gold-400 hover:bg-gold-600/10 disabled:opacity-50"
+                    className="text-[10px] font-bold   px-3 py-1.5 rounded border border-gold-500/30 text-gold-400 hover:bg-gold-600/10 disabled:opacity-50"
                   >
                     Move all warehouse → shop
                   </button>
@@ -1372,19 +1372,19 @@ export const StockTakeView = ({ readOnly = false }) => {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
         <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
-          <p className="text-gold-500/40 uppercase tracking-wider">Cost value (counted)</p>
+          <p className="text-gold-500/40  tracking-wider">Cost value (counted)</p>
           <p className="text-gold-200 font-semibold mt-1">{fmt(totals.costValue)}</p>
         </div>
         <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
-          <p className="text-gold-500/40 uppercase tracking-wider">Retail value (counted)</p>
+          <p className="text-gold-500/40  tracking-wider">Retail value (counted)</p>
           <p className="text-gold-200 font-semibold mt-1">{fmt(totals.retailValue)}</p>
         </div>
         <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
-          <p className="text-gold-500/40 uppercase tracking-wider">Potential profit</p>
+          <p className="text-gold-500/40  tracking-wider">Potential profit</p>
           <p className="text-emerald-400 font-semibold mt-1">{fmt(totals.profit)}</p>
         </div>
         <div className="bg-navy-900/50 border border-gold-500/10 rounded-lg p-3">
-          <p className="text-gold-500/40 uppercase tracking-wider">Net variance (units)</p>
+          <p className="text-gold-500/40  tracking-wider">Net variance (units)</p>
           <p className={`font-semibold mt-1 ${totals.varianceUnits < 0 ? 'text-red-400' : totals.varianceUnits > 0 ? 'text-green-400' : 'text-gold-200'}`}>
             {totals.varianceUnits > 0 ? '+' : ''}{totals.varianceUnits}
           </p>

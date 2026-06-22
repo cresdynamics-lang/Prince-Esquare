@@ -2,7 +2,7 @@ import { parseDescriptionSections } from '../../utils/productDescription';
 
 const Section = ({ title, icon, children, className = '' }) => (
   <div className={`space-y-4 ${className}`}>
-    <h3 className="text-[11px] font-bold uppercase tracking-[0.25em] text-gold-500 flex items-center gap-2">
+    <h3 className="text-[11px] font-bold  tracking-[0.25em] text-gold-500 flex items-center gap-2">
       {icon && <span aria-hidden className="text-gold-600/80">{icon}</span>}
       {title}
     </h3>
@@ -40,9 +40,9 @@ const ProductDescription = ({
   return (
     <div className="space-y-10">
       <div className="space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-600/60">Product Details</p>
+        <p className="text-[10px] font-bold  tracking-[0.3em] text-gold-600/60">Product Details</p>
         {brandName && (
-          <p className="text-[10px] uppercase tracking-widest text-gold-500/80">{brandName}</p>
+          <p className="text-[10px]   text-gold-500/80">{brandName}</p>
         )}
         <h2 className="text-xl md:text-2xl font-serif text-white leading-snug">{productName}</h2>
       </div>

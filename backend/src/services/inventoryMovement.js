@@ -308,7 +308,7 @@ const applyStoreStockTake = async (productId, physicalStoreQty, { recordedBy } =
        VALUES ($1, 'ADJUSTMENT', $2, $3, $4)`,
       [
         productId,
-        Math.abs(variance),
+        variance,
         `Store stock take: ${before.storeQty} -> ${target}`,
         recordedBy || null,
       ]
@@ -358,7 +358,7 @@ const applyStockTake = async (productId, physicalShopQty, { recordedBy } = {}) =
        VALUES ($1, 'ADJUSTMENT', $2, $3, $4)`,
       [
         productId,
-        Math.abs(variance),
+        variance,
         `Shop stock take: ${before.shopQty} -> ${target}`,
         recordedBy || null,
       ]

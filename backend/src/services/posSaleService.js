@@ -205,37 +205,47 @@ const deductCategoryShopPieces = async (
   { movementType, recordedBy, receiptNumber, variantId = null }
 ) => {
   const pieces = await client.query(
-    `SELECT pp.id
+    `SELECT pp.id, COALESCE(sl.current_qty, 0) AS current_qty
      FROM pos_products pp
      INNER JOIN pos_stock_levels sl ON sl.product_id = pp.id
      WHERE pp.category = $1
        AND pp.sku LIKE 'PE-CAT-%' AND pp.sku NOT LIKE '%-W-%'
        AND COALESCE(sl.current_qty, 0) > 0
      ORDER BY pp.sku ASC
-     LIMIT $2
      FOR UPDATE OF sl`,
-    [categoryName, qty]
+    [categoryName]
   );
-  if (pieces.rows.length < qty) {
+  
+  let remaining = qty;
+  const updates = [];
+  
+  for (const piece of pieces.rows) {
+    if (remaining <= 0) break;
+    
+    const available = parseInt(piece.current_qty, 10);
+    const toDeduct = Math.min(available, remaining);
+    
+    const upd = await client.query(
+      `UPDATE pos_stock_levels SET current_qty = current_qty - $1, updated_at = NOW()
+       WHERE product_id = $2 RETURNING current_qty`,
+      [toDeduct, piece.id]
+    );
+    await client.query(
+      `INSERT INTO pos_stock_movements (product_id, variant_id, movement_type, qty, recorded_by, notes)
+       VALUES ($1, $2, $3::"PosMovementType", $4, $5, $6)`,
+      [piece.id, variantId, movementType, toDeduct, recordedBy, `Website sale ${receiptNumber}`]
+    );
+    updates.push({ productId: piece.id, newQty: upd.rows[0].current_qty });
+    remaining -= toDeduct;
+  }
+
+  if (remaining > 0) {
     throw Object.assign(
       new Error(`Could not allocate ${qty} shop piece(s) for ${categoryName}`),
       { statusCode: 400 }
     );
   }
-  const updates = [];
-  for (const piece of pieces.rows) {
-    const upd = await client.query(
-      `UPDATE pos_stock_levels SET current_qty = current_qty - 1, updated_at = NOW()
-       WHERE product_id = $1 RETURNING current_qty`,
-      [piece.id]
-    );
-    await client.query(
-      `INSERT INTO pos_stock_movements (product_id, variant_id, movement_type, qty, recorded_by, notes)
-       VALUES ($1, $2, $3::"PosMovementType", 1, $4, $5)`,
-      [piece.id, variantId, movementType, recordedBy, `Website sale ${receiptNumber}`]
-    );
-    updates.push({ productId: piece.id, newQty: upd.rows[0].current_qty });
-  }
+  
   return updates;
 };
 
