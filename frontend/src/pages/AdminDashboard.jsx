@@ -648,6 +648,12 @@ const parseOrderAddress = (value) => {
   return value;
 };
 
+const formatPaymentLabel = (method) => {
+  if (method === 'whatsapp_mpesa') return 'WhatsApp + M-Pesa';
+  if (method === 'mpesa') return 'M-Pesa';
+  return method || '—';
+};
+
 const OrdersView = ({ readOnly = false }) => {
   const confirm = useConfirm();
   const [orders, setOrders] = useState([]);
@@ -873,7 +879,7 @@ const OrdersView = ({ readOnly = false }) => {
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(o.total_amount).toLocaleString()}</td>
                   <td className="px-6 py-4 text-xs">
                     <span className={`px-2 py-1 rounded border border-gold-500/10 ${o.payment_status === 'paid' ? 'text-green-400 bg-green-400/5' : 'text-gold-500/60 bg-navy-800'}`}>
-                      {o.payment_method} ({o.payment_status})
+                      {formatPaymentLabel(o.payment_method)} ({o.payment_status})
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -965,7 +971,7 @@ const OrdersView = ({ readOnly = false }) => {
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Payment</p>
                     <p className="text-gold-100 text-xs">
-                      {detailOrder.payment_method} · {detailOrder.payment_status}
+                      {formatPaymentLabel(detailOrder.payment_method)} · {detailOrder.payment_status}
                     </p>
                   </div>
                 </div>

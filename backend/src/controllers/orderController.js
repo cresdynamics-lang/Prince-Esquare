@@ -106,19 +106,24 @@ exports.createGuestOrder = async (req, res, next) => {
     try {
         const { shipping_address, billing_address, payment_method, items } = req.body;
 
-        if (!shipping_address?.email || !shipping_address?.phone || !shipping_address?.line1) {
-            return formatResponse(res, 400, false, 'Shipping name, email, phone, and address are required');
+        if (!shipping_address?.phone || !shipping_address?.line1) {
+            return formatResponse(res, 400, false, 'Phone and delivery address are required');
+        }
+        if (!shipping_address.email) {
+            const digits = String(shipping_address.phone).replace(/\D/g, '');
+            shipping_address.email = `${digits || 'guest'}@guest.prince-esquire.co.ke`;
         }
         if (!Array.isArray(items) || items.length === 0) {
             return formatResponse(res, 400, false, 'No items in order');
         }
 
+        const method = payment_method || 'whatsapp_mpesa';
         const order = await createOrderFromItems({
             userId: null,
             items,
             shipping_address,
             billing_address,
-            payment_method: payment_method || 'mpesa',
+            payment_method: method,
             clearUserCart: false,
         });
 
@@ -156,13 +161,27 @@ exports.getCheckoutOrder = async (req, res, next) => {
             }
         }
 
+        const itemsResult = await db.query(
+            'SELECT oi.*, p.name, p.slug AS product_slug, p.thumbnail ' +
+            'FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = $1',
+            [id]
+        );
+
+        const shipping = typeof order.shipping_address === 'string'
+            ? (() => { try { return JSON.parse(order.shipping_address); } catch { return {}; } })()
+            : (order.shipping_address || {});
+
         formatResponse(res, 200, true, 'Order fetched', {
             id: order.id,
             total_amount: order.total_amount,
+            tax_amount: order.tax_amount,
+            shipping_amount: order.shipping_amount,
             payment_method: order.payment_method,
             payment_status: order.payment_status,
             status: order.status,
             created_at: order.created_at,
+            shipping_address: shipping,
+            items: itemsResult.rows,
         });
     } catch (error) {
         next(error);

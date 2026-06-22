@@ -46,6 +46,17 @@ const start = async () => {
   }
   await runStartupBootstrap();
   await startStockDayScheduler();
+  httpServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.error({
+        err,
+        msg: `Port ${PORT} is already in use. Stop the other backend process or set PORT in .env.`,
+      });
+    } else {
+      logger.error({ err, msg: 'HTTP server error' });
+    }
+    process.exit(1);
+  });
   httpServer.listen(PORT, () => {
     logger.info({
       msg: 'Server started',

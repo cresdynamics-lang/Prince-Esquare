@@ -2,10 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Globe, MessageSquare, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
 import { SITE_URL, SOCIAL_INSTAGRAM, SOCIAL_FACEBOOK } from '../seo/seoData';
+import { WHATSAPP_NUMBER } from '../lib/storeContact';
 
 const Footer = () => {
-  const [whatsappOpen, setWhatsappOpen] = React.useState(false);
-
   return (
     <footer className="bg-navy-950 pt-24 pb-12 border-t border-gold-500/10 relative overflow-hidden">
       {/* Background elements */}
@@ -126,40 +125,19 @@ const Footer = () => {
           </p>
         </div>
       </div>
-      {/* WhatsApp Floating Chat */}
-      {whatsappOpen ? (
-        <div className="fixed bottom-6 right-6 w-64 h-80 bg-white rounded-lg shadow-xl border border-gold-500/20 flex flex-col">
-          <div className="flex justify-between items-center p-2 bg-gold-500 text-navy-950 rounded-t-lg">
-            <span>WhatsApp Chat</span>
-            <button onClick={() => setWhatsappOpen(false)} className="text-sm">✕</button>
-          </div>
-          <iframe src="https://wa.me/254712345678" className="flex-1 rounded-b-lg" title="WhatsApp Chat" />
-        </div>
-      ) : (
-        <button
-          onMouseEnter={() => {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const o = ctx.createOscillator();
-            const g = ctx.createGain();
-            o.type = 'sine';
-            o.frequency.setValueAtTime(440, ctx.currentTime);
-            o.connect(g);
-            g.connect(ctx.destination);
-            g.gain.setValueAtTime(0.001, ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + 0.01);
-            o.start();
-            o.stop(ctx.currentTime + 0.1);
-          }}
-          onClick={() => setWhatsappOpen(true)}
-          className="group fixed bottom-6 right-6 bg-gold-500 rounded-full flex items-center overflow-hidden transition-all duration-300 w-12 h-12 hover:w-48"
-        >
-          <MessageSquare size={24} className="text-navy-950 p-2" />
-          <span className="text-navy-950 font-medium ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            WhatsApp
-          </span>
-          <ArrowRight size={20} className="text-navy-950 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        </button>
-      )}
+      <a
+        href={`https://wa.me/${WHATSAPP_NUMBER}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chat on WhatsApp"
+        className="group fixed bottom-6 right-6 bg-[#25D366] rounded-full flex items-center overflow-hidden transition-all duration-300 w-12 h-12 hover:w-48 shadow-lg"
+      >
+        <MessageSquare size={24} className="text-white p-2 shrink-0" />
+        <span className="text-white font-medium ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+          WhatsApp
+        </span>
+        <ArrowRight size={20} className="text-white ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shrink-0" />
+      </a>
     </footer>
   );
 };
