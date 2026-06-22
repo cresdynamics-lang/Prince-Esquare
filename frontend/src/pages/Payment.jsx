@@ -119,13 +119,13 @@ const Payment = () => {
     <div className="bg-navy-950 min-h-screen">
       <Navbar />
       <main className="pt-32 pb-24 container mx-auto px-6 max-w-lg">
-        <Link to="/" className="inline-flex items-center text-gold-500 hover:text-gold-200 mb-10 text-[10px] uppercase tracking-widest">
+        <Link to="/" className="inline-flex items-center text-gold-500 hover:text-gold-200 mb-10 text-[10px]  ">
           <ChevronLeft size={18} />
           Home
         </Link>
 
         {!order ? (
-          <p className="text-gold-500/60 text-[10px] uppercase tracking-widest text-center py-20">Loading order…</p>
+          <p className="text-gold-500/60 text-[10px]   text-center py-20">Loading order…</p>
         ) : done ? (
           <div className="border border-gold-500/20 p-10 text-center space-y-6">
             <p className="text-white font-serif text-2xl">Thank you</p>
@@ -133,16 +133,16 @@ const Payment = () => {
             {devMode && (
               <p className="text-amber-400/80 text-xs">Development payment mode — configure MPESA_* in production .env for live M-Pesa.</p>
             )}
-            <Link to="/products" className="inline-block bg-gold-600 text-navy-950 px-8 py-4 text-[10px] font-bold uppercase tracking-widest">
+            <Link to="/products" className="inline-block bg-gold-600 text-navy-950 px-8 py-4 text-[10px] font-bold  ">
               Continue shopping
             </Link>
           </div>
         ) : (
           <div className="border border-gold-500/20 p-10 space-y-8">
             <div className="text-center space-y-2">
-              <p className="text-[10px] text-gold-500 uppercase tracking-widest font-bold">Amount due</p>
+              <p className="text-[10px] text-gold-500   font-bold">Amount due</p>
               <p className="text-4xl font-serif text-white">KSh {Math.round(total).toLocaleString()}</p>
-              <p className="text-[10px] text-navy-400 uppercase tracking-widest">Order #{String(order.id).slice(0, 8)}</p>
+              <p className="text-[10px] text-navy-400  ">Order #{String(order.id).slice(0, 8)}</p>
             </div>
 
             {err && <div className="text-red-400 text-xs text-center bg-red-500/10 py-2 px-3">{err}</div>}
@@ -150,7 +150,7 @@ const Payment = () => {
             {method === 'mpesa' ? (
               <form onSubmit={payMpesa} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gold-500 uppercase tracking-widest font-bold flex items-center gap-2">
+                  <label className="text-[10px] text-gold-500   font-bold flex items-center gap-2">
                     <Smartphone size={14} /> M-Pesa phone
                   </label>
                   <input
@@ -164,7 +164,7 @@ const Payment = () => {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full bg-gold-600 text-navy-950 py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 disabled:opacity-50"
+                  className="w-full bg-gold-600 text-navy-950 py-4 text-[10px] font-bold   hover:bg-gold-500 disabled:opacity-50"
                 >
                   {busy ? 'Sending…' : 'Pay with M-Pesa'}
                 </button>
@@ -177,7 +177,7 @@ const Payment = () => {
                   type="button"
                   disabled={busy}
                   onClick={payCardDemo}
-                  className="w-full bg-gold-600 text-navy-950 py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 disabled:opacity-50"
+                  className="w-full bg-gold-600 text-navy-950 py-4 text-[10px] font-bold   hover:bg-gold-500 disabled:opacity-50"
                 >
                   {busy ? 'Processing…' : 'Confirm payment'}
                 </button>
@@ -186,12 +186,12 @@ const Payment = () => {
 
             {/* WhatsApp Payment Option */}
             <div className="border-t border-gold-500/10 pt-6 space-y-4">
-              <p className="text-center text-[10px] text-gold-500/70 uppercase tracking-widest font-bold">Alternative Payment</p>
+              <p className="text-center text-[10px] text-gold-500/70   font-bold">Alternative Payment</p>
               <button
                 type="button"
                 onClick={handleWhatsAppCheckout}
                 disabled={busy}
-                className="w-full bg-green-600 text-white py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+                className="w-full bg-green-600 text-white py-4 text-[10px] font-bold   hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
               >
                 <MessageCircle size={16} />
                 <span>Send Order via WhatsApp</span>

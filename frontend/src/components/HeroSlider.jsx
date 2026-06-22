@@ -104,12 +104,12 @@ const HeroSlider = ({ heroSlides }) => {
             >
               <div className="flex items-center space-x-4">
                 <div className="h-px w-12 bg-gold-600" />
-                <p className="text-gold-500 tracking-[0.4em] uppercase text-[10px] font-bold">
+                <p className="text-gold-500 tracking-[0.4em]  text-[10px] font-bold">
                   {slide.subtitle}
                 </p>
               </div>
 
-              <h1 className="text-4xl md:text-7xl lg:text-8xl font-serif text-white leading-tight uppercase tracking-tighter">
+              <h1 className="text-4xl md:text-7xl lg:text-8xl font-serif text-white leading-tight  tracking-tighter">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -124,7 +124,7 @@ const HeroSlider = ({ heroSlides }) => {
               <div className="pt-8">
                 <Link
                   to={slide.link}
-                  className="bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
+                  className="bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
                 >
                   <span>{slide.cta}</span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
@@ -168,7 +168,7 @@ const HeroSlider = ({ heroSlides }) => {
       )}
 
       <div className="absolute right-10 top-1/2 -translate-y-1/2 origin-center rotate-90 hidden lg:block">
-        <p className="text-gold-600/20 text-[10px] font-bold tracking-[1em] uppercase whitespace-nowrap">
+        <p className="text-gold-600/20 text-[10px] font-bold tracking-[1em]  whitespace-nowrap">
           ESTABLISHED 2026 · NAIROBI · LUXURY
         </p>
       </div>

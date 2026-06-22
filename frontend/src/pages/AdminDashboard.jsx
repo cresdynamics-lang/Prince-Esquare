@@ -314,7 +314,7 @@ const AdminDashboard = () => {
           {navSections.map((section) => (
             <div key={section} className="mb-6">
               {isSidebarOpen && (
-                <h3 className="px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-500/40 mb-2">
+                <h3 className="px-4 text-[10px] font-bold  tracking-[0.2em] text-gold-500/40 mb-2">
                   {section}
                 </h3>
               )}
@@ -372,7 +372,7 @@ const AdminDashboard = () => {
             </button>
             <div className="hidden sm:block h-8 w-[1px] bg-gold-500/10 mx-1 sm:mx-2" />
             <div className="flex flex-col min-w-0">
-              <span className="text-[9px] sm:text-[10px] font-bold text-gold-500/40 uppercase tracking-widest truncate">
+              <span className="text-[9px] sm:text-[10px] font-bold text-gold-500/40   truncate">
                 {isSeller ? 'Seller Portal' : 'Admin / Overview'}
               </span>
               <h2 className="text-base sm:text-xl font-serif font-bold text-gold-100 capitalize truncate">
@@ -516,7 +516,7 @@ const DashboardView = ({ onOpenPos }) => {
                 </span>
               ))}
             </div>
-            <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest mb-1">{stat.label}</div>
+            <div className="text-[10px] font-bold text-gold-500/40   mb-1">{stat.label}</div>
             <div className="text-2xl font-serif font-bold text-gold-100">{stat.value}</div>
           </div>
         ))}
@@ -527,7 +527,7 @@ const DashboardView = ({ onOpenPos }) => {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h3 className="font-serif font-bold text-lg text-gold-100">Shop POS & Inventory</h3>
             {onOpenPos && (
-              <button type="button" onClick={onOpenPos} className="text-[10px] font-black uppercase tracking-widest bg-gold-600 text-navy-950 px-4 py-2 rounded-lg">
+              <button type="button" onClick={onOpenPos} className="text-[10px] font-black   bg-gold-600 text-navy-950 px-4 py-2 rounded-lg">
                 Open POS & Inventory
               </button>
             )}
@@ -546,14 +546,14 @@ const DashboardView = ({ onOpenPos }) => {
               ['Low stock items', posOverview.lowStockItems?.length ?? 0],
             ].map(([label, value]) => (
               <div key={label} className="bg-navy-950/50 border border-gold-500/10 rounded-xl p-4">
-                <p className="text-[10px] text-gold-500/40 uppercase tracking-widest">{label}</p>
+                <p className="text-[10px] text-gold-500/40  ">{label}</p>
                 <p className="text-xl font-bold text-gold-300 mt-1">{value}</p>
               </div>
             ))}
           </div>
           {posOverview.kpis?.openShifts?.length > 0 && (
             <div className="mt-4 rounded-xl border border-gold-500/10 bg-navy-950/40 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gold-500/50 mb-3">
+              <p className="text-[10px] font-bold   text-gold-500/50 mb-3">
                 Clocked in now (POS shifts not yet closed)
               </p>
               <div className="space-y-2">
@@ -568,12 +568,12 @@ const DashboardView = ({ onOpenPos }) => {
                         <span className="text-gold-500/50 text-xs ml-2">{shift.sellerEmail}</span>
                       )}
                       {shift.userRole && (
-                        <span className="text-[9px] uppercase tracking-widest text-gold-500/40 ml-2">
+                        <span className="text-[9px]   text-gold-500/40 ml-2">
                           {shift.userRole}
                         </span>
                       )}
                       {!shift.userRole && (
-                        <span className="text-[9px] uppercase tracking-widest text-amber-400/70 ml-2">
+                        <span className="text-[9px]   text-amber-400/70 ml-2">
                           legacy POS profile
                         </span>
                       )}
@@ -587,7 +587,7 @@ const DashboardView = ({ onOpenPos }) => {
                           type="button"
                           onClick={() => handleForceCloseShift(shift.shiftId)}
                           disabled={closingShiftId === shift.shiftId}
-                          className="text-[10px] font-bold uppercase tracking-widest text-red-300/80 hover:text-red-300 disabled:opacity-50"
+                          className="text-[10px] font-bold   text-red-300/80 hover:text-red-300 disabled:opacity-50"
                         >
                           {closingShiftId === shift.shiftId ? 'Closing…' : 'Close shift'}
                         </button>
@@ -606,7 +606,7 @@ const DashboardView = ({ onOpenPos }) => {
       <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
         <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
           <h3 className="font-serif font-bold text-lg text-gold-100">Monthly Sales</h3>
-          <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Current Year</div>
+          <div className="text-[10px] font-bold text-gold-500/40  ">Current Year</div>
         </div>
         <div className="p-8 h-64 flex items-end justify-between gap-2">
           {salesData.length > 0 ? salesData.map((d, i) => (
@@ -621,10 +621,10 @@ const DashboardView = ({ onOpenPos }) => {
                   KSh {parseInt(d.total).toLocaleString()}
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-gold-500/30 uppercase tracking-widest">{d.label}</span>
+              <span className="text-[10px] font-bold text-gold-500/30  ">{d.label}</span>
             </div>
           )) : (
-            <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs uppercase tracking-widest">No sales data yet</div>
+            <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs  ">No sales data yet</div>
           )}
         </div>
       </div>
@@ -855,7 +855,7 @@ const OrdersView = ({ readOnly = false }) => {
           <AdminTable>
           <table className="w-full min-w-[900px] text-left">
             <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+              <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                 <th className="px-6 py-4">Order ID</th>
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Total</th>
@@ -877,7 +877,7 @@ const OrdersView = ({ readOnly = false }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${
                       o.status === 'pending' ? 'bg-gold-500/10 text-gold-500' :
                       o.status === 'delivered' ? 'bg-green-400/10 text-green-400' :
                       o.status === 'cancelled' ? 'bg-red-400/10 text-red-400' :
@@ -930,7 +930,7 @@ const OrdersView = ({ readOnly = false }) => {
               <div>
                 <h3 className="text-xl font-serif text-gold-100">Order Details</h3>
                 {detailOrder && (
-                  <p className="text-gold-500/50 text-xs mt-1 uppercase tracking-widest">
+                  <p className="text-gold-500/50 text-xs mt-1  ">
                     #{detailOrder.id.substring(0, 8).toUpperCase()}
                   </p>
                 )}
@@ -950,20 +950,20 @@ const OrdersView = ({ readOnly = false }) => {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Customer</p>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Customer</p>
                     <p className="text-gold-100">{detailOrder.customer_name}</p>
                     <p className="text-gold-500/60 text-xs">{detailOrder.customer_email}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Placed</p>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Placed</p>
                     <p className="text-gold-100">{new Date(detailOrder.created_at).toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Status</p>
-                    <p className="text-gold-100 uppercase text-xs font-bold">{detailOrder.status}</p>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Status</p>
+                    <p className="text-gold-100  text-xs font-bold">{detailOrder.status}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-1">Payment</p>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Payment</p>
                     <p className="text-gold-100 text-xs">
                       {detailOrder.payment_method} · {detailOrder.payment_status}
                     </p>
@@ -971,7 +971,7 @@ const OrdersView = ({ readOnly = false }) => {
                 </div>
 
                 <div className="bg-navy-950/60 border border-gold-500/10 rounded-xl p-4 text-sm">
-                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-2">Shipping</p>
+                  <p className="text-[10px]   text-gold-500/40 mb-2">Shipping</p>
                   <p className="text-gold-100">
                     {[detailAddress.first_name, detailAddress.last_name].filter(Boolean).join(' ')}
                   </p>
@@ -982,7 +982,7 @@ const OrdersView = ({ readOnly = false }) => {
                 </div>
 
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-gold-500/40 mb-3">Items</p>
+                  <p className="text-[10px]   text-gold-500/40 mb-3">Items</p>
                   <div className="space-y-2">
                     {(detailOrder.items || []).map((item) => (
                       <div key={item.id} className="flex justify-between gap-4 bg-navy-950/60 border border-gold-500/5 rounded-xl px-4 py-3 text-sm">
@@ -1014,7 +1014,7 @@ const OrdersView = ({ readOnly = false }) => {
                       closeDetail();
                       openOrderEdit(detailOrder);
                     }}
-                    className="w-full py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500"
+                    className="w-full py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500"
                   >
                     Edit Order
                   </button>
@@ -1031,7 +1031,7 @@ const OrdersView = ({ readOnly = false }) => {
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-serif text-gold-100">Edit Order</h3>
-                <p className="text-gold-500/50 text-xs mt-1 uppercase tracking-widest">
+                <p className="text-gold-500/50 text-xs mt-1  ">
                   #{editOrder.id.substring(0, 8).toUpperCase()} · {editOrder.customer_name}
                 </p>
               </div>
@@ -1046,7 +1046,7 @@ const OrdersView = ({ readOnly = false }) => {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-gold-500/40 font-bold">Order Status</label>
+                <label className="text-[10px]   text-gold-500/40 font-bold">Order Status</label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
@@ -1058,7 +1058,7 @@ const OrdersView = ({ readOnly = false }) => {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest text-gold-500/40 font-bold">Payment Status</label>
+                <label className="text-[10px]   text-gold-500/40 font-bold">Payment Status</label>
                 <select
                   value={editPaymentStatus}
                   onChange={(e) => setEditPaymentStatus(e.target.value)}
@@ -1076,7 +1076,7 @@ const OrdersView = ({ readOnly = false }) => {
                 type="button"
                 onClick={handleCancelOrder}
                 disabled={saving}
-                className="w-full mt-4 py-3 rounded-xl border border-red-500/30 text-red-400 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/10 disabled:opacity-50"
+                className="w-full mt-4 py-3 rounded-xl border border-red-500/30 text-red-400 text-[10px] font-bold   hover:bg-red-500/10 disabled:opacity-50"
               >
                 Cancel Order
               </button>
@@ -1087,7 +1087,7 @@ const OrdersView = ({ readOnly = false }) => {
                 type="button"
                 onClick={handleRefundOrder}
                 disabled={saving}
-                className="w-full mt-2 py-3 rounded-xl border border-amber-500/30 text-amber-400 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500/10 disabled:opacity-50"
+                className="w-full mt-2 py-3 rounded-xl border border-amber-500/30 text-amber-400 text-[10px] font-bold   hover:bg-amber-500/10 disabled:opacity-50"
               >
                 Refund Order
               </button>
@@ -1097,7 +1097,7 @@ const OrdersView = ({ readOnly = false }) => {
               <button
                 type="button"
                 onClick={closeEdit}
-                className="flex-1 py-3 rounded-xl border border-gold-500/20 text-gold-500/60 text-[10px] font-bold uppercase tracking-widest"
+                className="flex-1 py-3 rounded-xl border border-gold-500/20 text-gold-500/60 text-[10px] font-bold  "
               >
                 Close
               </button>
@@ -1106,7 +1106,7 @@ const OrdersView = ({ readOnly = false }) => {
                   type="button"
                   onClick={handleSaveOrder}
                   disabled={saving}
-                  className="flex-1 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold uppercase tracking-widest hover:bg-gold-500 disabled:opacity-50"
+                  className="flex-1 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 disabled:opacity-50"
                 >
                   {saving ? 'Saving…' : 'Save Changes'}
                 </button>
@@ -1245,7 +1245,7 @@ const CategoriesView = () => {
           </div>
         ) : categories.length > 0 ? (
           <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
               <tr>
                 <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Slug</th>
@@ -1264,7 +1264,7 @@ const CategoriesView = () => {
                   <td className="px-6 py-4 font-mono text-gold-500/60 text-xs">{c.slug}</td>
                   <td className="px-6 py-4 text-gold-200">{c.is_featured ? 'Yes' : 'No'}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${
                       c.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'
                     }`}>
                       {c.is_active ? 'Active' : 'Inactive'}
@@ -1315,7 +1315,7 @@ const CategoriesView = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Name</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Name</label>
                     <input 
                       type="text" 
                       required
@@ -1324,11 +1324,11 @@ const CategoriesView = () => {
                         const val = e.target.value.toUpperCase();
                         setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
                       }}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Slug</label>
                     <input 
                       type="text" 
                       required
@@ -1340,22 +1340,22 @@ const CategoriesView = () => {
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Image</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Image</label>
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center relative">
                             {formData.image ? <img src={formData.image} className="w-full h-full object-cover" /> : <ImageIcon size={20} className="text-gold-500/20" />}
                             <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                         </div>
-                        <p className="text-[9px] text-gold-500/40 uppercase tracking-widest">Click to upload cover image</p>
+                        <p className="text-[9px] text-gold-500/40  ">Click to upload cover image</p>
                     </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                  <label className="text-[10px] text-gold-500/40   font-black">Description</label>
                   <textarea 
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
-                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold "
                   />
                 </div>
 
@@ -1383,7 +1383,7 @@ const CategoriesView = () => {
               <button 
                 type="submit" 
                 disabled={submitting}
-                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
               >
                 {submitting ? 'AUTHENTICATING...' : 'COMMIT CATEGORY'}
               </button>
@@ -1532,8 +1532,8 @@ const BrandsView = () => {
                   <div className="text-lg font-bold text-gold-100 mb-1">{brand.name}</div>
                   <div className="text-xs text-gold-500/40 mb-3">{brand.product_count || 0} products live</div>
                   <div className="flex gap-2">
-                    {brand.is_featured && <span className="bg-gold-600/10 text-gold-500 text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border border-gold-500/10">Featured</span>}
-                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border ${brand.is_active ? 'border-green-400/20 text-green-400' : 'border-gold-500/5 text-gold-500/20'}`}>
+                    {brand.is_featured && <span className="bg-gold-600/10 text-gold-500 text-[9px] font-bold  px-2 py-0.5 rounded  border border-gold-500/10">Featured</span>}
+                    <span className={`text-[9px] font-bold  px-2 py-0.5 rounded  border ${brand.is_active ? 'border-green-400/20 text-green-400' : 'border-gold-500/5 text-gold-500/20'}`}>
                       {brand.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -1575,7 +1575,7 @@ const BrandsView = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Name</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Name</label>
                     <input 
                       type="text" 
                       required
@@ -1584,11 +1584,11 @@ const BrandsView = () => {
                         const val = e.target.value.toUpperCase();
                         setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
                       }}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Slug</label>
                     <input 
                       type="text" 
                       required
@@ -1600,22 +1600,22 @@ const BrandsView = () => {
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Logo</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Logo</label>
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center relative">
                             {formData.logo ? <img src={formData.logo} className="w-full h-full object-contain" /> : <Award size={20} className="text-gold-500/20" />}
                             <input type="file" accept="image/*" onChange={handleLogoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                         </div>
-                        <p className="text-[9px] text-gold-500/40 uppercase tracking-widest">Click to upload brand logo</p>
+                        <p className="text-[9px] text-gold-500/40  ">Click to upload brand logo</p>
                     </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                  <label className="text-[10px] text-gold-500/40   font-black">Description</label>
                   <textarea 
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
-                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold "
                   />
                 </div>
 
@@ -1643,7 +1643,7 @@ const BrandsView = () => {
               <button 
                 type="submit" 
                 disabled={submitting}
-                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
               >
                 {submitting ? 'SAVING...' : 'SAVE BRAND'}
               </button>
@@ -1684,7 +1684,7 @@ const UsersView = () => {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold   border transition-all ${
                 tab === t.id
                   ? 'bg-gold-600 text-navy-950 border-gold-600'
                   : 'bg-navy-900/50 text-gold-500/70 border-gold-500/15 hover:border-gold-500/40'
@@ -1796,7 +1796,7 @@ const CustomersView = ({ embedded = false }) => {
         ) : filteredCustomers.length > 0 ? (
           <AdminTable>
           <table className="w-full text-left min-w-[720px]">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
               <tr>
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Contact Info</th>
@@ -1819,7 +1819,7 @@ const CustomersView = ({ embedded = false }) => {
                           {c.name}
                           {c.is_verified && <CheckCircle2 size={14} className="text-blue-400" />}
                         </div>
-                        <div className="text-[10px] text-gold-500/40 uppercase tracking-widest mt-0.5">ID: {c.id.substring(0, 8)}</div>
+                        <div className="text-[10px] text-gold-500/40   mt-0.5">ID: {c.id.substring(0, 8)}</div>
                       </div>
                     </div>
                   </td>
@@ -1832,7 +1832,7 @@ const CustomersView = ({ embedded = false }) => {
                   <td className="px-6 py-4 font-serif font-bold text-gold-100">KSh {parseFloat(c.total_spent || 0).toLocaleString()}</td>
                   <td className="px-6 py-4 text-xs text-gold-500/60">{new Date(c.created_at).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-[0.1em] ${
+                    <span className={`text-[9px] font-black  px-2 py-0.5 rounded tracking-[0.1em] ${
                       c.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
                     }`}>
                       {c.is_active !== false ? 'Active' : 'Suspended'}
@@ -2037,26 +2037,26 @@ const AdminsView = ({ roleFilter = null }) => {
                   </div>
                   <div className="text-xs text-gold-500/40">{admin.email}</div>
                   {admin.role === 'staff' && (
-                    <span className={`inline-block mt-2 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${
+                    <span className={`inline-block mt-2 text-[9px] font-bold   px-2 py-0.5 rounded ${
                       admin.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
                     }`}>
                       {admin.is_active !== false ? 'Active' : 'Suspended'}
                     </span>
                   )}
                 </div>
-                <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10 ${admin.role === 'admin' ? 'text-gold-400' : 'text-blue-400'}`}>
+                <span className={`text-[9px] font-bold  px-2 py-1 rounded bg-navy-800 border border-gold-500/10 ${admin.role === 'admin' ? 'text-gold-400' : 'text-blue-400'}`}>
                   {admin.role}
                 </span>
               </div>
               <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
-                <span className="text-gold-500/30 uppercase">ID: {admin.id.substring(0, 8)}</span>
+                <span className="text-gold-500/30 ">ID: {admin.id.substring(0, 8)}</span>
                 <div className="flex gap-2">
                   {admin.role === 'staff' && (
                     <>
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(admin)}
-                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-gold-500/70 hover:text-gold-400 hover:bg-navy-800 transition-all flex items-center gap-1"
+                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold  tracking-wider text-gold-500/70 hover:text-gold-400 hover:bg-navy-800 transition-all flex items-center gap-1"
                       >
                         <Eye size={14} /> View staff
                       </button>
@@ -2115,7 +2115,7 @@ const AdminsView = ({ roleFilter = null }) => {
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                   <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Full Name</label>
+                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Full Name</label>
                   <input 
                     type="text" 
                     required
@@ -2127,7 +2127,7 @@ const AdminsView = ({ roleFilter = null }) => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Email Address</label>
+                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Email Address</label>
                   <input 
                     type="email" 
                     required
@@ -2141,7 +2141,7 @@ const AdminsView = ({ roleFilter = null }) => {
 
                 {!editingStaff && (
                 <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Temporary Password</label>
+                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Temporary Password</label>
                   <input 
                     type="password" 
                     required
@@ -2154,7 +2154,7 @@ const AdminsView = ({ roleFilter = null }) => {
                 )}
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">Access role</label>
+                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Access role</label>
                   <div className="space-y-2">
                     {STAFF_ACCESS_PRESETS.map((preset) => (
                       <label
@@ -2185,13 +2185,13 @@ const AdminsView = ({ roleFilter = null }) => {
 
                 {(formData.accessPreset === 'custom' || editingStaff) && (
                 <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60 uppercase tracking-widest mb-2">
+                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">
                     {editingStaff ? 'Assigned duties' : 'Custom duties'}
                   </label>
                   <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
                     {STAFF_PERMISSION_GROUPS.map((group) => (
                       <div key={group.label}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-gold-500/40 mb-1">{group.label}</p>
+                        <p className="text-[9px] font-bold   text-gold-500/40 mb-1">{group.label}</p>
                         {group.hint && (
                           <p className="text-[10px] text-gold-500/30 mb-2">{group.hint}</p>
                         )}
@@ -2205,7 +2205,7 @@ const AdminsView = ({ roleFilter = null }) => {
                                 disabled={perm === 'inventory-manage' && !formData.permissions.includes('inventory-view')}
                                 className="w-3.5 h-3.5 rounded border-gold-500/20 bg-navy-900 text-gold-600 focus:ring-0 focus:ring-offset-0"
                               />
-                              <span className="text-[10px] uppercase font-bold text-gold-100 group-hover:text-gold-500 transition-colors">
+                              <span className="text-[10px]  font-bold text-gold-100 group-hover:text-gold-500 transition-colors">
                                 {perm.replace(/-/g, ' ')}
                               </span>
                             </label>
@@ -2226,7 +2226,7 @@ const AdminsView = ({ roleFilter = null }) => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+                    className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
                   >
                     {submitting ? (editingStaff ? 'SAVING...' : 'CREATING...') : (editingStaff ? 'SAVE CHANGES' : 'CREATE STAFF ACCOUNT')}
                   </button>
@@ -2292,7 +2292,7 @@ const ReviewsView = () => {
         <div className="flex items-center gap-4">
           <h3 className="text-xl font-serif font-bold text-gold-100">Customer Feedback</h3>
           {pendingCount > 0 && (
-            <span className="bg-gold-600 text-navy-950 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+            <span className="bg-gold-600 text-navy-950 px-2 py-0.5 rounded-full text-[10px] font-black  ">
               {pendingCount} Pending
             </span>
           )}
@@ -2325,19 +2325,19 @@ const ReviewsView = () => {
               </div>
               <p className="text-sm text-gold-200/80 leading-relaxed mb-6 italic">"{r.comment}"</p>
               <div className="flex items-center justify-between border-t border-gold-500/5 pt-4">
-                <span className="text-[10px] text-gold-500/30 uppercase tracking-widest">{new Date(r.created_at).toLocaleDateString()}</span>
+                <span className="text-[10px] text-gold-500/30  ">{new Date(r.created_at).toLocaleDateString()}</span>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {!r.is_approved && (
                     <button 
                       onClick={() => handleApprove(r.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-green-400 text-navy-950 rounded-lg text-[10px] font-black uppercase tracking-widest"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-green-400 text-navy-950 rounded-lg text-[10px] font-black  "
                     >
                       <CheckCircle2 size={12} /> Approve
                     </button>
                   )}
                   <button 
                     onClick={() => handleDelete(r.id)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-400/10 text-red-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-400/20"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-400/10 text-red-400 rounded-lg text-[10px] font-black   border border-red-400/20"
                   >
                      <Trash2 size={12} /> Delete
                   </button>
@@ -2401,7 +2401,7 @@ const SettingsView = () => {
               <Settings size={20} className="text-gold-500" /> Store Information
             </h4>
             {loading ? (
-              <div className="py-12 text-center text-gold-500/40 uppercase tracking-widest text-xs">Retrieving configurations...</div>
+              <div className="py-12 text-center text-gold-500/40   text-xs">Retrieving configurations...</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[
@@ -2411,7 +2411,7 @@ const SettingsView = () => {
                   { label: 'Store Currency', key: 'store_currency' },
                 ].map((f, i) => (
                   <div key={i} className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">{f.label}</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">{f.label}</label>
                     <input 
                       type="text" 
                       value={settings[f.key] || ''} 
@@ -2422,7 +2422,7 @@ const SettingsView = () => {
                         }
                         setSettings({...settings, [f.key]: val});
                       }}
-                      className={`w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold ${(!f.key.includes('email') && !f.key.includes('phone')) ? 'uppercase' : ''}`} 
+                      className={`w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold ${(!f.key.includes('email') && !f.key.includes('phone')) ? '' : ''}`} 
                     />
                   </div>
                 ))}
@@ -2442,7 +2442,7 @@ const SettingsView = () => {
                 'Daily Sales Summaries'
               ].map((pref, i) => (
                 <label key={i} className="flex items-center justify-between p-4 bg-navy-950/50 rounded-xl border border-gold-500/5 cursor-pointer group">
-                  <span className="text-xs font-bold text-gold-100 group-hover:text-gold-500 transition-colors uppercase">{pref}</span>
+                  <span className="text-xs font-bold text-gold-100 group-hover:text-gold-500 transition-colors ">{pref}</span>
                   <div className="w-12 h-6 bg-navy-800 rounded-full relative border border-gold-500/20">
                     <div className="absolute top-1 right-1 w-4 h-4 bg-gold-600 rounded-full" />
                   </div>
@@ -2454,7 +2454,7 @@ const SettingsView = () => {
 
         <div className="space-y-8">
            <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
-             <h5 className="text-[10px] font-black text-gold-500/40 uppercase tracking-widest mb-6 border-b border-gold-500/10 pb-2">System Integrations</h5>
+             <h5 className="text-[10px] font-black text-gold-500/40   mb-6 border-b border-gold-500/10 pb-2">System Integrations</h5>
              <div className="space-y-6">
                 {[
                   { label: 'Daraja API', val: 'Connected', color: 'text-green-400' },
@@ -2463,8 +2463,8 @@ const SettingsView = () => {
                   { label: 'SendGrid', val: 'Operational', color: 'text-green-400' },
                 ].map((h, i) => (
                   <div key={i} className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gold-100 uppercase">{h.label}</span>
-                    <span className={`text-[10px] font-black uppercase ${h.color}`}>{h.val}</span>
+                    <span className="text-[10px] font-bold text-gold-100 ">{h.label}</span>
+                    <span className={`text-[10px] font-black  ${h.color}`}>{h.val}</span>
                   </div>
                 ))}
              </div>
@@ -2473,7 +2473,7 @@ const SettingsView = () => {
            <button 
             onClick={handleSave}
             disabled={saving}
-            className="w-full py-5 bg-gold-600 text-navy-950 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all disabled:opacity-50"
+            className="w-full py-5 bg-gold-600 text-navy-950 rounded-2xl font-black  tracking-[0.2em] shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all disabled:opacity-50"
            >
              {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
            </button>

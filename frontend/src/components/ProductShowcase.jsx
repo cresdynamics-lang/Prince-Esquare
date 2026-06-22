@@ -26,7 +26,7 @@ const ProductCard = ({ product, onAddToCart, addedProductId }) => (
               e.preventDefault();
               onAddToCart(product);
             }}
-            className="bg-white text-navy-950 px-4 py-3 text-[9px] font-bold uppercase tracking-widest flex items-center gap-2"
+            className="bg-white text-navy-950 px-4 py-3 text-[9px] font-bold   flex items-center gap-2"
           >
             <ShoppingBag size={13} />
             {addedProductId === product.id ? 'Added' : 'Add to Cart'}
@@ -35,7 +35,7 @@ const ProductCard = ({ product, onAddToCart, addedProductId }) => (
       </div>
     </Link>
     <div className="pt-3 space-y-1">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-gold-600/50">{product.brand_name}</p>
+      <p className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</p>
       <h3 className="text-sm md:text-base font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2">
         {product.name}
       </h3>
@@ -86,7 +86,7 @@ const ProductShowcase = ({ categoryRows = [] }) => {
               </h2>
               <Link
                 to={row.path || '/products'}
-                className="text-gold-500 text-[10px] font-bold uppercase tracking-[0.3em] flex items-center gap-2 hover:gap-3 transition-all shrink-0"
+                className="text-gold-500 text-[10px] font-bold  tracking-[0.3em] flex items-center gap-2 hover:gap-3 transition-all shrink-0"
               >
                 View All <ArrowRight size={14} />
               </Link>
@@ -108,7 +108,7 @@ const ProductShowcase = ({ categoryRows = [] }) => {
         <div className="pt-4 flex justify-center">
           <Link
             to="/products"
-            className="inline-flex items-center gap-3 border border-gold-500/50 text-gold-500 px-10 py-4 text-[10px] font-bold uppercase tracking-[0.35em] hover:bg-gold-500 hover:text-navy-950 transition-all"
+            className="inline-flex items-center gap-3 border border-gold-500/50 text-gold-500 px-10 py-4 text-[10px] font-bold  tracking-[0.35em] hover:bg-gold-500 hover:text-navy-950 transition-all"
           >
             View All Products <ArrowRight size={14} />
           </Link>

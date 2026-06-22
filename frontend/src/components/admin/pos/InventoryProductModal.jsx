@@ -237,7 +237,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
               {isNew ? 'Add product with full details' : 'Product details'}
             </h3>
             {!isNew && (
-              <p className="text-[10px] text-gold-500/40 mt-0.5 uppercase tracking-widest">
+              <p className="text-[10px] text-gold-500/40 mt-0.5  ">
                 Data source: {source === 'live' ? 'Live website' : 'Inventory draft'}
                 {websiteLinked && ' · Linked'}
               </p>
@@ -255,7 +255,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
         ) : (
           <div className="p-6 space-y-6">
             <section className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-gold-500/70">Basics</h4>
+              <h4 className="text-xs font-bold   text-gold-500/70">Basics</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Product name</label>
@@ -311,7 +311,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
             </section>
 
             <section className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-gold-500/70">Images & description</h4>
+              <h4 className="text-xs font-bold   text-gold-500/70">Images & description</h4>
               <div>
                 <label className={labelCls}>Description</label>
                 <textarea
@@ -338,7 +338,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
 
             <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-gold-500/70">Colors & sizes</h4>
+                <h4 className="text-xs font-bold   text-gold-500/70">Colors & sizes</h4>
                 <button
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, color_groups: [...f.color_groups, newColorGroup('')] }))}

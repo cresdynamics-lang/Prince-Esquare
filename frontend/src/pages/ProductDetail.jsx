@@ -457,7 +457,7 @@ const ProductDetail = () => {
     return (
       <div className="min-h-screen pt-32 text-center text-white bg-navy-950 font-serif">
         {loadError}
-        <Link to="/products" className="block mt-4 text-gold-500 underline uppercase tracking-widest text-[10px]">
+        <Link to="/products" className="block mt-4 text-gold-500 underline   text-[10px]">
           Back to products
         </Link>
       </div>
@@ -466,7 +466,7 @@ const ProductDetail = () => {
 
   if (!product) {
     return (
-      <div className="min-h-screen pt-32 text-center text-gold-500 bg-navy-950 font-serif text-[10px] uppercase tracking-widest">
+      <div className="min-h-screen pt-32 text-center text-gold-500 bg-navy-950 font-serif text-[10px]  ">
         Loading…
       </div>
     );
@@ -498,7 +498,7 @@ const ProductDetail = () => {
             <button type="button" onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
               <ChevronLeft size={24} />
             </button>
-            <span className="text-[10px] uppercase tracking-widest text-gold-600/50">Back</span>
+            <span className="text-[10px]   text-gold-600/50">Back</span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
@@ -572,7 +572,7 @@ const ProductDetail = () => {
                         />
                       ))}
                     </div>
-                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-sm bg-navy-950/75 text-[10px] font-bold uppercase tracking-widest text-gold-300 border border-gold-600/20">
+                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-sm bg-navy-950/75 text-[10px] font-bold   text-gold-300 border border-gold-600/20">
                       {colorCarouselSlides[colorCarouselIndex]?.label}
                     </span>
                   </>
@@ -617,7 +617,7 @@ const ProductDetail = () => {
                           className="w-full h-full object-cover"
                         />
                         {isColorThumb && (
-                          <span className="absolute inset-x-0 bottom-0 bg-navy-950/80 text-[8px] font-bold uppercase tracking-wider text-gold-200 py-0.5 truncate px-1">
+                          <span className="absolute inset-x-0 bottom-0 bg-navy-950/80 text-[8px] font-bold  tracking-wider text-gold-200 py-0.5 truncate px-1">
                             {thumb.label}
                           </span>
                         )}
@@ -638,7 +638,7 @@ const ProductDetail = () => {
             <div className="space-y-6 lg:pt-2 min-h-0">
               <div className="space-y-3">
                 {product.brand_name && (
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-500">{product.brand_name}</p>
+                  <p className="text-[10px] font-bold  tracking-[0.3em] text-gold-500">{product.brand_name}</p>
                 )}
                 <h1 className="text-3xl md:text-4xl font-serif text-white leading-tight">{product.name}</h1>
 
@@ -660,7 +660,7 @@ const ProductDetail = () => {
 
               {hasMultipleColors && (
                 <div className="space-y-3">
-                  <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-gold-500">
+                  <h3 className="text-[10px]  tracking-[0.25em] font-bold text-gold-500">
                     {variantMeta.isShoe ? 'Color' : 'Variant'}
                   </h3>
                   <div className="flex flex-col gap-2">
@@ -693,12 +693,12 @@ const ProductDetail = () => {
               {availableSizes.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-gold-500">
+                    <h3 className="text-[10px]  tracking-[0.25em] font-bold text-gold-500">
                       {variantMeta.isShoe ? 'Shoe Size' : 'Size'}
                     </h3>
                     <button
                       type="button"
-                      className="text-[10px] uppercase tracking-widest text-gold-600/50 font-bold hover:text-gold-500 transition-colors"
+                      className="text-[10px]   text-gold-600/50 font-bold hover:text-gold-500 transition-colors"
                     >
                       Size Guide
                     </button>
@@ -760,7 +760,7 @@ const ProductDetail = () => {
                     type="button"
                     onClick={handleAddToCart}
                     disabled={shopOutOfStock}
-                    className={`flex-1 py-4 px-5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${
+                    className={`flex-1 py-4 px-5 text-[10px] font-bold  tracking-[0.2em] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${
                       addedToCart
                         ? 'bg-green-600 text-white border border-green-600'
                         : 'bg-navy-950 border border-gold-600 text-gold-500 hover:bg-gold-600 hover:text-navy-950'
@@ -777,7 +777,7 @@ const ProductDetail = () => {
                   type="button"
                   onClick={handleBuyNow}
                   disabled={shopOutOfStock}
-                  className="w-full bg-gold-600 text-navy-950 py-4 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full bg-gold-600 text-navy-950 py-4 px-6 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Buy it now
                 </motion.button>
@@ -788,7 +788,7 @@ const ProductDetail = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
-                      className="text-[10px] text-green-500 font-bold uppercase tracking-widest text-center"
+                      className="text-[10px] text-green-500 font-bold   text-center"
                     >
                       Excellent choice. Item added to your curation.
                     </motion.p>
@@ -825,7 +825,7 @@ const ProductDetail = () => {
                       />
                     </div>
                     <div className="space-y-1">
-                      <h3 className="text-[10px] font-bold text-white uppercase tracking-widest min-h-[28px] group-hover:text-gold-500 transition-colors line-clamp-2">
+                      <h3 className="text-[10px] font-bold text-white   min-h-[28px] group-hover:text-gold-500 transition-colors line-clamp-2">
                         {p.name}
                       </h3>
                       <p className="text-xs font-light text-gold-500 italic">

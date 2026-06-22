@@ -158,9 +158,9 @@ const AdminLogin = () => {
 
             </div>
 
-            <h1 className="text-3xl font-serif text-white uppercase tracking-[0.2em]">Staff Access</h1>
+            <h1 className="text-3xl font-serif text-white  tracking-[0.2em]">Staff Access</h1>
 
-            <p className="text-gold-500/40 font-bold text-[10px] uppercase tracking-widest">
+            <p className="text-gold-500/40 font-bold text-[10px]  ">
 
               Admin, staff &amp; shop sellers — one login
 
@@ -194,7 +194,7 @@ const AdminLogin = () => {
 
             <div className="space-y-2">
 
-              <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black ml-1">Staff ID / Email</label>
+              <label className="text-[10px] text-gold-500/40   font-black ml-1">Staff ID / Email</label>
 
               <div className="relative group">
 
@@ -224,7 +224,7 @@ const AdminLogin = () => {
 
             <div className="space-y-2">
 
-              <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black ml-1">Security Key</label>
+              <label className="text-[10px] text-gold-500/40   font-black ml-1">Security Key</label>
 
               <div className="relative group">
 
@@ -258,7 +258,7 @@ const AdminLogin = () => {
 
               disabled={loading}
 
-              className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-3 shadow-xl shadow-gold-600/10 mt-10 disabled:opacity-50"
+              className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl text-xs font-black  tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-3 shadow-xl shadow-gold-600/10 mt-10 disabled:opacity-50"
 
             >
 
@@ -278,7 +278,7 @@ const AdminLogin = () => {
 
               onClick={() => navigate('/')}
 
-              className="text-[10px] text-gold-500/30 hover:text-gold-500 font-bold uppercase tracking-widest transition-colors"
+              className="text-[10px] text-gold-500/30 hover:text-gold-500 font-bold   transition-colors"
 
             >
 

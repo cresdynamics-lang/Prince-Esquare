@@ -207,10 +207,10 @@ const PosCartPanel = ({
             <div>
               <span className="font-medium">{item.name}</span>
               {item.websiteStatus === 'live' && (
-                <span className="ml-1 text-[9px] text-emerald-400/80 uppercase">Web</span>
+                <span className="ml-1 text-[9px] text-emerald-400/80 ">Web</span>
               )}
               {item.channel === 'inventory' && (
-                <span className="ml-1 text-[9px] text-sky-400/80 uppercase">Inv</span>
+                <span className="ml-1 text-[9px] text-sky-400/80 ">Inv</span>
               )}
               <p className="text-white/50 text-xs">{formatKES(item.unitPrice)} each</p>
             </div>
@@ -659,7 +659,7 @@ const PosTerminalView = ({ embedded = false, embeddedLayout = 'direct', onClockO
           ) : viewMode === 'list' ? (
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full text-sm text-white">
-                <thead className="text-white/40 text-xs uppercase">
+                <thead className="text-white/40 text-xs ">
                   <tr>
                     <th className="p-3 text-left">SKU</th>
                     <th className="p-3 text-left">Product</th>
@@ -740,7 +740,7 @@ const PosTerminalView = ({ embedded = false, embeddedLayout = 'direct', onClockO
                         <img src={p.thumbnail} alt="" className="w-10 h-10 rounded object-cover shrink-0 border border-white/10" />
                       )}
                     </div>
-                    <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide border ${badge.className}`}>
+                    <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px]  tracking-wide border ${badge.className}`}>
                       {badge.label}
                     </span>
                     <p className="text-gold-400 text-sm mt-2 font-semibold">POS: {formatKES(p.shop_price)}</p>

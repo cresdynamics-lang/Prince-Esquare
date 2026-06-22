@@ -24,13 +24,13 @@ const Cart = () => {
             <button onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
               <ChevronLeft size={24} />
             </button>
-            <span className="text-[10px] uppercase tracking-widest text-gold-600/50">Back</span>
+            <span className="text-[10px]   text-gold-600/50">Back</span>
           </div>
           <div className="flex flex-col lg:flex-row gap-16">
             <div className="lg:w-2/3">
               <div className="flex justify-between items-end mb-12 border-b border-gold-600/10 pb-8">
                 <h1 className="text-5xl font-serif text-white">Shopping Bag</h1>
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-600">
+                <span className="text-[10px] font-bold  tracking-[0.3em] text-gold-600">
                   {items.reduce((n, i) => n + i.quantity, 0)} Items
                 </span>
               </div>
@@ -43,7 +43,7 @@ const Cart = () => {
                   <p className="text-gold-500 mb-8 font-light italic">Your bag is currently empty.</p>
                   <Link
                     to="/products"
-                    className="inline-block bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all"
+                    className="inline-block bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all"
                   >
                     Start Shopping
                   </Link>
@@ -66,15 +66,15 @@ const Cart = () => {
                         <div className="flex-1 flex flex-col justify-between">
                           <div className="flex justify-between items-start">
                             <div className="space-y-2">
-                              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-600/50">
+                              <p className="text-[10px] font-bold  tracking-[0.3em] text-gold-600/50">
                                 {item.brandName || 'Bespoke'}
                               </p>
                               <h3 className="text-xl font-serif text-white">{item.name}</h3>
                               <div className="flex flex-wrap gap-4 pt-3">
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-gold-400 bg-navy-950 px-4 py-1.5 border border-gold-600/20">
+                                <div className="text-[10px] font-bold   text-gold-400 bg-navy-950 px-4 py-1.5 border border-gold-600/20">
                                   Size: {item.sizeLabel || '—'}
                                 </div>
-                                <div className="text-[10px] font-bold uppercase tracking-widest text-gold-400 bg-navy-950 px-4 py-1.5 border border-gold-600/20">
+                                <div className="text-[10px] font-bold   text-gold-400 bg-navy-950 px-4 py-1.5 border border-gold-600/20">
                                   Color: {item.variantValue || '—'}
                                 </div>
                               </div>
@@ -122,11 +122,11 @@ const Cart = () => {
                 <h2 className="text-2xl font-serif text-white border-b border-gold-600/10 pb-6">Summary</h2>
 
                 <div className="space-y-6">
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
+                  <div className="flex justify-between text-[10px] font-bold  ">
                     <span className="text-gold-600/50">Subtotal</span>
                     <span className="text-white">KSh {getTotal().toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
+                  <div className="flex justify-between text-[10px] font-bold  ">
                     <span className="text-gold-600/50">Shipping</span>
                     <span className="text-gold-500 italic lowercase font-light">KSh 250 at checkout</span>
                   </div>
@@ -143,12 +143,12 @@ const Cart = () => {
                     type="button"
                     disabled={items.length === 0}
                     onClick={() => navigate('/checkout')}
-                    className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group shadow-xl shadow-gold-600/10"
+                    className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group shadow-xl shadow-gold-600/10"
                   >
                     <span>Proceed to Checkout</span>
                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </motion.button>
-                  <p className="text-[9px] text-gold-600/30 text-center uppercase tracking-[0.3em] font-bold">
+                  <p className="text-[9px] text-gold-600/30 text-center  tracking-[0.3em] font-bold">
                     Guest checkout available — sign in optional
                   </p>
                 </div>

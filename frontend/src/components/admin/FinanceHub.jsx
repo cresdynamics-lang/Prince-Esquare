@@ -54,7 +54,7 @@ const FinanceHub = ({ forcedModule, readOnly = false }) => {
           <button
             type="button"
             onClick={() => setAdminTestPos(false)}
-            className="text-[10px] font-bold uppercase tracking-widest text-amber-300 hover:text-amber-100"
+            className="text-[10px] font-bold   text-amber-300 hover:text-amber-100"
           >
             Exit test mode
           </button>
@@ -73,7 +73,7 @@ const FinanceHub = ({ forcedModule, readOnly = false }) => {
                   setModule(m.id);
                   if (m.id !== 'pos-terminal') setAdminTestPos(false);
                 }}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold   border transition-all ${
                   module === m.id
                     ? 'bg-gold-600 text-navy-950 border-gold-600'
                     : 'bg-navy-900/50 text-gold-500/70 border-gold-500/15 hover:border-gold-500/40'
@@ -88,7 +88,7 @@ const FinanceHub = ({ forcedModule, readOnly = false }) => {
 
       {!isPosTerminal && (
         <div className="bg-navy-900/50 border border-gold-500/10 rounded-2xl p-4 sm:p-6">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Finance</p>
+          <p className="text-[10px] font-black  tracking-[0.3em] text-gold-500/40">Finance</p>
           <h2 className="text-xl sm:text-2xl font-serif font-bold text-gold-100 mt-1">{active.label}</h2>
           <p className="text-xs text-gold-500/50 mt-1 max-w-xl">{active.description}</p>
         </div>

@@ -87,7 +87,7 @@ const PickInventoryProductModal = ({ open, onClose, onSelect }) => {
           <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gold-500/50">Category</span>
+                <span className="text-[10px] font-bold   text-gold-500/50">Category</span>
                 <div className="relative">
                   <select
                     value={category}
@@ -106,7 +106,7 @@ const PickInventoryProductModal = ({ open, onClose, onSelect }) => {
                 </div>
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gold-500/50">Search</span>
+                <span className="text-[10px] font-bold   text-gold-500/50">Search</span>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gold-500/40" />
                   <input
@@ -121,7 +121,7 @@ const PickInventoryProductModal = ({ open, onClose, onSelect }) => {
             </div>
 
             <label className="block space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gold-500/50">
+              <span className="text-[10px] font-bold   text-gold-500/50">
                 Product ({unpublished.length} not published)
               </span>
               <div className="relative">
@@ -158,7 +158,7 @@ const PickInventoryProductModal = ({ open, onClose, onSelect }) => {
               type="button"
               disabled={!selectedId}
               onClick={handleContinue}
-              className="flex-1 py-3 bg-gold-600 text-navy-950 rounded-xl text-sm font-bold uppercase tracking-widest disabled:opacity-40"
+              className="flex-1 py-3 bg-gold-600 text-navy-950 rounded-xl text-sm font-bold   disabled:opacity-40"
             >
               Continue
             </button>

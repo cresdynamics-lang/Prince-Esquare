@@ -232,10 +232,10 @@ const Products = ({ categoryOverride = null }) => {
             <button onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
               <ChevronLeft size={24} />
             </button>
-            <span className="text-[10px] uppercase tracking-widest text-gold-600/50">Back</span>
+            <span className="text-[10px]   text-gold-600/50">Back</span>
           </div>
           <div className="mb-12">
-            <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold">Prince Esquire</span>
+            <span className="text-gold-500 text-[10px]  tracking-[0.4em] font-bold">Prince Esquire</span>
             <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight mt-2">
               {currentCategory === 'All' ? 'Our Collections' : selectedCategory?.name}
             </h1>
@@ -245,7 +245,7 @@ const Products = ({ categoryOverride = null }) => {
             </div>
             <div className="flex gap-4 mt-4">
                 {currentSub !== 'All' && (
-                <p className="text-gold-600/60 text-[12px] uppercase tracking-widest">
+                <p className="text-gold-600/60 text-[12px]  ">
                     Exploring: {currentSub}
                 </p>
                 )}
@@ -261,7 +261,7 @@ const Products = ({ categoryOverride = null }) => {
                     key={cat.id}
                     type="button"
                     onClick={() => setFilter(cat.id, 'All')}
-                    className={`shrink-0 px-6 py-2.5 text-[9px] font-bold uppercase tracking-[0.2em] transition-all border ${
+                    className={`shrink-0 px-6 py-2.5 text-[9px] font-bold  tracking-[0.2em] transition-all border ${
                       currentCategory === cat.id || currentCategory.toLowerCase() === cat.name.toLowerCase()
                         ? 'bg-gold-600 text-navy-950 border-gold-600'
                         : 'bg-navy-900/50 text-gold-400 border-gold-600/30 hover:border-gold-500 hover:text-gold-200 hover:bg-navy-800'
@@ -274,13 +274,13 @@ const Products = ({ categoryOverride = null }) => {
               )}
 
               <div className={`flex gap-2 items-center overflow-x-auto custom-scrollbar pb-2 ${isDedicatedCategoryPage ? '' : 'pt-4 border-t border-gold-600/5'}`}>
-                 <span className="text-[8px] font-black uppercase text-gold-500/80 mr-2 tracking-widest">
+                 <span className="text-[8px] font-black  text-gold-500/80 mr-2 ">
                    Sub Categories:
                  </span>
                  <button
                   type="button"
                   onClick={() => setFilter(currentCategory, 'All')}
-                  className={`shrink-0 px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
+                  className={`shrink-0 px-4 py-1.5 text-[8px] font-bold   transition-all rounded-full border ${
                       currentSub === 'All'
                         ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
                         : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
@@ -293,7 +293,7 @@ const Products = ({ categoryOverride = null }) => {
                     key={sub}
                     type="button"
                     onClick={() => setFilter(currentCategory, sub)}
-                    className={`shrink-0 px-4 py-1.5 text-[8px] font-bold uppercase tracking-widest transition-all rounded-full border ${
+                    className={`shrink-0 px-4 py-1.5 text-[8px] font-bold   transition-all rounded-full border ${
                         currentSub === sub
                           ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
                           : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
@@ -309,7 +309,7 @@ const Products = ({ categoryOverride = null }) => {
               <select
                 value={stockFilter}
                 onChange={(e) => setStockFilter(e.target.value)}
-                className="bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white px-4 py-4 outline-none focus:border-gold-600"
+                className="bg-navy-950 border border-gold-600/10 text-[10px]   text-white px-4 py-4 outline-none focus:border-gold-600"
               >
                 <option value="all">All availability</option>
                 <option value="in_stock">In stock only</option>
@@ -323,7 +323,7 @@ const Products = ({ categoryOverride = null }) => {
                 <input
                   type="text"
                   placeholder="Search collection..."
-                  className="w-full pl-12 pr-4 py-4 bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20"
+                  className="w-full pl-12 pr-4 py-4 bg-navy-950 border border-gold-600/10 text-[10px]   text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -336,7 +336,7 @@ const Products = ({ categoryOverride = null }) => {
           )}
 
           {loading ? (
-            <p className="text-center text-gold-600/50 text-[10px] uppercase tracking-widest py-24">Loading collection…</p>
+            <p className="text-center text-gold-600/50 text-[10px]   py-24">Loading collection…</p>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-10 gap-y-12 sm:gap-y-20">
               <AnimatePresence mode="popLayout">
@@ -362,7 +362,7 @@ const Products = ({ categoryOverride = null }) => {
                           className={`w-full h-full object-contain p-3 bg-white transition-transform duration-700 group-hover:scale-105 ${outOfStock ? 'opacity-50' : ''}`}
                         />
                         {outOfStock && (
-                          <span className="absolute top-3 left-3 bg-red-600/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-1">
+                          <span className="absolute top-3 left-3 bg-red-600/90 text-white text-[9px] font-bold  tracking-wider px-2 py-1">
                             Out of Stock
                           </span>
                         )}
@@ -373,7 +373,7 @@ const Products = ({ categoryOverride = null }) => {
                               if (!outOfStock) handleQuickAdd(product);
                             }}
                             disabled={outOfStock}
-                            className="bg-white text-navy-950 px-5 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 disabled:opacity-40"
+                            className="bg-white text-navy-950 px-5 py-3 text-[10px] font-bold   transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 disabled:opacity-40"
                           >
                             {outOfStock ? 'Unavailable' : addedProductId === product.id ? 'Added' : 'Add to Cart'}
                           </button>
@@ -382,7 +382,7 @@ const Products = ({ categoryOverride = null }) => {
                               e.preventDefault();
                               navigate(`/product/${product.slug}`);
                             }}
-                            className="border border-white/70 text-white px-5 py-3 text-[10px] font-bold uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 hover:bg-white hover:text-navy-950"
+                            className="border border-white/70 text-white px-5 py-3 text-[10px] font-bold   transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 hover:bg-white hover:text-navy-950"
                           >
                             View Product
                           </button>
@@ -390,7 +390,7 @@ const Products = ({ categoryOverride = null }) => {
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-gold-600/50">{product.brand_name}</span>
+                          <span className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</span>
                         </div>
                         <h3 className="text-lg font-serif text-white group-hover:text-gold-500 transition-colors">{product.name}</h3>
                         <p className="text-gold-500 font-light italic">KSh {parseFloat(product.price).toLocaleString()}</p>
@@ -404,10 +404,10 @@ const Products = ({ categoryOverride = null }) => {
 
           {!loading && filteredProducts.length === 0 && (
             <div className="text-center py-24 space-y-4">
-              <p className="text-gold-600/50 text-[10px] uppercase tracking-widest">No pieces found in this curation.</p>
+              <p className="text-gold-600/50 text-[10px]  ">No pieces found in this curation.</p>
               <button 
                 onClick={() => setFilter('All')}
-                className="text-white text-[10px] font-bold uppercase tracking-widest border-b border-white/20 pb-1 hover:border-white transition-all"
+                className="text-white text-[10px] font-bold   border-b border-white/20 pb-1 hover:border-white transition-all"
               >
                 Clear Filters
               </button>

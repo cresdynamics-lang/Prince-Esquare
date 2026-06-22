@@ -45,7 +45,7 @@ const PosLogin = () => {
           <p className="text-white/50 text-sm mt-1">Seller login</p>
         </div>
         <div>
-          <label className="text-white/60 text-xs uppercase tracking-wider">Email</label>
+          <label className="text-white/60 text-xs  tracking-wider">Email</label>
           <div className="relative mt-1">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
             <input
@@ -58,7 +58,7 @@ const PosLogin = () => {
           </div>
         </div>
         <div>
-          <label className="text-white/60 text-xs uppercase tracking-wider">Password</label>
+          <label className="text-white/60 text-xs  tracking-wider">Password</label>
           <div className="relative mt-1">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
             <input

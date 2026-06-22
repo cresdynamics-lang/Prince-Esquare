@@ -34,7 +34,7 @@ const MOVEMENT_LABELS = {
 const Badge = ({ type }) => {
   const cfg = MOVEMENT_LABELS[type] || { label: type, color: 'text-gold-400 bg-gold-400/10' };
   return (
-    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${cfg.color}`}>
+    <span className={`text-[10px] font-black   px-2 py-1 rounded-lg ${cfg.color}`}>
       {cfg.label}
     </span>
   );
@@ -88,9 +88,9 @@ const ShopsPanel = ({ shops, onRefresh }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h5 className="text-sm font-black uppercase tracking-widest text-gold-500/60">Shops / Branches</h5>
+        <h5 className="text-sm font-black   text-gold-500/60">Shops / Branches</h5>
         <button onClick={() => setShowForm(v => !v)}
-          className="flex items-center gap-2 px-4 py-2 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black uppercase tracking-widest">
+          className="flex items-center gap-2 px-4 py-2 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black  ">
           <Plus size={14} /> Add Shop
         </button>
       </div>
@@ -106,10 +106,10 @@ const ShopsPanel = ({ shops, onRefresh }) => {
             ))}
             <div className="flex gap-3 items-center">
               <button onClick={handleSave} disabled={saving}
-                className="px-5 py-3 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black uppercase disabled:opacity-50">
+                className="px-5 py-3 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black  disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save'}
               </button>
-              <button onClick={() => setShowForm(false)} className="px-4 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black uppercase">
+              <button onClick={() => setShowForm(false)} className="px-4 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black ">
                 Cancel
               </button>
             </div>
@@ -125,8 +125,8 @@ const ShopsPanel = ({ shops, onRefresh }) => {
                 <Building2 size={18} className="text-gold-500" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-black text-gold-100 uppercase truncate">{shop.name}</p>
-                <p className="text-[10px] text-gold-500/40 uppercase tracking-widest">{shop.code}</p>
+                <p className="text-sm font-black text-gold-100  truncate">{shop.name}</p>
+                <p className="text-[10px] text-gold-500/40  ">{shop.code}</p>
                 {shop.address && <p className="text-[10px] text-gold-500/30 truncate">{shop.address}</p>}
               </div>
             </div>
@@ -193,9 +193,9 @@ const OpeningStockModal = ({ shops, onClose, onDone }) => {
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <button onClick={onClose} className="px-5 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black uppercase">Cancel</button>
+          <button onClick={onClose} className="px-5 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black ">Cancel</button>
           <button onClick={handleSubmit} disabled={saving}
-            className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase disabled:opacity-50 ${confirmed ? 'bg-amber-500 text-navy-950' : 'bg-gold-600 text-navy-950'}`}>
+            className={`px-5 py-3 rounded-xl text-[10px] font-black  disabled:opacity-50 ${confirmed ? 'bg-amber-500 text-navy-950' : 'bg-gold-600 text-navy-950'}`}>
             {saving ? 'Saving...' : confirmed ? 'Confirm & Lock' : 'Set Opening Stock'}
           </button>
         </div>
@@ -246,9 +246,9 @@ const MovementModal = ({ type, shops, onClose, onDone }) => {
         <InputField label="Description" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Optional note" />
 
         <div className="flex justify-end gap-3 pt-2">
-          <button onClick={onClose} className="px-5 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black uppercase">Cancel</button>
+          <button onClick={onClose} className="px-5 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black ">Cancel</button>
           <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-3 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black uppercase disabled:opacity-50">
+            className="px-5 py-3 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black  disabled:opacity-50">
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -303,8 +303,8 @@ const TransferModal = ({ shops, onClose, onDone }) => {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gold-500/50">Items</p>
-            <button onClick={addItem} className="flex items-center gap-1 text-gold-500 text-[10px] font-black uppercase">
+            <p className="text-[10px] font-black   text-gold-500/50">Items</p>
+            <button onClick={addItem} className="flex items-center gap-1 text-gold-500 text-[10px] font-black ">
               <Plus size={12} /> Add Item
             </button>
           </div>
@@ -325,9 +325,9 @@ const TransferModal = ({ shops, onClose, onDone }) => {
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <button onClick={onClose} className="px-5 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black uppercase">Cancel</button>
+          <button onClick={onClose} className="px-5 py-3 bg-navy-800 text-gold-500 rounded-xl text-[10px] font-black ">Cancel</button>
           <button onClick={handleSubmit} disabled={saving}
-            className="flex items-center gap-2 px-5 py-3 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black uppercase disabled:opacity-50">
+            className="flex items-center gap-2 px-5 py-3 bg-gold-600 text-navy-950 rounded-xl text-[10px] font-black  disabled:opacity-50">
             <ArrowRightLeft size={14} /> {saving ? 'Processing...' : 'Transfer'}
           </button>
         </div>
@@ -363,7 +363,7 @@ const StockSummaryTable = ({ shops }) => {
         <div className="flex gap-2">
           {['daily', 'weekly', 'monthly'].map(p => (
             <button key={p} onClick={() => setPeriod(p)}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+              className={`px-4 py-2 rounded-xl text-[10px] font-black   border transition-all ${
                 period === p ? 'bg-gold-600 text-navy-950 border-gold-600' : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
               }`}>{p}</button>
           ))}
@@ -376,7 +376,7 @@ const StockSummaryTable = ({ shops }) => {
         <button onClick={fetchSummary} className="p-2 text-gold-500/50 hover:text-gold-500 bg-navy-800/50 border border-gold-500/10 rounded-xl transition-colors">
           <RefreshCw size={16} />
         </button>
-        <span className="text-[10px] uppercase tracking-widest text-gold-500/30">{periodLabels[period]}</span>
+        <span className="text-[10px]   text-gold-500/30">{periodLabels[period]}</span>
       </div>
 
       <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden">
@@ -384,7 +384,7 @@ const StockSummaryTable = ({ shops }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
               <thead className="bg-navy-800/50">
-                <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+                <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                   <th className="px-5 py-4">Product</th>
                   <th className="px-5 py-4">Variant</th>
                   <th className="px-5 py-4">Shop</th>
@@ -401,7 +401,7 @@ const StockSummaryTable = ({ shops }) => {
                     <td className="px-5 py-4 text-sm font-bold text-gold-100">{row.product_name}</td>
                     <td className="px-5 py-4 text-xs text-gold-500/60">{row.variant_label || '—'}</td>
                     <td className="px-5 py-4">
-                      <span className="text-[10px] font-black uppercase text-gold-500 bg-gold-500/10 px-2 py-1 rounded-lg">{row.shop_code}</span>
+                      <span className="text-[10px] font-black  text-gold-500 bg-gold-500/10 px-2 py-1 rounded-lg">{row.shop_code}</span>
                     </td>
                     <td className="px-5 py-4 text-right text-gold-100 font-bold">{row.opening_stock}</td>
                     <td className="px-5 py-4 text-right text-green-400 font-bold">+{row.stock_in}</td>
@@ -421,7 +421,7 @@ const StockSummaryTable = ({ shops }) => {
       </div>
 
       {/* Formula hint */}
-      <p className="text-[10px] text-gold-500/30 uppercase tracking-widest">
+      <p className="text-[10px] text-gold-500/30  ">
         Closing Stock = Opening Stock + Stock In − Stock Out − Sales
       </p>
     </div>
@@ -463,7 +463,7 @@ const CurrentStockPanel = ({ shops }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left">
               <thead className="bg-navy-800/50">
-                <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+                <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                   <th className="px-5 py-4">Product</th>
                   <th className="px-5 py-4">Variant</th>
                   <th className="px-5 py-4">Shop</th>
@@ -481,7 +481,7 @@ const CurrentStockPanel = ({ shops }) => {
                     </td>
                     <td className="px-5 py-4 text-xs text-gold-500/60">{row.variant_label || '—'}</td>
                     <td className="px-5 py-4">
-                      <span className="text-[10px] font-black uppercase text-gold-500 bg-gold-500/10 px-2 py-1 rounded-lg">{row.shop_code}</span>
+                      <span className="text-[10px] font-black  text-gold-500 bg-gold-500/10 px-2 py-1 rounded-lg">{row.shop_code}</span>
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span className={`text-base font-black ${parseInt(row.current_stock) <= 5 ? 'text-red-400' : parseInt(row.current_stock) <= 15 ? 'text-amber-400' : 'text-green-400'}`}>
@@ -545,7 +545,7 @@ const MovementHistory = ({ shops }) => {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
               <thead className="bg-navy-800/50">
-                <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+                <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                   <th className="px-5 py-4">Date</th>
                   <th className="px-5 py-4">Type</th>
                   <th className="px-5 py-4">Product</th>
@@ -564,7 +564,7 @@ const MovementHistory = ({ shops }) => {
                     <td className="px-5 py-4 text-sm font-bold text-gold-100">{row.product_name}</td>
                     <td className="px-5 py-4 text-xs text-gold-500/60">{row.variant_label || '—'}</td>
                     <td className="px-5 py-4">
-                      <span className="text-[10px] font-black uppercase text-gold-500 bg-gold-500/10 px-2 py-1 rounded-lg">{row.shop_name}</span>
+                      <span className="text-[10px] font-black  text-gold-500 bg-gold-500/10 px-2 py-1 rounded-lg">{row.shop_name}</span>
                     </td>
                     <td className="px-5 py-4 text-right font-black text-gold-100">{row.quantity}</td>
                     <td className="px-5 py-4 text-right font-black text-gold-400">{row.closing_stock}</td>
@@ -599,7 +599,7 @@ const TransferHistory = () => {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left">
             <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+              <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                 <th className="px-5 py-4">Date</th>
                 <th className="px-5 py-4">From</th>
                 <th className="px-5 py-4">To</th>
@@ -617,7 +617,7 @@ const TransferHistory = () => {
                   <td className="px-5 py-4 text-right font-black text-gold-400">{row.total_quantity}</td>
                   <td className="px-5 py-4 text-right text-gold-500/60">{row.item_count}</td>
                   <td className="px-5 py-4">
-                    <span className="text-[10px] font-black uppercase text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">{row.status}</span>
+                    <span className="text-[10px] font-black  text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">{row.status}</span>
                   </td>
                 </tr>
               )) : <EmptyRow cols={6} msg="No transfers yet." />}
@@ -645,7 +645,7 @@ const ModalWrap = ({ title, onClose, children, wide }) => (
 
 const SelectField = ({ label, value, onChange, children }) => (
   <div>
-    {label && <label className="block text-[10px] font-black uppercase tracking-widest text-gold-500/50 mb-1">{label}</label>}
+    {label && <label className="block text-[10px] font-black   text-gold-500/50 mb-1">{label}</label>}
     <select value={value} onChange={e => onChange(e.target.value)}
       className="w-full bg-navy-900 border border-gold-500/10 rounded-xl px-4 py-3 text-sm text-gold-200 outline-none focus:border-gold-500/40 cursor-pointer">
       {children}
@@ -655,7 +655,7 @@ const SelectField = ({ label, value, onChange, children }) => (
 
 const InputField = ({ label, value, onChange, type = 'text', placeholder }) => (
   <div>
-    {label && <label className="block text-[10px] font-black uppercase tracking-widest text-gold-500/50 mb-1">{label}</label>}
+    {label && <label className="block text-[10px] font-black   text-gold-500/50 mb-1">{label}</label>}
     <input type={type} value={value} placeholder={placeholder}
       onChange={e => onChange(e.target.value)}
       className="w-full bg-navy-900 border border-gold-500/10 rounded-xl px-4 py-3 text-sm text-gold-100 placeholder:text-gold-500/30 outline-none focus:border-gold-500/40" />
@@ -696,7 +696,7 @@ const InventoryView = () => {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-500/40">Multi-Shop · Real-Time</span>
+          <span className="text-[10px] font-black  tracking-[0.3em] text-gold-500/40">Multi-Shop · Real-Time</span>
           <h3 className="text-2xl font-serif font-bold text-gold-100 mt-1">Inventory Management</h3>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -708,7 +708,7 @@ const InventoryView = () => {
             { id: 'transfer', label: 'Transfer', icon: ArrowRightLeft, color: 'bg-gold-600 text-navy-950 border-gold-600 hover:bg-gold-500' },
           ].map(btn => (
             <button key={btn.id} onClick={() => setModal(btn.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${btn.color}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black   border transition-all ${btn.color}`}>
               <btn.icon size={14} /> {btn.label}
             </button>
           ))}
@@ -726,7 +726,7 @@ const InventoryView = () => {
           <div key={s.label} className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-4 flex items-center gap-4">
             <div className={`${s.color} opacity-80`}><s.icon size={22} /></div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gold-500/40">{s.label}</p>
+              <p className="text-[10px] font-black   text-gold-500/40">{s.label}</p>
               <p className="text-xl font-serif font-bold text-gold-100">{loading ? '—' : s.value}</p>
             </div>
           </div>
@@ -737,7 +737,7 @@ const InventoryView = () => {
       <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+            className={`shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black   border transition-all ${
               tab === t.id ? 'bg-gold-600 text-navy-950 border-gold-600' : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
             }`}>
             <t.icon size={14} /> {t.label}

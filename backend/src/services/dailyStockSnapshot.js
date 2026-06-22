@@ -37,13 +37,15 @@ const aggregateMovements = async (client, productId, dateStr) => {
   let sales = 0;
   let stockIn = 0;
   let stockOut = 0;
+  let adjustments = 0;
   for (const row of movR.rows) {
     if (row.movement_type === 'STOCK_IN') stockIn += row.total;
     if (row.movement_type === 'STOCK_OUT') stockOut += row.total;
     if (row.movement_type === 'SALE_POS' || row.movement_type === 'SALE_ONLINE') sales += row.total;
-    if (row.movement_type === 'VOID') stockIn += row.total;
+    if (row.movement_type === 'VOID') sales -= row.total;
+    if (row.movement_type === 'ADJUSTMENT') adjustments += row.total;
   }
-  return { sales, stockIn, stockOut };
+  return { sales, stockIn, stockOut, adjustments };
 };
 
 const resolveOpeningQty = async (client, productId, dateStr) => {
@@ -64,8 +66,8 @@ const resolveOpeningQty = async (client, productId, dateStr) => {
     [productId]
   );
   const currentQty = stockR.rows[0]?.current_qty ?? 0;
-  const { sales, stockIn, stockOut } = await aggregateMovements(client, productId, dateStr);
-  return currentQty + sales + stockOut - stockIn;
+  const { sales, stockIn, stockOut, adjustments } = await aggregateMovements(client, productId, dateStr);
+  return currentQty + sales + stockOut - stockIn - adjustments;
 };
 
 const refreshDailySnapshot = async (productId, date = new Date(), existingClient = null) => {
@@ -75,14 +77,14 @@ const refreshDailySnapshot = async (productId, date = new Date(), existingClient
 
   try {
     const opening = await resolveOpeningQty(client, productId, dateStr);
-    const { sales, stockIn, stockOut } = await aggregateMovements(client, productId, dateStr);
+    const { sales, stockIn, stockOut, adjustments } = await aggregateMovements(client, productId, dateStr);
 
     const stockR = await client.query(
       `SELECT current_qty FROM pos_stock_levels WHERE product_id = $1`,
       [productId]
     );
     const currentQty = stockR.rows[0]?.current_qty;
-    const formulaClosing = Math.max(0, opening + stockIn - stockOut - sales);
+    const formulaClosing = Math.max(0, opening + stockIn - stockOut - sales + adjustments);
     const closingQty = currentQty != null ? currentQty : formulaClosing;
 
     await client.query(
