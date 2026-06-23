@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { formatResponse } from '../utils/responseFormatter';
 
 export default function BlogsView() {
   const [blogs, setBlogs] = useState([]);
