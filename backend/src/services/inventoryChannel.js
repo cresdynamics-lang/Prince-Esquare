@@ -126,7 +126,71 @@ const syncPosMetadataFromEcommerce = async (product, posRow = null) => {
      WHERE id = $6`,
     [product.name, categoryName, shopPrice, listPrice, product.id, posId]
   );
+
+  await syncPosWebsiteDetailsFromEcommerce(product.id, posId);
   return { id: posId, categoryName, shopPrice, listPrice };
+};
+
+/** Mirror website variants, prices, and stock into linked POS inventory draft. */
+const syncPosWebsiteDetailsFromEcommerce = async (ecommerceProductId, posProductId = null) => {
+  const productR = await db.query(
+    `SELECT p.*, c.name AS category_name
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     WHERE p.id = $1`,
+    [ecommerceProductId]
+  );
+  const product = productR.rows[0];
+  if (!product) return null;
+
+  let posId = posProductId || product.pos_stock_product_id;
+  if (!posId) return null;
+
+  const vr = await db.query(
+    `SELECT id, color, size, stock_quantity, price_modifier, image_url
+     FROM product_variants WHERE product_id = $1 ORDER BY color, size`,
+    [ecommerceProductId]
+  );
+  const { groupVariantsByColor } = require('./inventoryProductDetail');
+  const variants = vr.rows.map((v) => ({
+    id: v.id,
+    color: v.color,
+    size: v.size,
+    stock: v.stock_quantity ?? 0,
+    price_override: parseFloat(v.price_modifier) || 0,
+    image_url: v.image_url,
+  }));
+
+  const images = typeof product.images === 'string'
+    ? (() => { try { return JSON.parse(product.images); } catch { return []; } })()
+    : (product.images || []);
+
+  const websiteDetails = {
+    category_id: product.category_id,
+    category_name: product.category_name || 'General',
+    brand_id: product.brand_id,
+    description: product.description,
+    price: parseFloat(product.price || 0),
+    discount_price: product.discount_price != null ? parseFloat(product.discount_price) : null,
+    thumbnail: product.thumbnail,
+    images,
+    variants,
+    color_groups: groupVariantsByColor(variants),
+  };
+
+  await db.query(
+    `UPDATE pos_products SET website_details = $1::jsonb WHERE id = $2`,
+    [JSON.stringify(websiteDetails), posId]
+  );
+
+  const totalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+  if (totalStock > 0) {
+    const { setShopQty, afterInventoryChange } = require('./inventoryMovement');
+    const shopQty = await setShopQty(posId, totalStock);
+    await afterInventoryChange(posId, { shopQty });
+  }
+
+  return { posId, totalStock, variantCount: variants.length };
 };
 
 /** One-time seed: copy website stock_quantity into POS shop when POS qty is still zero. */
@@ -325,6 +389,7 @@ module.exports = {
   ensurePosForEcommerceProduct,
   ensureAllEcommerceProductsInPos,
   syncPosMetadataFromEcommerce,
+  syncPosWebsiteDetailsFromEcommerce,
   seedPosOpeningStockIfEmpty,
   publishPosToWebsite,
   unpublishFromWebsite,

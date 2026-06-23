@@ -93,6 +93,9 @@ export const buildColorGroupsFromDetail = (detail) => {
       })),
     }));
   }
+  if (detail?.variants?.length) {
+    return buildColorGroupsFromVariants(detail.variants);
+  }
   return [newColorGroup('Original')];
 };
 

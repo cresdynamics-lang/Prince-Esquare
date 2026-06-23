@@ -1,7 +1,7 @@
 // NEW — POS & Inventory admin views (embedded in AdminDashboard)
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Users, ChevronDown, ChevronRight } from 'lucide-react';
+import { Users, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   posAdminAPI, posAPI, inventoryAPI, shiftsAPI, sellersAPI, reportsAPI, posSettingsAPI, downloadReport,
@@ -183,8 +183,7 @@ const StockExcelToolbar = ({ onImported, sheetDate, readOnly = false }) => {
   );
 };
 
-const UnifiedStockSheetToolbar = ({ category = '', onImported, readOnly = false }) => {
-  const [uploading, setUploading] = useState(false);
+const UnifiedStockSheetToolbar = ({ category = '', readOnly = false, onAddProduct }) => {
   const [downloading, setDownloading] = useState(false);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -202,7 +201,7 @@ const UnifiedStockSheetToolbar = ({ category = '', onImported, readOnly = false 
         }),
         `Stock${suffix}-${date}.xlsx`
       );
-      toast.success('Stock sheet downloaded');
+      toast.success('Stock report downloaded');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Download failed');
     } finally {
@@ -210,70 +209,37 @@ const UnifiedStockSheetToolbar = ({ category = '', onImported, readOnly = false 
     }
   };
 
-  const handleTemplate = async () => {
-    try {
-      const res = await inventoryAPI.downloadMasterStockTemplate();
-      blobDownload(
-        new Blob([res.data], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        }),
-        'Stock-Template.xlsx'
-      );
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Template download failed');
-    }
-  };
-
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const res = await inventoryAPI.importMasterStock(file, { date });
-      if (res.data?.success) {
-        toast.success(res.data.message || 'Stock updated from Excel');
-        onImported?.();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Upload failed');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
-  };
-
   return (
     <div className="space-y-2 p-4 bg-navy-900/50 border border-gold-500/15 rounded-xl">
-      <h3 className="text-gold-400 text-sm font-medium  tracking-wider">Stock sheet</h3>
+      <h3 className="text-gold-400 text-sm font-medium tracking-wider">Inventory</h3>
+      <p className="text-[11px] text-gold-500/50 leading-relaxed">
+        Add products with full details (sizes, stock, prices) or use <strong className="text-gold-400/80 font-normal">Add</strong> on each card for quick stock updates. Download Excel for reports.
+      </p>
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm"
-          title="Sheet date"
-        />
+        {!readOnly && onAddProduct && (
+          <button
+            type="button"
+            onClick={onAddProduct}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 text-white rounded text-sm font-medium hover:bg-emerald-500"
+          >
+            <Plus size={16} /> Add Product
+          </button>
+        )}
         <button
           type="button"
           onClick={handleDownload}
           disabled={downloading}
           className="px-4 py-1.5 bg-gold-600 text-navy-950 rounded text-sm font-medium hover:bg-gold-500 disabled:opacity-50"
         >
-          {downloading ? 'Generating…' : 'Download Stock.xlsx'}
+          {downloading ? 'Generating…' : 'Download Stock Report'}
         </button>
-        {!readOnly && (
-          <label className="px-4 py-1.5 border border-gold-500/40 text-gold-300 rounded text-sm font-medium cursor-pointer hover:bg-gold-500/10">
-            {uploading ? 'Uploading…' : 'Upload Stock.xlsx'}
-            <input type="file" accept=".xlsx" className="hidden" onChange={handleUpload} disabled={uploading} />
-          </label>
-        )}
-        <button
-          type="button"
-          onClick={handleTemplate}
-          className="px-3 py-1.5 border border-gold-500/25 text-gold-500/60 rounded text-sm"
-        >
-          Template
-        </button>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm"
+          title="Report date"
+        />
       </div>
     </div>
   );
@@ -647,12 +613,27 @@ export const PosSalesView = ({ channel = 'POS', readOnly = false }) => {
 
 export const StockOverviewView = ({ readOnly = false }) => {
   const [exportCategory, setExportCategory] = useState('');
-  const reload = () => window.dispatchEvent(new Event('inventory:reload'));
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+
+  const reloadInventory = () => window.dispatchEvent(new Event('inventory:reload'));
 
   return (
     <div className="p-2 space-y-4">
-      <UnifiedStockSheetToolbar category={exportCategory} onImported={reload} readOnly={readOnly} />
+      <UnifiedStockSheetToolbar
+        category={exportCategory}
+        readOnly={readOnly}
+        onAddProduct={() => setCreateProductOpen(true)}
+      />
       <InventoryCatalogView onCategoryChange={setExportCategory} readOnly={readOnly} />
+      {createProductOpen && !readOnly && (
+        <InventoryProductModal
+          onClose={() => setCreateProductOpen(false)}
+          onSaved={() => {
+            setCreateProductOpen(false);
+            reloadInventory();
+          }}
+        />
+      )}
     </div>
   );
 };

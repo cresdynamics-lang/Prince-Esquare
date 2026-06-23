@@ -261,7 +261,7 @@ exports.createProduct = async (req, res, next) => {
                         'Variant',
                         value,
                         v.price_override || 0,
-                        0,
+                        parseInt(v.stock, 10) || 0,
                         v.image_url || null,
                         v.color || null,
                         v.size || null,
@@ -272,10 +272,11 @@ exports.createProduct = async (req, res, next) => {
             }
         }
 
-        const { ensurePosForEcommerceProduct } = require('../services/inventoryChannel');
+        const { ensurePosForEcommerceProduct, syncPosMetadataFromEcommerce } = require('../services/inventoryChannel');
         const { receiveAtStore } = require('../services/inventoryMovement');
         const posRow = await ensurePosForEcommerceProduct(result.rows[0]);
-        const storeQty = Math.max(0, parseInt(inventory_opening_qty, 10) || parseInt(stock_quantity, 10) || 1);
+        await syncPosMetadataFromEcommerce(result.rows[0], posRow);
+        const storeQty = Math.max(0, parseInt(inventory_opening_qty, 10) || 0);
         if (posRow?.id && storeQty > 0) {
             await receiveAtStore(posRow.id, storeQty, {
                 notes: 'Added from Products — warehouse intake',

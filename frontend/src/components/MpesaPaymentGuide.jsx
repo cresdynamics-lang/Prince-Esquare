@@ -1,9 +1,26 @@
 import { useState } from 'react';
 import { ChevronDown, Check, Copy } from 'lucide-react';
-import { MPESA_TILL } from '../lib/storeContact';
+import {
+  MPESA_ACCOUNT,
+  MPESA_PAYBILL,
+  MPESA_TILL,
+  getMpesaPaymentType,
+} from '../lib/storeContact';
 
 const buildSteps = () => {
-  if (MPESA_TILL) {
+  const paymentType = getMpesaPaymentType();
+  if (paymentType === 'paybill') {
+    return [
+      'Open the M-Pesa menu on your phone',
+      'Select Lipa na M-Pesa',
+      'Select Pay Bill',
+      `Enter business number ${MPESA_PAYBILL}`,
+      `Enter account number ${MPESA_ACCOUNT}`,
+      'Enter the exact order total',
+      'Enter your M-Pesa PIN and confirm',
+    ];
+  }
+  if (paymentType === 'till') {
     return [
       'Open the M-Pesa menu on your phone',
       'Select Lipa na M-Pesa',
@@ -16,8 +33,7 @@ const buildSteps = () => {
   return [
     'Open the M-Pesa menu on your phone',
     'Select Lipa na M-Pesa',
-    'Select Buy Goods and Services',
-    'Enter the exact order total shown below',
+    'Pay the exact order total shown below',
     'Enter your M-Pesa PIN and confirm',
   ];
 };
@@ -44,15 +60,21 @@ const MpesaPaymentGuide = ({ amount, orderRef }) => {
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const rounded = Math.round(Number(amount) || 0);
   const steps = buildSteps();
+  const paymentType = getMpesaPaymentType();
+
+  const headerLabel = paymentType === 'paybill'
+    ? `M-Pesa Pay Bill – ${MPESA_PAYBILL} (Prince Esquire)`
+    : paymentType === 'till'
+      ? `M-Pesa Lipa na M-Pesa (Buy Goods) – Till ${MPESA_TILL}`
+      : 'Pay with M-Pesa';
 
   return (
     <div className="space-y-4">
       <div className="border border-gold-500/20 bg-navy-950/50 px-4 py-3">
-        <p className="text-sm text-white font-medium">
-          {MPESA_TILL
-            ? `M-Pesa Lipa na M-Pesa (Buy Goods) – Till ${MPESA_TILL}`
-            : 'Pay with M-Pesa'}
-        </p>
+        <p className="text-sm text-white font-medium">{headerLabel}</p>
+        {paymentType === 'paybill' && (
+          <p className="text-xs text-navy-400 mt-1">Account no. {MPESA_ACCOUNT}</p>
+        )}
       </div>
 
       <div className="border border-gold-500/10">
@@ -69,7 +91,21 @@ const MpesaPaymentGuide = ({ amount, orderRef }) => {
         </button>
         {instructionsOpen && (
           <div className="px-4 pb-4 space-y-3 border-t border-gold-500/10">
-            {MPESA_TILL && (
+            {paymentType === 'paybill' && (
+              <>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 text-sm">
+                  <span className="text-navy-400">Pay bill:</span>
+                  <span className="font-bold text-gold-400">{MPESA_PAYBILL}</span>
+                  <CopyBtn value={MPESA_PAYBILL} label="Copy pay bill" />
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span className="text-navy-400">Account:</span>
+                  <span className="font-bold text-gold-400">{MPESA_ACCOUNT}</span>
+                  <CopyBtn value={MPESA_ACCOUNT} label="Copy account" />
+                </div>
+              </>
+            )}
+            {paymentType === 'till' && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 text-sm">
                 <span className="text-navy-400">Till:</span>
                 <span className="font-bold text-gold-400">{MPESA_TILL}</span>

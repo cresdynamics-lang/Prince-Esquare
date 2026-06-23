@@ -96,6 +96,9 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
     variants: flattenColorGroups(form.color_groups),
   });
 
+  const variantStockTotal = () =>
+    flattenColorGroups(form.color_groups).reduce((sum, row) => sum + (Number(row.stock) || 0), 0);
+
   const uploadFile = async (file) => {
     const fd = new FormData();
     fd.append('images', file);
@@ -165,26 +168,34 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
     setBusy(true);
     try {
       const payload = buildPayload();
+      const stockTotal = variantStockTotal();
+      const openingQty = Math.max(stockTotal, Number(form.opening_qty) || 0);
+      const storeQty = Number(form.store_qty) || 0;
+      let savedId = itemId;
+
       if (isNew) {
         const res = await inventoryAPI.createItem({
           ...payload,
-          opening_qty: Number(form.opening_qty) || 0,
-          store_qty: Number(form.store_qty) || 0,
+          opening_qty: openingQty,
+          store_qty: storeQty,
         });
-        const newId = res.data?.data?.productId;
-        if (andPublish && newId) {
-          await inventoryAPI.publishToWebsite(newId, payload);
+        savedId = res.data?.data?.productId;
+        if (andPublish && savedId) {
+          await inventoryAPI.publishToWebsite(savedId, payload);
           toast.success('Product added and published to website');
         } else {
           toast.success('Product added to inventory');
         }
       } else {
         await inventoryAPI.saveProductDetails(itemId, payload);
+        if (stockTotal > 0) {
+          await inventoryAPI.stockTake([{ productId: itemId, physicalQty: stockTotal }]);
+        }
         if (andPublish) {
           await inventoryAPI.publishToWebsite(itemId, payload);
           toast.success(websiteLinked ? 'Saved and website updated' : 'Saved and published to website');
         } else {
-          toast.success('Product details saved');
+          toast.success('Product saved');
         }
       }
       onSaved?.();
@@ -234,7 +245,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
         <div className="sticky top-0 bg-navy-900/95 backdrop-blur border-b border-gold-500/10 px-6 py-4 flex items-center justify-between z-10">
           <div>
             <h3 className="text-gold-400 font-medium">
-              {isNew ? 'Add product with full details' : 'Product details'}
+              {isNew ? 'Add product' : 'Product details'}
             </h3>
             {!isNew && (
               <p className="text-[10px] text-gold-500/40 mt-0.5  ">
@@ -299,7 +310,8 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
                   <>
                     <div>
                       <label className={labelCls}>Shop opening qty</label>
-                      <input type="number" min={0} className={inputCls} value={form.opening_qty} onChange={(e) => setForm({ ...form, opening_qty: e.target.value })} />
+                      <input type="number" min={0} className={inputCls} value={form.opening_qty} onChange={(e) => setForm({ ...form, opening_qty: e.target.value })} placeholder={String(variantStockTotal() || 0)} />
+                      <p className="text-[9px] text-gold-500/40 mt-1">Defaults to total of size stocks if left empty.</p>
                     </div>
                     <div>
                       <label className={labelCls}>Store qty (warehouse)</label>
@@ -338,7 +350,10 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
 
             <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold   text-gold-500/70">Colors & sizes</h4>
+                <div>
+                  <h4 className="text-xs font-bold   text-gold-500/70">Colors & sizes</h4>
+                  <p className="text-[10px] text-gold-500/40 mt-0.5">Set stock and optional price override per size.</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, color_groups: [...f.color_groups, newColorGroup('')] }))}
@@ -424,7 +439,8 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
                         <thead className="text-gold-500/40">
                           <tr>
                             <th className="text-left p-1">Size</th>
-                            <th className="p-1">Web stock</th>
+                            <th className="p-1">Stock</th>
+                            <th className="p-1">Price +/-</th>
                             <th className="p-1" />
                           </tr>
                         </thead>
@@ -446,6 +462,27 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
                                             ...g,
                                             sizes: g.sizes.map((s) =>
                                               s._key === row._key ? { ...s, stock: e.target.value } : s
+                                            ),
+                                          }
+                                        : g
+                                    ),
+                                  }))}
+                                />
+                              </td>
+                              <td className="p-1">
+                                <input
+                                  type="number"
+                                  className="w-16 bg-navy-950 border border-gold-500/20 rounded px-1 py-0.5 text-white"
+                                  value={row.price_override}
+                                  placeholder="0"
+                                  onChange={(e) => setForm((f) => ({
+                                    ...f,
+                                    color_groups: f.color_groups.map((g) =>
+                                      g._key === group._key
+                                        ? {
+                                            ...g,
+                                            sizes: g.sizes.map((s) =>
+                                              s._key === row._key ? { ...s, price_override: e.target.value } : s
                                             ),
                                           }
                                         : g

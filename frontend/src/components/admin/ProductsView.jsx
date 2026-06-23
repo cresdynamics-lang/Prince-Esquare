@@ -544,8 +544,8 @@ const ProductsView = () => {
     setSubmitting(true);
     try {
       const payload = { ...formData };
-      payload.variants = flattenColorGroups(formData.color_groups).map((row) => ({ ...row, stock: 0 }));
-      payload.stock_quantity = 0;
+      payload.variants = flattenColorGroups(formData.color_groups);
+      payload.stock_quantity = totalVariantStock(formData.color_groups);
       payload.brand_id = null;
 
       // Remove frontend-only state fields
@@ -579,6 +579,7 @@ const ProductsView = () => {
       }
       closeProductModal();
       fetchData();
+      window.dispatchEvent(new Event('inventory:reload'));
       adminToast.success(currentProduct ? 'Product updated' : 'Product added');
     } catch (error) {
       console.error('Error saving product:', error);
@@ -594,7 +595,7 @@ const ProductsView = () => {
         <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100  ">
           Products ({filteredProducts.length}{filteredProducts.length !== products.length ? ` of ${products.length}` : ''})
         </h3>
-        <button 
+        <button
           type="button"
           onClick={() => handleOpenModal()}
           className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black  tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-xs sm:text-sm"
@@ -602,16 +603,6 @@ const ProductsView = () => {
           <Plus size={20} /> Add Product
         </button>
       </div>
-
-      <p className="text-xs text-gold-500/50 -mt-4 mb-2">
-        Add product details, images, and sizes here. Web stock is adjusted by admin in Inventory after the item is saved.
-      </p>
-
-      {staffUser && (
-        <p className="text-xs text-amber-400/80 mb-2">
-          Staff: pick colors and sizes when adding a product. Website stock counts are set by admin in Inventory.
-        </p>
-      )}
 
       <div className="flex flex-wrap gap-3 p-4 bg-navy-900/40 border border-gold-500/10 rounded-2xl">
         <div className="relative flex-1 min-w-[200px]">
@@ -899,7 +890,7 @@ const ProductsView = () => {
                       onChange={(e) => setFormData({ ...formData, inventory_opening_qty: e.target.value })}
                       className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                     />
-                    <p className="text-[9px] text-gold-500/35">Warehouse opening qty — transfer to shop in Inventory.</p>
+                    <p className="text-[9px] text-gold-500/35">Warehouse opening qty — also reflected in Inventory.</p>
                   </div>
                 </div>
 
@@ -1098,7 +1089,7 @@ const ProductsView = () => {
                   <div>
                     <h5 className="text-xs font-black text-gold-500  tracking-[0.3em]">Colors & Sizes</h5>
                     <p className="text-[9px] text-gold-500/40  tracking-wider mt-1">
-                      Choose which sizes exist for each color. Admin sets website stock in Inventory — not here.
+                      Pick colors and sizes, then enter stock for each size.
                     </p>
                   </div>
                   <button
@@ -1214,6 +1205,7 @@ const ProductsView = () => {
                             <thead className="text-gold-500/40">
                               <tr>
                                 <th className="text-left p-2">Size</th>
+                                <th className="p-2">Stock</th>
                                 <th className="p-2 w-10" />
                               </tr>
                             </thead>
@@ -1221,6 +1213,15 @@ const ProductsView = () => {
                               {group.sizes.map((row) => (
                                 <tr key={row._key} className="border-t border-gold-500/10">
                                   <td className="p-2 font-bold text-gold-100">{row.size}</td>
+                                  <td className="p-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={row.stock}
+                                      onChange={(e) => updateSizeInGroup(group._key, row._key, 'stock', e.target.value)}
+                                      className="w-20 bg-navy-950 border border-gold-500/10 rounded-lg py-1.5 px-2 text-gold-100 text-center outline-none focus:border-gold-500/30"
+                                    />
+                                  </td>
                                   <td className="p-2 text-right">
                                     <button type="button" onClick={() => removeSizeFromGroup(group._key, row._key)} className="text-red-400/60 hover:text-red-400">
                                       <Trash2 size={14} />
@@ -1234,6 +1235,9 @@ const ProductsView = () => {
                       )}
                     </div>
                   ))}
+                  <p className="text-[10px] text-gold-500/50 text-right">
+                    Total stock: <span className="text-gold-300 font-bold">{formData.stock_quantity}</span> units
+                  </p>
                 </div>
               </div>
 

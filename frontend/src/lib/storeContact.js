@@ -5,8 +5,20 @@ export const WHATSAPP_NUMBER = (
   import.meta.env.VITE_WHATSAPP_NUMBER || CONTACT_PHONE.replace(/\D/g, '')
 ).replace(/\D/g, '');
 
-/** Lipa na M-Pesa till — set VITE_MPESA_TILL in .env */
+/** M-Pesa Pay Bill business number — Prince Esquire: 303030 */
+export const MPESA_PAYBILL = (import.meta.env.VITE_MPESA_PAYBILL || '303030').trim();
+
+/** M-Pesa Pay Bill account number — Prince Esquire: PSXQ# */
+export const MPESA_ACCOUNT = (import.meta.env.VITE_MPESA_ACCOUNT || 'PSXQ#').trim();
+
+/** Lipa na M-Pesa till (Buy Goods) — optional; pay bill takes priority when set */
 export const MPESA_TILL = (import.meta.env.VITE_MPESA_TILL || '').trim();
+
+export const getMpesaPaymentType = () => {
+  if (MPESA_PAYBILL) return 'paybill';
+  if (MPESA_TILL) return 'till';
+  return 'none';
+};
 
 export const buildOrderTrackUrl = (orderId, email = '') => {
   const url = new URL(`${SITE_URL}/payment/${orderId}`);
@@ -50,6 +62,8 @@ export const buildWhatsAppOrderUrl = ({ order, items = [], trackUrl }) => {
 
   if (addr.mpesa_code) {
     lines.push('', `M-Pesa confirmation code: ${addr.mpesa_code}`);
+  } else if (MPESA_PAYBILL) {
+    lines.push('', `I will pay via M-Pesa Pay Bill ${MPESA_PAYBILL}, account ${MPESA_ACCOUNT}.`);
   } else if (MPESA_TILL) {
     lines.push('', `I will pay via M-Pesa to Till ${MPESA_TILL}.`);
   }

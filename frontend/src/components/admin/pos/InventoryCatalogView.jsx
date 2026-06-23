@@ -363,8 +363,8 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
           <Empty
             message={
               selectedCategory
-                ? `No pieces in "${selectedCategory}". Use the stock sheet above to update counts.`
-                : 'No inventory pieces found. Add products or sync from the website catalog.'
+                ? `No pieces in "${selectedCategory}". Use Add Product above.`
+                : 'No inventory pieces found. Use Add Product above or sync from the website.'
             }
           />
         )}
@@ -412,6 +412,7 @@ const InventoryCatalogView = ({ onCategoryChange, readOnly = false }) => {
                 toast.error(err.response?.data?.message || 'Could not save threshold');
               }
             }}
+            onStockAdded={reloadAll}
           />
         ))}
 

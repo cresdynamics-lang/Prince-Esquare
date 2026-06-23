@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Store, ShoppingBag, Globe, Pencil, FileText, EyeOff } from 'lucide-react';
 import { formatKES } from '../../../lib/format';
+import InventoryStockAddPanel from './InventoryStockAddPanel';
 
 const SizeChip = ({ size, stock, outOfStockStyle }) => {
   const out = stock == null ? false : Number(stock) <= 0;
@@ -43,11 +44,13 @@ const InventoryProductCard = ({
   onTransferIn,
   onTransferOut,
   onThresholdChange,
+  onStockAdded,
   readOnly = false,
   selected = false,
   onSelectToggle,
 }) => {
   const [thresholdDraft, setThresholdDraft] = useState(String(product.low_stock_threshold ?? ''));
+  const [addOpen, setAddOpen] = useState(false);
   const inShop = (product.currentQty ?? 0) > 0;
   const liveOnWeb = product.on_website ?? (product.website_product_id && product.website_published);
   const showImage = liveOnWeb && product.website_thumbnail;
@@ -89,7 +92,22 @@ const InventoryProductCard = ({
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h4 className="text-white font-medium leading-snug">{product.name}</h4>
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-white font-medium leading-snug">{product.name}</h4>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen((o) => !o)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                      addOpen
+                        ? 'bg-emerald-600 text-white border-emerald-500'
+                        : 'bg-emerald-600/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-600/25'
+                    }`}
+                  >
+                    Add
+                  </button>
+                )}
+              </div>
               <p className="text-[10px] text-gold-500/50 font-mono mt-0.5">{product.sku}</p>
               <p className="text-[10px] text-gold-500/40 mt-0.5">
                 {product.website_category_name || product.category}
@@ -195,8 +213,19 @@ const InventoryProductCard = ({
         </div>
       )}
 
-      {!hasVariants && product.variant_count > 0 && (
-        <p className="px-4 pb-3 text-[10px] text-gold-500/40">Variants on file — open edit to view sizes.</p>
+      {!hasVariants && product.variant_count > 0 && !addOpen && (
+        <p className="px-4 pb-3 text-[10px] text-gold-500/40">Click Add to update stock by size.</p>
+      )}
+
+      {addOpen && !readOnly && (
+        <InventoryStockAddPanel
+          product={product}
+          onCancel={() => setAddOpen(false)}
+          onDone={() => {
+            setAddOpen(false);
+            onStockAdded?.();
+          }}
+        />
       )}
 
       <div className="flex flex-wrap gap-2 px-4 pb-4 pt-1 border-t border-gold-500/5 mx-0">
