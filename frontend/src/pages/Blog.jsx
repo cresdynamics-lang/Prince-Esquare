@@ -15,7 +15,6 @@ export default function Blog() {
   const [categories, setCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch blogs
   useEffect(() => {
     const fetchBlogs = async () => {
       setLoading(true);
@@ -45,7 +44,6 @@ export default function Blog() {
     fetchBlogs();
   }, [currentPage, selectedCategory, searchQuery]);
 
-  // Extract unique categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -55,8 +53,7 @@ export default function Blog() {
 
         if (!response.ok) throw new Error('Failed to fetch categories');
         const data = await response.json();
-        
-        const uniqueCategories = [...new Set(data.posts.map(blog => blog.category))];
+        const uniqueCategories = [...new Set(data.posts.map((blog) => blog.category))];
         setCategories(uniqueCategories);
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -79,7 +76,7 @@ export default function Blog() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-navy-950 text-white">
       <SEO
         title={routeSeo.blog.title}
         description={routeSeo.blog.description}
@@ -93,23 +90,39 @@ export default function Blog() {
           blogs[0] ? buildBlogPostingSchema(blogs[0]) : null,
         ]}
       />
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-gray-900 to-black text-white py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">Prince Esquire Style Journal</h1>
-          <p className="text-lg text-gray-300 max-w-3xl">Style notes, wardrobe guidance, and shopping ideas built around the actual pieces on the site so the journal can support search, internal linking, and product discovery.</p>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        {/* Search and Filter */}
-        <div className="mb-8 space-y-4">
+      <section className="border-b border-gold-600/10 bg-navy-950">
+        <div className="max-w-7xl mx-auto px-4 py-16 md:py-20">
+          <div className="max-w-4xl space-y-5">
+            <span className="text-gold-500 text-[10px] tracking-[0.4em] font-bold uppercase">
+              Prince Esquire Journal
+            </span>
+            <h1 className="text-4xl md:text-6xl font-serif leading-tight text-white">
+              Style notes, wardrobe ideas, and editorial stories from the brand
+            </h1>
+            <p className="text-navy-200 text-lg max-w-3xl leading-relaxed">
+              A tighter, more useful blog built around the products, categories, and styling language already on the site.
+            </p>
+            <div className="pt-4">
+              <Link
+                to="/"
+                className="inline-flex items-center text-gold-400 text-[10px] font-bold tracking-[0.25em] uppercase hover:text-gold-300 transition-colors"
+              >
+                Back to home
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 py-12 md:py-14">
+        <div className="mb-10 space-y-4">
           <input
             type="text"
             placeholder="Search blog posts..."
             value={searchQuery}
             onChange={handleSearch}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="w-full px-4 py-3 bg-navy-900/70 border border-gold-600/15 rounded-lg text-white placeholder:text-navy-300 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
           />
 
           {categories.length > 0 && (
@@ -118,20 +131,20 @@ export default function Blog() {
                 onClick={() => handleCategoryFilter('')}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                   !selectedCategory
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                    ? 'bg-gold-600 text-navy-950'
+                    : 'bg-navy-900/70 text-navy-200 border border-gold-600/15 hover:border-gold-500/30'
                 }`}
               >
                 All
               </button>
-              {categories.map(category => (
+              {categories.map((category) => (
                 <button
                   key={category}
                   onClick={() => handleCategoryFilter(category)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     selectedCategory === category
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                      ? 'bg-gold-600 text-navy-950'
+                      : 'bg-navy-900/70 text-navy-200 border border-gold-600/15 hover:border-gold-500/30'
                   }`}
                 >
                   {category}
@@ -141,26 +154,23 @@ export default function Blog() {
           )}
         </div>
 
-        {/* Loading State */}
         {loading && (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500"></div>
           </div>
         )}
 
-        {/* Blog Grid */}
         {!loading && blogs.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-            {blogs.map(blog => (
+            {blogs.map((blog) => (
               <BlogShowcase key={blog.id} blog={blog} />
             ))}
           </div>
         )}
 
-        {/* No Results */}
         {!loading && blogs.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-lg text-gray-600 mb-4">No blog posts found.</p>
+            <p className="text-lg text-navy-200 mb-4">No blog posts found.</p>
             {searchQuery || selectedCategory ? (
               <button
                 onClick={() => {
@@ -168,7 +178,7 @@ export default function Blog() {
                   setSelectedCategory('');
                   setCurrentPage(1);
                 }}
-                className="text-gray-900 hover:text-gray-700 font-medium underline"
+                className="text-gold-400 hover:text-gold-300 font-medium underline"
               >
                 Clear filters
               </button>
@@ -176,27 +186,26 @@ export default function Blog() {
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && totalPages > 1 && (
           <div className="flex justify-center items-center gap-2">
             {currentPage > 1 && (
               <button
                 onClick={() => setCurrentPage(currentPage - 1)}
-                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 bg-gold-600 text-navy-950 rounded-lg hover:bg-gold-500 transition-colors font-medium"
               >
                 Previous
               </button>
             )}
 
             <div className="flex gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
                   className={`px-3 py-2 rounded-lg transition-colors ${
                     currentPage === page
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                      ? 'bg-gold-600 text-navy-950'
+                      : 'bg-navy-900/70 text-navy-200 border border-gold-600/15 hover:border-gold-500/30'
                   }`}
                 >
                   {page}
@@ -207,7 +216,7 @@ export default function Blog() {
             {currentPage < totalPages && (
               <button
                 onClick={() => setCurrentPage(currentPage + 1)}
-                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 bg-gold-600 text-navy-950 rounded-lg hover:bg-gold-500 transition-colors font-medium"
               >
                 Next
               </button>

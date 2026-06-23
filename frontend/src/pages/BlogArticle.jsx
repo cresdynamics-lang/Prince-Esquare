@@ -5,7 +5,6 @@ import { buildBreadcrumbSchema, buildBlogPostingSchema } from '../seo/seoData';
 
 export default function BlogArticle() {
   const { slug } = useParams();
-  const navigate = useNavigate();
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,7 +23,6 @@ export default function BlogArticle() {
         const data = await response.json();
         setBlog(data);
 
-        // Increment view count
         try {
           await fetch(`/api/blog/${data.id}/views`, {
             method: 'PATCH',
@@ -47,22 +45,19 @@ export default function BlogArticle() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+      <div className="flex justify-center items-center min-h-screen bg-navy-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500"></div>
       </div>
     );
   }
 
   if (error || !blog) {
     return (
-      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50">
-        <h1 className="text-2xl font-serif font-bold text-gray-900 mb-4">
+      <div className="min-h-screen flex flex-col justify-center items-center bg-navy-950 text-white px-6">
+        <h1 className="text-2xl font-serif font-bold text-white mb-4 text-center">
           {error || 'Blog post not found'}
         </h1>
-        <Link 
-          to="/blog" 
-          className="text-gray-900 hover:text-gray-700 font-medium underline"
-        >
+        <Link to="/blog" className="text-gold-400 hover:text-gold-300 font-medium underline">
           Return to blog
         </Link>
       </div>
@@ -73,57 +68,52 @@ export default function BlogArticle() {
   const imageUrl = blog.featured_image_url || fallbackImage;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {blog && (
-        <SEO
-          title={blog.title}
-          description={blog.excerpt || blog.title}
-          path={`/blog/${blog.slug}`}
-          image={blog.featured_image_url}
-          keywords={[blog.title, blog.category, 'Prince Esquire blog', 'menswear Kenya'].filter(Boolean)}
-          schema={[
-            buildBreadcrumbSchema([
-              { name: 'Home', path: '/' },
-              { name: 'Blog', path: '/blog' },
-              { name: blog.title, path: `/blog/${blog.slug}` },
-            ]),
-            buildBlogPostingSchema(blog),
-          ]}
-        />
-      )}
-      {/* Hero Image */}
+    <div className="min-h-screen bg-navy-950 text-white">
+      <SEO
+        title={blog.title}
+        description={blog.excerpt || blog.title}
+        path={`/blog/${blog.slug}`}
+        image={blog.featured_image_url}
+        keywords={[blog.title, blog.category, 'Prince Esquire blog', 'menswear Kenya'].filter(Boolean)}
+        schema={[
+          buildBreadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: 'Blog', path: '/blog' },
+            { name: blog.title, path: `/blog/${blog.slug}` },
+          ]),
+          buildBlogPostingSchema(blog),
+        ]}
+      />
+
       {imageUrl && (
-        <div className="relative w-full h-96 bg-gray-200 overflow-hidden">
-          <img 
-            src={imageUrl} 
+        <div className="relative w-full h-96 bg-navy-900 overflow-hidden">
+          <img
+            src={imageUrl}
             alt={blog.title}
             className="w-full h-full object-cover"
-            onError={(e) => {e.target.src = fallbackImage;}}
+            onError={(e) => {
+              e.target.src = fallbackImage;
+            }}
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent" />
         </div>
       )}
 
-      {/* Article Content */}
       <div className="max-w-3xl mx-auto px-4 py-12">
-        {/* Breadcrumb */}
         <div className="mb-8">
-          <Link 
-            to="/blog" 
-            className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-          >
-            ← Back to blog
+          <Link to="/blog" className="text-gold-400 hover:text-gold-300 text-sm font-medium">
+            {"<- Back to blog"}
           </Link>
         </div>
 
-        {/* Header */}
         <header className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-serif font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-4">
             {blog.title}
           </h1>
-          
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
+
+          <div className="flex flex-wrap items-center gap-4 text-sm text-navy-200 mb-4">
             <span className="font-medium">{blog.author_name}</span>
-            <span>•</span>
+            <span>-</span>
             <time dateTime={blog.published_date}>
               {new Date(blog.published_date).toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -131,42 +121,38 @@ export default function BlogArticle() {
                 day: 'numeric',
               })}
             </time>
-            <span>•</span>
-            <span className="inline-block bg-gray-200 px-3 py-1 rounded-full">
+            <span>-</span>
+            <span className="inline-block bg-gold-600/10 px-3 py-1 rounded-full border border-gold-600/15 text-gold-400">
               {blog.category}
             </span>
-            <span>•</span>
+            <span>-</span>
             <span>{blog.views || 0} views</span>
           </div>
         </header>
 
-        {/* Excerpt */}
-        <div className="mb-8 text-lg text-gray-700 italic border-l-4 border-gray-900 pl-4">
+        <div className="mb-8 text-lg text-navy-200 italic border-l-4 border-gold-500 pl-4">
           {blog.excerpt}
         </div>
 
-        {/* Content */}
-        <article className="prose prose-lg max-w-none mb-12">
-          <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+        <article className="max-w-none mb-12">
+          <div className="text-navy-100 leading-relaxed whitespace-pre-wrap">
             {blog.content}
           </div>
         </article>
 
-        {/* Author Bio */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-serif font-bold text-gray-900 mb-2">
+        <div className="bg-navy-900/70 border border-gold-600/10 rounded-lg p-6 mb-8">
+          <h3 className="text-lg font-serif font-bold text-white mb-2">
             About {blog.author_name}
           </h3>
-          <p className="text-gray-600">
+          <p className="text-navy-200">
             {blog.author_name} is a contributor at Prince Esquire, sharing insights on fashion, style, and lifestyle trends.
           </p>
         </div>
 
-        {/* Related Articles Link */}
-        <div className="text-center py-8 border-t border-gray-200">
-          <Link 
+        <div className="text-center py-8 border-t border-gold-600/10">
+          <Link
             to={`/blog?category=${encodeURIComponent(blog.category)}`}
-            className="inline-block px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+            className="inline-block px-6 py-3 bg-gold-600 text-navy-950 rounded-lg hover:bg-gold-500 transition-colors font-medium"
           >
             Explore more {blog.category} articles
           </Link>

@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import HeroSlider from '../components/HeroSlider';
 import ProductShowcase from '../components/ProductShowcase';
 import CategoryGrid from '../components/CategoryGrid';
+import BlogShowcase from '../components/BlogShowcase';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import { bannerAPI } from '../services/api';
@@ -12,6 +13,7 @@ import { localBusinessSchema, organizationSchema, routeSeo, websiteSchema } from
 
 const Home = () => {
   const [homepageData, setHomepageData] = useState(null);
+  const [featuredBlogs, setFeaturedBlogs] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +32,33 @@ const Home = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchFeaturedBlogs = async () => {
+      try {
+        const response = await fetch('/api/blog?limit=3', {
+          credentials: 'include',
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch featured blogs');
+        const data = await response.json();
+
+        if (!cancelled) {
+          setFeaturedBlogs(Array.isArray(data.posts) ? data.posts : []);
+        }
+      } catch (error) {
+        console.error('Home: featured blogs unavailable', error);
+      }
+    };
+
+    fetchFeaturedBlogs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="bg-navy-950 min-h-screen">
       <SEO
@@ -42,6 +71,38 @@ const Home = () => {
         <HeroSlider heroSlides={homepageData?.heroSlides} />
 
         <ProductShowcase categoryRows={homepageData?.categoryRows} />
+
+        {featuredBlogs.length > 0 && (
+          <section className="py-24 bg-navy-950 border-y border-gold-600/10">
+            <div className="container mx-auto px-6">
+              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-10">
+                <div className="max-w-3xl space-y-4">
+                  <span className="text-gold-500 text-[10px] tracking-[0.4em] font-bold uppercase">
+                    Style Journal
+                  </span>
+                  <h2 className="text-3xl md:text-5xl font-serif text-white leading-tight">
+                    Recent notes from the Prince Esquire journal
+                  </h2>
+                  <p className="text-navy-200 max-w-2xl leading-relaxed">
+                    Short editorial reads, wardrobe guidance, and product-led style ideas that support the collection and keep the brand discoverable.
+                  </p>
+                </div>
+                <Link
+                  to="/blog"
+                  className="inline-flex items-center justify-center bg-gold-600 text-navy-950 px-7 py-3 text-[10px] font-bold tracking-[0.25em] uppercase hover:bg-gold-500 transition-colors"
+                >
+                  View all articles
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {featuredBlogs.map((blog) => (
+                  <BlogShowcase key={blog.id} blog={blog} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Quote Section */}
         <section className="py-16 md:py-20 bg-navy-950 text-center relative overflow-hidden border-t border-gold-600/10">
