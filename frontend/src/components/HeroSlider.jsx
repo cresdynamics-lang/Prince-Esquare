@@ -67,7 +67,7 @@ const HeroSlider = ({ heroSlides }) => {
   const slide = slides[current];
 
   return (
-    <section className="hero-section relative min-h-[86vh] bg-navy-950 overflow-hidden">
+    <section className="hero-section relative min-h-[90vh] bg-navy-950 overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={`${slide.link}-${current}`}
@@ -91,8 +91,8 @@ const HeroSlider = ({ heroSlides }) => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="container mx-auto px-6 h-full flex items-center relative z-10">
-        <div className="max-w-5xl space-y-8">
+      <div className="container mx-auto px-6 h-full flex items-center justify-start relative z-10">
+        <div className="w-full max-w-5xl space-y-8 text-left pl-0 md:pl-4 lg:pl-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={`content-${slide.link}-${current}`}
@@ -109,7 +109,7 @@ const HeroSlider = ({ heroSlides }) => {
                 </p>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight tracking-tighter max-w-4xl">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif text-white leading-tight tracking-tighter max-w-4xl">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -117,7 +117,7 @@ const HeroSlider = ({ heroSlides }) => {
                 ))}
               </h1>
 
-              <p className="text-base md:text-lg text-slate-300 max-w-2xl font-light leading-relaxed line-clamp-3">
+              <p className="text-lg md:text-xl text-slate-300 max-w-2xl font-light leading-relaxed line-clamp-3">
                 {slide.desc}
               </p>
 
