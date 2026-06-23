@@ -30,11 +30,11 @@ export default function BlogShowcase({ blog }) {
         <p className="text-sm text-navy-200 line-clamp-2 leading-relaxed">
           {blog.excerpt}
         </p>
-        <div className="flex items-center justify-between text-[10px] tracking-[0.18em] uppercase text-gold-400">
-          <span>{blog.author_name}</span>
+        <div className="flex items-center justify-end text-[10px] tracking-[0.18em] uppercase text-gold-400">
           <span>Read story</span>
         </div>
       </div>
     </Link>
   );
 }
+

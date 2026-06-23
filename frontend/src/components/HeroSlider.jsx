@@ -92,7 +92,7 @@ const HeroSlider = ({ heroSlides }) => {
       </AnimatePresence>
 
       <div className="container mx-auto px-6 h-full flex items-end justify-start pb-10 md:pb-12 lg:pb-14 relative z-10">
-        <div className="w-full max-w-7xl space-y-10 text-left pl-0 md:pl-4 lg:pl-8">
+        <div className="w-full max-w-7xl space-y-8 text-left pl-0 md:pl-4 lg:pl-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={`content-${slide.link}-${current}`}
@@ -109,7 +109,7 @@ const HeroSlider = ({ heroSlides }) => {
                 </p>
               </div>
 
-              <h1 className="text-7xl md:text-[7.5rem] lg:text-[8.5rem] font-serif text-white leading-[0.9] tracking-tighter max-w-5xl">
+              <h1 className="text-7xl md:text-[7.5rem] lg:text-[8.5rem] font-serif text-white leading-[0.9] tracking-tighter max-w-4xl">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -117,7 +117,7 @@ const HeroSlider = ({ heroSlides }) => {
                 ))}
               </h1>
 
-              <p className="text-2xl md:text-3xl text-slate-300 max-w-3xl font-light leading-relaxed line-clamp-3">
+              <p className="text-2xl md:text-3xl text-slate-300 max-w-2xl font-light leading-relaxed line-clamp-3">
                 {slide.desc}
               </p>
 
@@ -171,4 +171,5 @@ const HeroSlider = ({ heroSlides }) => {
 };
 
 export default HeroSlider;
+
 

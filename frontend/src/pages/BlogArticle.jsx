@@ -113,8 +113,6 @@ export default function BlogArticle() {
           </h1>
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-navy-200 mb-4">
-            <span className="font-medium">{blog.author_name}</span>
-            <span>|</span>
             <time dateTime={blog.published_date}>
               {new Date(blog.published_date).toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -143,10 +141,10 @@ export default function BlogArticle() {
 
         <div className="bg-navy-900/70 border border-gold-600/10 rounded-lg p-6 mb-8">
           <h3 className="text-base md:text-lg font-serif font-bold text-white mb-2">
-            About {blog.author_name}
+            Style note
           </h3>
           <p className="text-navy-200">
-            {blog.author_name} is a contributor at Prince Esquire, sharing insights on fashion, style, and lifestyle trends.
+            This article is built around the category and product imagery already on the site so the visual story matches the written one.
           </p>
         </div>
 
@@ -162,3 +160,4 @@ export default function BlogArticle() {
     </div>
   );
 }
+
