@@ -67,7 +67,7 @@ const HeroSlider = ({ heroSlides }) => {
   const slide = slides[current];
 
   return (
-    <section className="hero-section relative h-screen bg-navy-950 overflow-hidden">
+    <section className="hero-section relative min-h-[86vh] bg-navy-950 overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={`${slide.link}-${current}`}
@@ -92,7 +92,7 @@ const HeroSlider = ({ heroSlides }) => {
       </AnimatePresence>
 
       <div className="container mx-auto px-6 h-full flex items-center relative z-10">
-        <div className="max-w-4xl space-y-8">
+        <div className="max-w-5xl space-y-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={`content-${slide.link}-${current}`}
@@ -109,7 +109,7 @@ const HeroSlider = ({ heroSlides }) => {
                 </p>
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-serif text-white leading-tight tracking-tighter">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight tracking-tighter max-w-4xl">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -117,14 +117,14 @@ const HeroSlider = ({ heroSlides }) => {
                 ))}
               </h1>
 
-              <p className="text-sm md:text-base text-slate-300 max-w-xl font-light leading-relaxed line-clamp-3">
+              <p className="text-base md:text-lg text-slate-300 max-w-2xl font-light leading-relaxed line-clamp-3">
                 {slide.desc}
               </p>
 
               <div className="pt-8">
                 <Link
                   to={slide.link}
-                className="bg-gold-600 text-navy-950 px-10 py-4 text-[9px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
+                className="bg-gold-600 text-navy-950 px-10 py-4 text-[10px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
                 >
                   <span>{slide.cta}</span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />

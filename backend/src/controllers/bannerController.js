@@ -27,6 +27,16 @@ const fetchHeroProductRow = async (slug) => {
 
 const categoryKey = (row) => row.parent_category_slug || row.category_slug;
 
+const HERO_COPY = {
+  shirts: 'Presidential shirts cut for clean collars, confident structure, and a polished finish that reads well in boardrooms and formal settings.',
+  suits: 'Tailored two-piece and three-piece suits selected for weddings, boardrooms, and evening occasions where sharp presentation matters.',
+  shoes: 'Polished loafers and formal shoes with refined leather, balanced shape, and the kind of finish that lifts the full outfit.',
+  linen: 'Breathable linen sets and trousers built for warm-weather dressing with ease, texture, and a clean silhouette.',
+  'track-suits': 'Relaxed tracksuits in elevated fabrics for off-duty hours, travel days, and polished casual dressing.',
+  'polo-t-shirts': 'Signature polos with a neat shape and premium hand-feel for smart weekends, lunches, and everyday wear.',
+  belts: 'Refined leather belts chosen to finish the outfit with quiet structure and a clean, polished line.',
+};
+
 const buildHeroSlidesFromBanners = (rows) =>
   rows.map((b) => ({
     image: optimizeCloudinaryUrl(b.image, { width: 1600, height: 900, crop: 'fill' }),
@@ -54,9 +64,10 @@ const mapHeroProductSlide = (p) => {
   const img = toImage(optimized);
   const category = p.parent_category_slug || p.category_slug || 'products';
   const subtitle = p.parent_category_name || p.category_name || 'Collection';
-  const desc = (p.description || `KSh ${parseFloat(p.price || 0).toLocaleString()}`)
-    .split('\n')[0]
-    .slice(0, 160);
+  const desc = HERO_COPY[category] ||
+    (p.description || `KSh ${parseFloat(p.price || 0).toLocaleString()}`)
+      .split('\n')[0]
+      .slice(0, 160);
   const useFitCrop = category === 'belts-ties' || category === 'track-suits';
 
   return {

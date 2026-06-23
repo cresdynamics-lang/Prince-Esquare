@@ -26,7 +26,7 @@ const ProductCard = ({ product, onAddToCart, addedProductId }) => (
               e.preventDefault();
               onAddToCart(product);
             }}
-            className="bg-white text-navy-950 px-4 py-3 text-[9px] font-bold   flex items-center gap-2"
+            className="bg-white text-navy-950 px-4 py-3 text-[10px] font-bold flex items-center gap-2"
           >
             <ShoppingBag size={13} />
             {addedProductId === product.id ? 'Added' : 'Add to Cart'}
@@ -35,8 +35,8 @@ const ProductCard = ({ product, onAddToCart, addedProductId }) => (
       </div>
     </Link>
     <div className="pt-3 space-y-1">
-      <p className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</p>
-        <h3 className="text-[8px] md:text-[10px] font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">
+      <p className="text-[11px] font-bold text-gold-600/50">{product.brand_name}</p>
+        <h3 className="text-[9px] md:text-[11px] font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">
           {product.name}
         </h3>
       <p className="text-gold-500 font-light italic text-sm">
