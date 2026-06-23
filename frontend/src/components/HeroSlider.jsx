@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -91,7 +91,7 @@ const HeroSlider = ({ heroSlides }) => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-20 md:pb-24 lg:pb-28 relative z-10">
+      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-10 md:pb-12 lg:pb-14 relative z-10">
         <div className="w-full max-w-7xl space-y-10 text-left pl-0 md:pl-4 lg:pl-8">
           <AnimatePresence mode="wait">
             <motion.div
@@ -121,7 +121,7 @@ const HeroSlider = ({ heroSlides }) => {
                 {slide.desc}
               </p>
 
-              <div className="pt-8">
+              <div className="pt-4 md:pt-6">
                 <Link
                   to={slide.link}
                   className="bg-gold-600 text-navy-950 px-12 py-5 text-[11px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
@@ -171,3 +171,4 @@ const HeroSlider = ({ heroSlides }) => {
 };
 
 export default HeroSlider;
+
