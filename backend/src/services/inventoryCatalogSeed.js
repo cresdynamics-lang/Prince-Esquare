@@ -32,7 +32,7 @@ const BELT_NAMES = [
 ];
 const BELT_SIZES = ['32', '34', '36', '38', '40'];
 const KHAKI_NAMES = ['Classic Khaki Chino', 'Slim Taper Khaki', 'Stretch Comfort Khaki', 'Flat Front Khaki', 'Pleated Khaki'];
-const POLO_NAMES = ['Pique Polo', 'Knitted Polo', 'Classic Polo', 'Premium Cotton Polo', 'Contrast Collar Polo'];
+const POLO_NAMES = ['Classic Pique Polo', 'Knitted Polo', 'Classic Polo', 'Premium Cotton Polo', 'Contrast Collar Polo'];
 const SUIT_NAMES = ['Two-Piece Business Suit', 'Three-Piece Formal Suit', 'Slim Fit Suit', 'Classic Wool Suit'];
 const GENERIC_ADJECTIVES = ['Classic', 'Premium', 'Executive', 'Heritage', 'Modern', 'Essential'];
 

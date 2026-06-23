@@ -3,62 +3,62 @@ export const DUMMY_PRODUCTS = [
   // Polo T-shirts
   {
     id: 45,
-    name: 'Prince Esquire Polo in Black',
+    name: 'Classic Pique Polo in Black',
     category_name: 'polo-t-shirts',
     subcategory: 'Polos',
     price: 6500,
     brand_name: 'Prince Esquire',
-    slug: 'prince-esquire-polo-black',
+    slug: 'classic-pique-polo-black',
     thumbnail: '/polo black.jpeg'
   },
   {
     id: 46,
-    name: 'Prince Esquire Polo in Dark Black',
+    name: 'Knitted Polo in Dark Black',
     category_name: 'polo-t-shirts',
     subcategory: 'Polos',
     price: 6500,
     brand_name: 'Prince Esquire',
-    slug: 'prince-esquire-polo-dark-black',
+    slug: 'knitted-polo-dark-black',
     thumbnail: '/polo dark black.jpeg'
   },
   {
     id: 47,
-    name: 'Prince Esquire Polo in Brown',
+    name: 'Classic Polo in Brown',
     category_name: 'polo-t-shirts',
     subcategory: 'Polos',
     price: 6500,
     brand_name: 'Prince Esquire',
-    slug: 'prince-esquire-polo-brown',
+    slug: 'classic-polo-brown',
     thumbnail: '/polo brown.jpeg'
   },
   {
     id: 48,
-    name: 'Prince Esquire Polo in Light Blue',
+    name: 'Premium Cotton Polo in Light Blue',
     category_name: 'polo-t-shirts',
     subcategory: 'Polos',
     price: 6500,
     brand_name: 'Prince Esquire',
-    slug: 'prince-esquire-polo-light-blue',
+    slug: 'premium-cotton-polo-light-blue',
     thumbnail: '/polo light blue.jpeg'
   },
   {
     id: 49,
-    name: 'Prince Esquire Polo in Red',
+    name: 'Contrast Collar Polo in Red',
     category_name: 'polo-t-shirts',
     subcategory: 'Polos',
     price: 6500,
     brand_name: 'Prince Esquire',
-    slug: 'prince-esquire-polo-red',
+    slug: 'contrast-collar-polo-red',
     thumbnail: '/polo red.jpeg'
   },
   {
     id: 50,
-    name: 'Prince Esquire Polo in White',
+    name: 'Signature Polo in White',
     category_name: 'polo-t-shirts',
     subcategory: 'Polos',
     price: 6500,
     brand_name: 'Prince Esquire',
-    slug: 'prince-esquire-polo-white',
+    slug: 'signature-polo-white',
     thumbnail: '/polo white.jpeg'
   },
 
