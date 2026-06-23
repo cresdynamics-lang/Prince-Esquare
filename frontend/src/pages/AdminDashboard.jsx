@@ -277,7 +277,7 @@ const AdminDashboard = () => {
 
   return (
     <ConfirmProvider>
-    <div className="admin-app flex h-dvh bg-navy-950 text-gold-50 font-sans overflow-hidden">
+    <div className="flex h-dvh bg-navy-950 text-gold-50 font-sans overflow-hidden">
       {isMobileNavOpen && (
         <button
           type="button"

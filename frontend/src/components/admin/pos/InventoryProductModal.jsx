@@ -72,15 +72,20 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
   const selectedCategory = categories.find((c) => c.id === form.category_id);
   const sizeOptions = getSizeOptionsForCategory(selectedCategory?.name || '');
 
+  const retailPrice = Number(form.shop_price) || 0;
+  const costPrice = Number(form.cost_price) || 0;
+  const profit = retailPrice - costPrice;
+  const margin = retailPrice > 0 ? ((profit / retailPrice) * 100).toFixed(1) : '0.0';
+
   const buildPayload = () => ({
     name: form.name,
     sku: form.sku,
     category: selectedCategory?.name || 'General',
-    shop_price: Number(form.shop_price),
+    shop_price: retailPrice,
     category_id: form.category_id || null,
     brand_id: form.brand_id || null,
     description: form.description,
-    price: Number(form.price || form.shop_price),
+    price: retailPrice,
     discount_price: form.discount_price ? Number(form.discount_price) : null,
     cost_price: form.cost_price !== '' && form.cost_price != null ? Number(form.cost_price) : null,
     thumbnail: form.thumbnail || null,
@@ -160,7 +165,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
 
   const handleSave = async (andPublish = false) => {
     if (!form.name || !form.sku || !form.shop_price) {
-      toast.error('Name, SKU and shop price are required');
+      toast.error('Name, SKU and retail price are required');
       return;
     }
     if (!form.category_id) {
@@ -220,8 +225,9 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
       setForm((f) => ({
         ...f,
         name: data?.name || f.name,
+        shop_price: String(data?.shop_price ?? f.shop_price),
+        cost_price: data?.cost_price != null ? String(data.cost_price) : f.cost_price,
         description: d.description || '',
-        price: String(d.price ?? ''),
         discount_price: d.discount_price != null ? String(d.discount_price) : '',
         thumbnail: d.thumbnail || '',
         thumbnailPreview: d.thumbnail || '',
@@ -297,35 +303,20 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Shop price (POS) KES</label>
+                  <label className={labelCls}>Retail price KES</label>
                   <input type="number" min={0} className={inputCls} value={form.shop_price} onChange={(e) => setForm({ ...form, shop_price: e.target.value })} />
+                  <p className="text-[9px] text-gold-500/40 mt-1">Same price for shop and website.</p>
                 </div>
-                {!isNew && (
-                  <div>
-                    <label className={labelCls}>Cost price KES</label>
-                    <input type="number" min={0} className={inputCls} value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} placeholder="What you paid" />
-                  </div>
-                )}
                 <div>
-                  <label className={labelCls}>Website price KES</label>
-                  <input type="number" min={0} className={inputCls} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                  <label className={labelCls}>Cost price KES</label>
+                  <input type="number" min={0} className={inputCls} value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} placeholder="What you paid" />
                 </div>
-                {!isNew && (
-                  <div className="md:col-span-2 rounded-lg border border-gold-500/15 bg-navy-950/60 p-3">
-                    <p className="text-[10px] text-gold-500/50 mb-1">Profit (shop retail − cost)</p>
-                    {(() => {
-                      const retail = Number(form.shop_price) || 0;
-                      const cost = Number(form.cost_price) || 0;
-                      const profit = retail - cost;
-                      const margin = retail > 0 ? ((profit / retail) * 100).toFixed(1) : '0.0';
-                      return (
-                        <p className="text-sm text-green-400 font-medium">
-                          KSh {profit.toLocaleString()} <span className="text-gold-500/50 font-normal">· {margin}% margin</span>
-                        </p>
-                      );
-                    })()}
-                  </div>
-                )}
+                <div className="md:col-span-2 rounded-lg border border-gold-500/15 bg-navy-950/60 p-3">
+                  <p className="text-[10px] text-gold-500/50 mb-1">Profit (retail − cost)</p>
+                  <p className="text-sm text-green-400 font-medium">
+                    KSh {profit.toLocaleString()} <span className="text-gold-500/50 font-normal">· {margin}% margin</span>
+                  </p>
+                </div>
                 <div>
                   <label className={labelCls}>Sale price (optional)</label>
                   <input type="number" min={0} className={inputCls} value={form.discount_price} onChange={(e) => setForm({ ...form, discount_price: e.target.value })} />

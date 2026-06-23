@@ -45,17 +45,22 @@ const Home = () => {
 
         {/* Quote Section */}
         <section className="py-16 md:py-20 bg-navy-950 text-center relative overflow-hidden border-t border-gold-600/10">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-24 bg-gradient-to-b from-gold-500/50 to-transparent" />
           <div className="container mx-auto px-6 max-w-4xl">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="space-y-6"
+              className="space-y-8"
             >
-              <h2 className="text-2xl md:text-4xl font-serif italic text-gold-200 leading-snug">
+              <h2 className="text-4xl md:text-6xl font-serif italic text-gold-200 leading-tight">
                 "True elegance is not being noticed, it's being remembered."
               </h2>
-              <span className="text-gold-500 text-xs font-medium">Giorgio Armani</span>
+              <div className="flex items-center justify-center space-x-6">
+                <div className="w-16 h-px bg-gold-600/30" />
+                <span className="text-gold-500 tracking-[0.5em] text-[10px]  font-bold">Giorgio Armani</span>
+                <div className="w-16 h-px bg-gold-600/30" />
+              </div>
             </motion.div>
           </div>
         </section>
@@ -64,11 +69,11 @@ const Home = () => {
 
         <section className="py-28 bg-navy-950 border-y border-gold-600/10">
           <div className="container mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
-            <div className="lg:col-span-5 space-y-4">
-              <span className="text-gold-500 text-xs font-medium">Luxury Fashion Kenya</span>
-              <h2 className="text-2xl md:text-4xl font-serif text-white leading-snug">
+            <div className="lg:col-span-5 space-y-6">
+              <span className="text-gold-500 text-[10px]  tracking-[0.4em] font-bold">Luxury Fashion Kenya</span>
+              <h1 className="text-4xl md:text-6xl font-serif text-white leading-tight">
                 Curated Luxury Fashion in Kenya
-              </h2>
+              </h1>
             </div>
             <div className="lg:col-span-7 space-y-6 text-navy-200 font-light leading-relaxed">
               <p>
@@ -86,14 +91,14 @@ const Home = () => {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
                 {['Curated premium labels', 'Nairobi-based service', 'Delivery across Kenya'].map((item) => (
-                  <div key={item} className="border-l border-gold-600/30 pl-4">
-                    <p className="text-gold-400 text-xs font-medium">{item}</p>
+                  <div key={item} className="border-l border-gold-600/30 pl-5">
+                    <p className="text-gold-400 text-[10px]  tracking-[0.25em] font-bold">{item}</p>
                   </div>
                 ))}
               </div>
               <Link
                 to="/products"
-                className="inline-block mt-4 bg-gold-600 text-navy-950 px-8 py-3 text-xs font-semibold hover:bg-gold-500 transition-all"
+                className="inline-block mt-4 bg-gold-600 text-navy-950 px-10 py-4 text-[10px] font-bold  tracking-[0.25em] hover:bg-gold-500 transition-all"
               >
                 Shop the Collection
               </Link>
@@ -113,8 +118,8 @@ const Home = () => {
               viewport={{ once: true }}
               className="max-w-3xl mx-auto space-y-10"
             >
-              <h3 className="text-gold-500 text-sm font-medium">The Prince Experience</h3>
-              <h2 className="text-3xl md:text-5xl font-serif text-white tracking-tight leading-tight">
+              <h3 className="text-gold-500 tracking-[0.3em]  text-xs font-bold">The Prince Experience</h3>
+              <h2 className="text-4xl md:text-7xl font-serif text-white  tracking-tighter leading-none">
                 Crafted For <br />
                 <span className="text-gold-500 italic">Discerning Taste</span>
               </h2>
@@ -124,7 +129,7 @@ const Home = () => {
               </p>
               <Link
                 to="/signup"
-                className="inline-block bg-transparent border border-gold-600 text-gold-500 px-10 py-4 text-xs font-semibold hover:bg-gold-600 hover:text-navy-950 transition-all"
+                className="inline-block bg-transparent border border-gold-600 text-gold-500 px-16 py-6 text-[10px] font-bold  tracking-[0.3em] hover:bg-gold-600 hover:text-navy-950 transition-all shadow-2xl shadow-gold-600/20"
               >
                 Join the Inner Circle
               </Link>
