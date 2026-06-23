@@ -191,19 +191,19 @@ const ProductDetail = () => {
   }, [product]);
 
   const sizesForColor = useCallback((color) => {
+    const category = `${product?.category_name || ''} ${product?.parent_category_name || ''}`.toLowerCase();
+    if (category.includes('belt')) return [];
     const sizes = variantMeta.variants
       .filter((v) => v.color === color)
       .map((v) => v.size);
     return sortSizes(sizes, variantMeta.isShoe);
-  }, [variantMeta]);
+  }, [variantMeta, product]);
 
   const findVariant = useCallback((color, size) => (
     variantMeta.variants.find((v) => v.color === color && v.size === size)
   ), [variantMeta]);
-
   useEffect(() => {
     const fetchProduct = async () => {
-      setLoadError('');
       setProduct(null);
       setSelectedColor('');
       setSelectedSize('');
@@ -314,8 +314,8 @@ const ProductDetail = () => {
     return () => observer.disconnect();
   }, [product, related.length]);
 
-  const currentVariant = findVariant(selectedColor, selectedSize) || variantMeta.variants[0];
-
+  const isBelt = `${product?.category_name || ''} ${product?.parent_category_name || ''}`.toLowerCase().includes('belt');
+  const currentVariant = (!isBelt && selectedSize && findVariant(selectedColor, selectedSize)) || (selectedColor ? variantMeta.variants.find((v) => v.color === selectedColor) : null) || variantMeta.variants[0];
   const colorCarouselSlides = useMemo(
     () => buildColorCarouselSlides(variantMeta, product),
     [variantMeta, product]
@@ -344,7 +344,7 @@ const ProductDetail = () => {
   const displayPrice = (saleBase ?? basePrice) + modifier;
   const compareAtPrice = saleBase != null ? basePrice + modifier : null;
 
-  const variantSummary = [selectedColor, selectedSize].filter(Boolean).join(' / ');
+  const variantSummary = [selectedColor, isBelt ? '' : selectedSize].filter(Boolean).join(' / ');
 
   const parsedColorList = variantMeta.colors.map((c) => c.color);
   const allSizes = sortSizes(
@@ -354,7 +354,7 @@ const ProductDetail = () => {
   const sizeLine = variantMeta.isShoe
     ? `EU ${allSizes[0]} – ${allSizes[allSizes.length - 1]}`
     : allSizes.join(' · ');
-
+  const parsedSizes = isBelt ? [] : [sizeLine];
   const buildPayload = () => ({
     productId: product?.id,
     variantId: toCartVariantId(currentVariant?.id),
@@ -377,9 +377,9 @@ const ProductDetail = () => {
     const sizes = sizesForColor(slide.color);
     const inStockSizes = sizes.filter((s) => isVariantAvailable(findVariant(slide.color, s)));
     const keepSize = inStockSizes.includes(selectedSize) ? selectedSize : null;
-    const nextSize = keepSize || inStockSizes[0] || sizes[0] || '';
+    const nextSize = isBelt ? '' : (keepSize || inStockSizes[0] || sizes[0] || '');
     setSelectedSize(nextSize);
-    const variant = findVariant(slide.color, nextSize);
+    const variant = isBelt ? variantMeta.variants.find((v) => v.color === slide.color) : findVariant(slide.color, nextSize);
     setSelectedImage(
       getDefaultAngleImage(variant, product) ||
       slide.src ||
@@ -389,16 +389,16 @@ const ProductDetail = () => {
     if (variant?.id) {
       setSearchParams({ variant: String(variant.id) }, { replace: true });
     }
-  }, [colorCarouselSlides, findVariant, product, selectedSize, setSearchParams, sizesForColor]);
+  }, [colorCarouselSlides, findVariant, isBelt, product, selectedSize, setSearchParams, sizesForColor, variantMeta.variants]);
 
   const handleColorSelect = (color) => {
     setSelectedColor(color);
     const sizes = sizesForColor(color);
     const inStockSizes = sizes.filter((s) => isVariantAvailable(findVariant(color, s)));
     const keepSize = inStockSizes.includes(selectedSize) ? selectedSize : null;
-    const nextSize = keepSize || inStockSizes[0] || sizes[0] || '';
+    const nextSize = isBelt ? '' : (keepSize || inStockSizes[0] || sizes[0] || '');
     setSelectedSize(nextSize);
-    const variant = findVariant(color, nextSize);
+    const variant = isBelt ? variantMeta.variants.find((v) => v.color === color) : findVariant(color, nextSize);
     const slideIndex = colorCarouselSlides.findIndex((s) => s.color === color);
     if (slideIndex >= 0) setColorCarouselIndex(slideIndex);
     if (variant) {
@@ -428,7 +428,7 @@ const ProductDetail = () => {
     }
   };
 
-  const availableSizes = sizesForColor(selectedColor);
+  const availableSizes = isBelt ? [] : sizesForColor(selectedColor);
   const hasVariants = variantMeta.variants.length > 0;
   const showColorPicker = variantMeta.colors.length > 1
     || (variantMeta.colors.length === 1 && variantMeta.colors[0]?.color
@@ -640,7 +640,7 @@ const ProductDetail = () => {
                 {product.brand_name && (
                   <p className="text-[10px] font-bold  tracking-[0.3em] text-gold-500">{product.brand_name}</p>
                 )}
-                <h1 className="text-3xl md:text-4xl font-serif text-white leading-tight">{product.name}</h1>
+                <h1 className="text-2xl md:text-3xl font-serif text-white leading-tight">{product.name}</h1>
 
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <p className="text-2xl font-light text-gold-400">

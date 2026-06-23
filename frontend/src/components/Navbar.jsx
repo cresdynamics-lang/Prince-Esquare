@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Menu, X, ShoppingBag, Search, User, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -196,7 +196,10 @@ const Navbar = () => {
         </div>
 
         {/* Icons */}
-        <div className="flex items-center space-x-6 text-gold-400">
+        <div className="hidden xl:flex items-center space-x-6 text-gold-400">
+          <Link to="/blog" className="text-[9px] 2xl:text-[10px] font-bold tracking-[0.18em] 2xl:tracking-[0.24em] text-white hover:text-gold-400 transition-colors duration-300">
+            BLOG
+          </Link>
           <Search size={18} className="cursor-pointer hover:text-gold-200 transition-colors" />
           
           <div className="relative group">
@@ -204,7 +207,7 @@ const Navbar = () => {
               {isAuthenticated ? (
                 <span
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-gold-500/30 bg-navy-900 text-[10px] font-bold text-gold-300"
-                  title={user?.name || user?.email || ''}
+                  title={user?.name || user?.email || ""}
                 >
                   {userInitials(user)}
                 </span>
@@ -215,12 +218,12 @@ const Navbar = () => {
             {isAuthenticated && (
               <div className="absolute top-full right-0 mt-6 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
                 <div className="bg-navy-950/95 border border-gold-500/20 p-6 min-w-[180px] shadow-2xl">
-                  <p className="text-[10px] text-gold-500 mb-4  tracking-[0.2em] font-bold border-b border-gold-500/10 pb-2">{user?.name}</p>
+                  <p className="text-[10px] text-gold-500 mb-4 tracking-[0.2em] font-bold border-b border-gold-500/10 pb-2">{user?.name}</p>
                   <div className="space-y-3">
-                    <Link to="/profile" className="block text-[10px] font-bold   text-navy-200 hover:text-gold-400">My Account</Link>
+                    <Link to="/profile" className="block text-[10px] font-bold text-navy-200 hover:text-gold-400">My Account</Link>
                     <button 
                       onClick={logout}
-                      className="flex items-center space-x-2 text-[10px] font-bold   text-red-400/70 hover:text-red-400 transition-colors"
+                      className="flex items-center space-x-2 text-[10px] font-bold text-red-400/70 hover:text-red-400 transition-colors"
                     >
                       <LogOut size={12} />
                       <span>Sign Out</span>
@@ -315,7 +318,11 @@ const Navbar = () => {
                     </AnimatePresence>
                   </div>
                 ))}
-                
+
+                <Link to="/blog" className="text-xl font-serif text-white tracking-[0.08em]">
+                  Blog
+                </Link>
+
                 <div className="pt-10 border-t border-gold-500/10">
                   <Link to="/products" className="text-xl font-serif text-gold-500  ">Shop All</Link>
                 </div>
@@ -329,3 +336,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
