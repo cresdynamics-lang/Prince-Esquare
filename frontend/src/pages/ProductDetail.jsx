@@ -538,26 +538,21 @@ const ProductDetail = () => {
                 </AnimatePresence>
 
                 <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-navy-950/95 via-navy-950/70 to-transparent px-5 pb-5 pt-20 md:px-8 md:pb-8">
-                  {product.brand_name && (
-                    <p className="text-[10px] md:text-[11px] font-bold tracking-[0.35em] text-gold-400 mb-3">
-                      {product.brand_name}
-                    </p>
-                  )}
-                  <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white leading-[0.92] tracking-tight max-w-3xl">
+                  <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white leading-[0.92] tracking-tight max-w-4xl">
                     {product.name}
                   </h1>
                   <div className="mt-4 flex flex-wrap items-baseline gap-3">
-                    <p className="text-2xl md:text-3xl font-light text-gold-400">
+                    <p className="text-3xl md:text-4xl font-light text-gold-400">
                       KSh {displayPrice.toLocaleString()}
                     </p>
                     {compareAtPrice != null && compareAtPrice > displayPrice && (
-                      <p className="text-lg md:text-xl text-slate-300/70 line-through font-light">
+                      <p className="text-xl md:text-2xl text-slate-300/70 line-through font-light">
                         KSh {compareAtPrice.toLocaleString()}
                       </p>
                     )}
                   </div>
                   {variantSummary && (
-                    <p className="mt-3 text-sm md:text-base text-slate-200/85 font-light max-w-2xl leading-relaxed">
+                    <p className="mt-3 text-base md:text-lg text-slate-200/85 font-light max-w-2xl leading-relaxed">
                       {variantSummary}
                     </p>
                   )}
