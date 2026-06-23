@@ -392,7 +392,7 @@ const Products = ({ categoryOverride = null }) => {
                         <div className="flex justify-between items-start">
                           <span className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</span>
                         </div>
-                        <h3 className="text-sm md:text-base font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2">{product.name}</h3>
+                        <h3 className="text-[0.72rem] md:text-sm font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">{product.name}</h3>
                         <p className="text-gold-500 font-light italic">KSh {parseFloat(product.price).toLocaleString()}</p>
                       </div>
                     </Link>

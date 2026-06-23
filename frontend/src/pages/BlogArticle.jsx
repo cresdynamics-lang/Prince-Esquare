@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import SEO from '../components/SEO';
+import { buildBreadcrumbSchema, buildBlogPostingSchema } from '../seo/seoData';
 
 export default function BlogArticle() {
   const { slug } = useParams();
@@ -72,6 +74,23 @@ export default function BlogArticle() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {blog && (
+        <SEO
+          title={blog.title}
+          description={blog.excerpt || blog.title}
+          path={`/blog/${blog.slug}`}
+          image={blog.featured_image_url}
+          keywords={[blog.title, blog.category, 'Prince Esquire blog', 'menswear Kenya'].filter(Boolean)}
+          schema={[
+            buildBreadcrumbSchema([
+              { name: 'Home', path: '/' },
+              { name: 'Blog', path: '/blog' },
+              { name: blog.title, path: `/blog/${blog.slug}` },
+            ]),
+            buildBlogPostingSchema(blog),
+          ]}
+        />
+      )}
       {/* Hero Image */}
       {imageUrl && (
         <div className="relative w-full h-96 bg-gray-200 overflow-hidden">
@@ -98,7 +117,7 @@ export default function BlogArticle() {
 
         {/* Header */}
         <header className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl md:text-4xl font-serif font-bold text-gray-900 mb-4">
             {blog.title}
           </h1>
           

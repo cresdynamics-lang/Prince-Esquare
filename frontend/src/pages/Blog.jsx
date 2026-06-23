@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import BlogShowcase from '../components/BlogShowcase';
+import SEO from '../components/SEO';
+import { buildBreadcrumbSchema, buildBlogPostingSchema, routeSeo } from '../seo/seoData';
 
 const BLOGS_PER_PAGE = 9;
 
@@ -78,11 +80,24 @@ export default function Blog() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title={routeSeo.blog.title}
+        description={routeSeo.blog.description}
+        path={routeSeo.blog.path}
+        keywords={routeSeo.blog.keywords}
+        schema={[
+          buildBreadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: 'Blog', path: '/blog' },
+          ]),
+          blogs[0] ? buildBlogPostingSchema(blogs[0]) : null,
+        ]}
+      />
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-gray-900 to-black text-white py-12">
         <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">Our Blog</h1>
-          <p className="text-lg text-gray-300">Insights, trends, and style tips for the modern gentleman</p>
+          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4">Prince Esquire Style Journal</h1>
+          <p className="text-lg text-gray-300 max-w-3xl">Style notes, wardrobe guidance, and shopping ideas built around the actual pieces on the site so the journal can support search, internal linking, and product discovery.</p>
         </div>
       </div>
 

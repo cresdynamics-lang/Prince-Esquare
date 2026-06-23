@@ -67,6 +67,12 @@ export const routeSeo = {
     introTitle: 'Luxury Linen Kenya',
     introCopy: 'Luxury linen in Kenya belongs in a wardrobe built for climate, comfort and effortless polish. Prince Esquire curates linen shirts, sets, trousers and shorts with a relaxed sophistication suited to Nairobi weekends, coastal escapes and warm-weather events. The collection favours breathable textures, calm colour and silhouettes that feel composed without stiffness. Explore linen pieces that make ease look deliberate.',
   },
+  blog: {
+    title: 'Prince Esquire Style Journal',
+    description: 'Read styling notes, wardrobe guides and fashion editorial from Prince Esquire. Discover practical style advice for premium menswear in Kenya.',
+    path: '/blog',
+    keywords: ['fashion blog Kenya', 'menswear style tips', 'wardrobe guide Nairobi', 'Prince Esquire blog'],
+  },
 };
 
 export const categoryFallbackIntro = {
@@ -171,4 +177,28 @@ export const buildProductSchema = (product, image, price) => ({
     ratingValue: '4.8',
     reviewCount: '24',
   },
+});
+
+export const buildBlogPostingSchema = (post) => ({
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.title,
+  description: post.excerpt || post.title,
+  image: post.featured_image_url ? [post.featured_image_url] : [DEFAULT_IMAGE],
+  datePublished: post.published_date || post.created_at,
+  dateModified: post.updated_at || post.published_date || post.created_at,
+  author: {
+    '@type': 'Person',
+    name: post.author_name || SITE_NAME,
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: SITE_NAME,
+    logo: {
+      '@type': 'ImageObject',
+      url: DEFAULT_IMAGE,
+    },
+  },
+  mainEntityOfPage: `${SITE_URL}/blog/${post.slug}`,
+  articleSection: post.category || 'Style',
 });

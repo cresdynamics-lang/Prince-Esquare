@@ -36,9 +36,9 @@ const ProductCard = ({ product, onAddToCart, addedProductId }) => (
     </Link>
     <div className="pt-3 space-y-1">
       <p className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</p>
-      <h3 className="text-[9px] md:text-[11px] font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2">
-        {product.name}
-      </h3>
+        <h3 className="text-[8px] md:text-[10px] font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">
+          {product.name}
+        </h3>
       <p className="text-gold-500 font-light italic text-sm">
         KSh {parseFloat(product.price).toLocaleString()}
       </p>

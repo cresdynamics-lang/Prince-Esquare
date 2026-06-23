@@ -77,8 +77,8 @@ function App() {
         <Route path="/trousers" element={<Products categoryOverride="trousers" />} />
         <Route path="/linen" element={<Products categoryOverride="linen" />} />
         <Route path="/product/:slug" element={<ProductDetail />} />
-        <Route path="/blog" element={<NoIndexPage title="Blog"><Blog /></NoIndexPage>} />
-        <Route path="/blog/:slug" element={<NoIndexPage title="Blog Article"><BlogArticle /></NoIndexPage>} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogArticle />} />
         <Route path="/cart" element={<NoIndexPage title="Shopping Bag"><Cart /></NoIndexPage>} />
         <Route path="/login" element={<NoIndexPage title="Client Login"><Login /></NoIndexPage>} />
         <Route path="/signup" element={<NoIndexPage title="Create Account"><SignUp /></NoIndexPage>} />

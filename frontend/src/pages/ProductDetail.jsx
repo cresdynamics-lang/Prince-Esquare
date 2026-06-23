@@ -640,7 +640,7 @@ const ProductDetail = () => {
                 {product.brand_name && (
                   <p className="text-[10px] font-bold  tracking-[0.3em] text-gold-500">{product.brand_name}</p>
                 )}
-                <h1 className="text-2xl md:text-3xl font-serif text-white leading-tight">{product.name}</h1>
+                <h1 className="text-xl md:text-2xl font-serif text-white leading-tight">{product.name}</h1>
 
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <p className="text-2xl font-light text-gold-400">
