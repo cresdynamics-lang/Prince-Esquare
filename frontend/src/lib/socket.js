@@ -1,8 +1,9 @@
 // MODIFIED — Socket.io client (live stock updates)
 import { io } from 'socket.io-client';
 
-const base = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-const socketUrl = base.replace(/\/api\/?$/, '') || 'http://localhost:8000';
+const browserOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+const base = import.meta.env.VITE_API_URL || `${browserOrigin}/api`;
+const socketUrl = base.replace(/\/api\/?$/, '') || browserOrigin;
 
 export const socket = io(socketUrl, {
   autoConnect: false,
