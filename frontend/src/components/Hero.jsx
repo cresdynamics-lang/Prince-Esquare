@@ -33,7 +33,7 @@ const Hero = () => {
               <p className="text-gold-500 tracking-[0.4em]  text-[10px] font-bold">Excellence in every stitch</p>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-serif text-white leading-tight">
+            <h1 className="text-3xl md:text-4xl font-serif text-white leading-tight">
               Bespoke <br />
               <span className="text-gold-500 italic">Elegance.</span>
             </h1>

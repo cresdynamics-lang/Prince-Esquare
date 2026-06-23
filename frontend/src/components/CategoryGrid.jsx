@@ -15,7 +15,7 @@ const CategoryGrid = () => {
             viewport={{ once: true }}
             className="space-y-4"
           >
-            <h2 className="text-3xl md:text-5xl font-serif text-white">Curated Collections</h2>
+            <h2 className="text-3xl md:text-4xl font-serif text-white">Curated Collections</h2>
             <div className="flex items-center space-x-4">
               <div className="h-px w-12 bg-gold-600" />
               <p className="text-gold-400 tracking-[0.3em]  text-[10px] font-bold">Discover your signature style</p>

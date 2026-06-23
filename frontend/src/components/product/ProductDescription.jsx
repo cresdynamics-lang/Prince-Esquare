@@ -2,7 +2,7 @@
 
 const Section = ({ title, icon, children, className = '' }) => (
   <div className={`space-y-4 ${className}`}>
-    <h3 className="text-[11px] font-bold tracking-[0.25em] text-gold-500 flex items-center gap-2">
+    <h3 className="text-[10px] font-bold tracking-[0.25em] text-gold-500 flex items-center gap-2">
       {icon && <span aria-hidden className="text-gold-600/80">{icon}</span>}
       {title}
     </h3>
@@ -40,12 +40,12 @@ const ProductDescription = ({
   return (
     <div className="space-y-10">
       <div className="space-y-2">
-        <p className="text-[10px] font-bold tracking-[0.3em] text-gold-600/60">Product Details</p>
-        {brandName && <p className="text-[10px] text-gold-500/80">{brandName}</p>}
-        <h2 className="text-lg md:text-xl font-serif text-white leading-snug">{productName}</h2>
+        <p className="text-[9px] font-bold tracking-[0.3em] text-gold-600/60">Product Details</p>
+        {brandName && <p className="text-[9px] text-gold-500/80">{brandName}</p>}
+        <h2 className="text-base md:text-lg font-serif text-white leading-snug">{productName}</h2>
       </div>
 
-      <div className="space-y-6 text-[15px] font-light leading-[1.75] text-slate-300/90">
+      <div className="space-y-5 text-[14px] font-light leading-[1.7] text-slate-300/90">
         {sections.intro.map((para) => (
           <p key={para.slice(0, 48)} className="text-slate-200/90">
             {para}
@@ -55,7 +55,7 @@ const ProductDescription = ({
 
       {sections.features.length > 0 && (
         <Section title="Key Features" icon="*">
-          <ul className="space-y-3 pl-1 text-[15px] leading-relaxed text-slate-300/90 font-light">
+          <ul className="space-y-3 pl-1 text-[14px] leading-relaxed text-slate-300/90 font-light">
             {sections.features.map((item) => (
               <li key={item} className="flex gap-3">
                 <span className="text-gold-500 shrink-0 mt-1">-</span>
@@ -68,7 +68,7 @@ const ProductDescription = ({
 
       {colorLines.length > 0 && (
         <Section title="Available Color Variants" icon="*">
-          <ul className="grid grid-cols-1 gap-2 pl-1 text-[14px] font-light text-slate-300/90 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 pl-1 text-[13px] font-light text-slate-300/90 sm:grid-cols-2">
             {colorLines.map((c) => (
               <li key={c} className="flex items-center gap-2 border border-gold-600/10 bg-navy-900/40 px-3 py-1.5">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500/70" />
@@ -82,11 +82,11 @@ const ProductDescription = ({
       {sizeLines.length > 0 && (
         <Section title={isShoe ? 'Available Sizes (EU)' : 'Available Sizes'} icon="*">
           <Callout>
-            <p className="text-[14px] font-light leading-relaxed text-slate-300/90">
+            <p className="text-[13px] font-light leading-relaxed text-slate-300/90">
               {Array.isArray(sizeLines) ? sizeLines.join(' · ') : sizeLines}
             </p>
             {isShoe && (
-              <p className="mt-2 text-[12px] text-slate-500">
+              <p className="mt-2 text-[11px] text-slate-500">
                 Unisex fit - suitable for men and women. Select your size above before adding to cart.
               </p>
             )}
@@ -96,7 +96,7 @@ const ProductDescription = ({
 
       <Section title="Delivery & Service" icon="*">
         <Callout>
-          <ul className="space-y-2 text-[14px] font-light leading-relaxed text-slate-300/90">
+          <ul className="space-y-2 text-[13px] font-light leading-relaxed text-slate-300/90">
             {(deliveryLines.length ? deliveryLines : [
               'All orders are confirmed by our team before dispatch.',
               'Nairobi CBD and surrounding areas may qualify for in-house rider delivery.',
@@ -113,7 +113,7 @@ const ProductDescription = ({
       </Section>
 
       <Section title="Why Prince Esquire" icon="*">
-        <ul className="space-y-2 text-[14px] font-light text-slate-300/90">
+        <ul className="space-y-2 text-[13px] font-light text-slate-300/90">
           {(whyLines.length ? whyLines : [
             'Curated luxury fashion with transparent pricing',
             'Fast, reliable delivery across Kenya',
@@ -129,7 +129,7 @@ const ProductDescription = ({
       </Section>
 
       {otherFooter.map((para) => (
-        <p key={para.slice(0, 48)} className="text-[14px] font-light leading-relaxed text-slate-400/80">{para}</p>
+        <p key={para.slice(0, 48)} className="text-[13px] font-light leading-relaxed text-slate-400/80">{para}</p>
       ))}
     </div>
   );

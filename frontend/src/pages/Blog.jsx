@@ -102,7 +102,7 @@ export default function Blog() {
             <span className="text-gold-500 text-[9px] tracking-[0.35em] font-bold uppercase">
               Prince Esquire Journal
             </span>
-            <h1 className="text-3xl md:text-5xl font-serif leading-tight text-white">
+            <h1 className="text-3xl md:text-4xl font-serif leading-tight text-white">
               Style notes, wardrobe ideas, and editorial stories from the brand
             </h1>
             <p className="text-navy-200 text-sm md:text-base max-w-3xl leading-relaxed">

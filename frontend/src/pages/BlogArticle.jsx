@@ -107,7 +107,7 @@ export default function BlogArticle() {
         </div>
 
         <header className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-4">
+          <h1 className="text-2xl md:text-3xl font-serif font-bold text-white mb-4">
             {blog.title}
           </h1>
 
@@ -141,7 +141,7 @@ export default function BlogArticle() {
         </article>
 
         <div className="bg-navy-900/70 border border-gold-600/10 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-serif font-bold text-white mb-2">
+          <h3 className="text-base md:text-lg font-serif font-bold text-white mb-2">
             About {blog.author_name}
           </h3>
           <p className="text-navy-200">

@@ -109,7 +109,7 @@ const HeroSlider = ({ heroSlides }) => {
                 </p>
               </div>
 
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-serif text-white leading-tight tracking-tighter">
+              <h1 className="text-3xl md:text-4xl font-serif text-white leading-tight tracking-tighter">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}

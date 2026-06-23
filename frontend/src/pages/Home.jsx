@@ -148,7 +148,7 @@ const Home = () => {
               className="max-w-3xl mx-auto space-y-10"
             >
               <h3 className="text-gold-500 tracking-[0.3em]  text-xs font-bold">The Prince Experience</h3>
-              <h2 className="text-3xl md:text-5xl font-serif text-white tracking-tighter leading-none">
+              <h2 className="text-3xl md:text-4xl font-serif text-white tracking-tighter leading-none">
                 Crafted For <br />
                 <span className="text-gold-500 italic">Discerning Taste</span>
               </h2>
@@ -183,7 +183,7 @@ const Home = () => {
                   transition={{ delay: i * 0.2 }}
                   className="space-y-8 group"
                 >
-                  <span className="text-5xl font-serif text-gold-600/10 group-hover:text-gold-600/20 transition-colors duration-500 block">{promise.icon}</span>
+                  <span className="text-4xl font-serif text-gold-600/10 group-hover:text-gold-600/20 transition-colors duration-500 block">{promise.icon}</span>
                   <h3 className="text-lg md:text-xl font-serif text-gold-400 border-b border-gold-600/10 pb-4">{promise.title}</h3>
                   <p className="text-navy-300 font-light text-sm leading-relaxed">{promise.desc}</p>
                 </motion.div>
