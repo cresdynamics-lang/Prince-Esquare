@@ -1,5 +1,5 @@
 #!/bin/bash
-# Safe production update — run ON the server from the repo root (e.g. /var/www/Prince-Esquare).
+# Safe production update Ã¢â‚¬â€ run ON the server from the repo root (e.g. /var/www/Prince-Esquare).
 # Does NOT delete data. Runs only pending SQL migrations.
 #
 # Usage:
@@ -54,7 +54,7 @@ if [ "$SKIP_BACKUP" != "1" ]; then
     pg_dump "$DB_NAME" | gzip > "$BACKUP_FILE"
     echo "Saved: $BACKUP_FILE"
   else
-    echo "WARN: pg_dump not found — backup skipped. Set SKIP_BACKUP=1 to silence."
+    echo "WARN: pg_dump not found Ã¢â‚¬â€ backup skipped. Set SKIP_BACKUP=1 to silence."
   fi
 fi
 
@@ -70,7 +70,7 @@ npm ci --omit=dev
 
 if [ "$RUN_MIGRATE" = "1" ]; then
   echo ""
-  echo "=== Database migrations (pending only — existing rows preserved) ==="
+  echo "=== Database migrations (pending only Ã¢â‚¬â€ existing rows preserved) ==="
   echo "Migrations add columns/tables/indexes; they do NOT truncate live data."
   npm run db:migrate
 fi
@@ -82,7 +82,7 @@ cd "$FRONTEND"
 npm ci --include=dev 2>/dev/null || NODE_ENV=development npm install
 if [ "$SKIP_BUILD" != "1" ]; then
   NODE_ENV=production npm run build
-  # Ensure nginx (www-data) can read Vite output — SCP/uploads sometimes leave assets at 700
+  # Ensure nginx (www-data) can read Vite output Ã¢â‚¬â€ SCP/uploads sometimes leave assets at 700
   chmod -R a+rX "$FRONTEND/dist/assets" 2>/dev/null || true
 fi
 
@@ -97,9 +97,24 @@ else
 fi
 
 echo ""
+echo ""
 echo "=== Health check ==="
-sleep 2
-curl -sf "http://127.0.0.1:${PORT:-8000}/api/health" && echo "" || echo "WARN: local health check failed — check PORT in .env"
+HEALTH_PORT="${PORT:-5000}"
+HEALTH_URL="http://127.0.0.1:${HEALTH_PORT}/api/health"
+health_ok=0
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -sf "$HEALTH_URL" >/dev/null; then
+    curl -sf "$HEALTH_URL"
+    echo ""
+    health_ok=1
+    break
+  fi
+  sleep 3
+done
+
+if [ "$health_ok" -ne 1 ]; then
+  echo "WARN: local health check failed -- tried $HEALTH_URL"
+fi
 
 echo ""
 echo "=== Done ==="
