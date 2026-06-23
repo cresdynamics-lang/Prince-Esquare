@@ -1,4 +1,4 @@
-﻿-- Expand the seeded Prince Esquire blog posts with longer SEO content.
+-- Expand the seeded Prince Esquire blog posts with longer SEO content.
 
 WITH updates (slug, excerpt, content) AS (
   VALUES
