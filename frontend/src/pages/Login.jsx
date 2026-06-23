@@ -55,7 +55,7 @@ const Login = () => {
           className="w-full max-w-md bg-navy-950/50 border border-gold-500/10 p-12 space-y-10 shadow-2xl backdrop-blur-xl"
         >
           <div className="text-center space-y-4">
-            <h1 className="text-4xl font-serif text-white  ">Sign In</h1>
+            <h1 className="text-3xl md:text-4xl font-serif text-white">Sign In</h1>
             <p className="text-navy-400 font-light text-sm tracking-wide">
               Access your bespoke orders and preferences.
             </p>

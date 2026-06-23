@@ -236,12 +236,12 @@ const Products = ({ categoryOverride = null }) => {
           </div>
           <div className="mb-12">
             <span className="text-gold-500 text-[10px]  tracking-[0.4em] font-bold">Prince Esquire</span>
-            <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight mt-2">
+            <h1 className="text-3xl md:text-4xl font-serif text-white tracking-tight mt-2">
               {currentCategory === 'All' ? 'Our Collections' : selectedCategory?.name}
             </h1>
             <div className="max-w-3xl mt-6 space-y-3">
-              <h2 className="text-xl md:text-2xl font-serif text-gold-300">{intro.title}</h2>
-              <p className="text-sm md:text-base text-navy-300 font-light leading-relaxed">{intro.copy}</p>
+              <h2 className="text-lg md:text-xl font-serif text-gold-300">{intro.title}</h2>
+              <p className="text-sm text-navy-300 font-light leading-relaxed">{intro.copy}</p>
             </div>
             <div className="flex gap-4 mt-4">
                 {currentSub !== 'All' && (

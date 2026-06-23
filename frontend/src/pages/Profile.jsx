@@ -115,12 +115,12 @@ const Profile = () => {
                 {user?.avatar ? (
                   <img src={user.avatar} alt="" className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
-                  <span className="text-3xl font-bold text-gold-400 tracking-wider">{userInitials(user)}</span>
+                  <span className="text-2xl font-bold text-gold-400 tracking-wider">{userInitials(user)}</span>
                 )}
               </div>
               
               <div className="text-center md:text-left space-y-2">
-                <h1 className="text-4xl text-white  ">{user?.name}</h1>
+                <h1 className="text-3xl md:text-4xl text-white">{user?.name}</h1>
                 <p className="text-gold-500/60 font-light italic">{user?.email}</p>
                 <div className="flex items-center gap-4 pt-2">
                   <span className="text-[10px] bg-gold-600/10 text-gold-500 border border-gold-600/20 px-3 py-1   font-bold">
@@ -183,7 +183,7 @@ const Profile = () => {
                   {activeTab === 'orders' && (
                     <div className="space-y-8">
                       <div className="flex justify-between items-end border-b border-gold-600/10 pb-6">
-                        <h2 className="text-2xl text-white  ">Recent Orders</h2>
+                        <h2 className="text-xl md:text-2xl text-white">Recent Orders</h2>
                         <span className="text-[10px] text-gold-600/50  ">{orders.length} total</span>
                       </div>
 
@@ -253,7 +253,7 @@ const Profile = () => {
 
                   {activeTab === 'details' && (
                     <div className="space-y-8 bg-navy-900/30 border border-gold-600/10 p-12">
-                       <h2 className="text-2xl text-white   border-b border-gold-600/10 pb-6">Personal Details</h2>
+                      <h2 className="text-xl md:text-2xl text-white border-b border-gold-600/10 pb-6">Personal Details</h2>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                           <div className="space-y-2">
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Full Name</label>
@@ -297,7 +297,7 @@ const Profile = () => {
                   {activeTab === 'addresses' && (
                     <div className="space-y-8">
                       <div className="flex justify-between items-end border-b border-gold-600/10 pb-6">
-                        <h2 className="text-2xl text-white  ">Saved Addresses</h2>
+                        <h2 className="text-xl md:text-2xl text-white">Saved Addresses</h2>
                       </div>
                       <div className="bg-navy-900/50 border border-gold-600/10 p-8 space-y-5">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -344,7 +344,7 @@ const Profile = () => {
 
                   {activeTab === 'security' && (
                     <div className="space-y-8 bg-navy-900/30 border border-gold-600/10 p-12">
-                      <h2 className="text-2xl text-white   border-b border-gold-600/10 pb-6">Security Settings</h2>
+                      <h2 className="text-xl md:text-2xl text-white border-b border-gold-600/10 pb-6">Security Settings</h2>
                       <div className="max-w-md space-y-8">
                         <div className="space-y-6">
                           <div className="space-y-2">

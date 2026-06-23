@@ -29,7 +29,7 @@ const Cart = () => {
           <div className="flex flex-col lg:flex-row gap-16">
             <div className="lg:w-2/3">
               <div className="flex justify-between items-end mb-12 border-b border-gold-600/10 pb-8">
-                <h1 className="text-5xl font-serif text-white">Shopping Bag</h1>
+                <h1 className="text-3xl md:text-4xl font-serif text-white">Shopping Bag</h1>
                 <span className="text-[10px] font-bold  tracking-[0.3em] text-gold-600">
                   {items.reduce((n, i) => n + i.quantity, 0)} Items
                 </span>
@@ -119,7 +119,7 @@ const Cart = () => {
 
             <div className="lg:w-1/3">
               <div className="bg-navy-950/50 p-10 border border-gold-600/10 sticky top-32 space-y-10">
-                <h2 className="text-2xl font-serif text-white border-b border-gold-600/10 pb-6">Summary</h2>
+                <h2 className="text-xl md:text-2xl font-serif text-white border-b border-gold-600/10 pb-6">Summary</h2>
 
                 <div className="space-y-6">
                   <div className="flex justify-between text-[10px] font-bold  ">
@@ -132,7 +132,7 @@ const Cart = () => {
                   </div>
                   <div className="pt-6 border-t border-gold-600/10 flex justify-between items-center">
                     <span className="text-xl font-serif text-white">Total</span>
-                    <span className="text-3xl font-serif text-gold-500 italic">KSh {getTotal().toLocaleString()}</span>
+                    <span className="text-2xl md:text-3xl font-serif text-gold-500 italic">KSh {getTotal().toLocaleString()}</span>
                   </div>
                 </div>
 

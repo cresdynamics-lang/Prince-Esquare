@@ -15,7 +15,7 @@ const CategoryGrid = () => {
             viewport={{ once: true }}
             className="space-y-4"
           >
-            <h2 className="text-4xl md:text-7xl font-serif text-white">Curated Collections</h2>
+            <h2 className="text-3xl md:text-5xl font-serif text-white">Curated Collections</h2>
             <div className="flex items-center space-x-4">
               <div className="h-px w-12 bg-gold-600" />
               <p className="text-gold-400 tracking-[0.3em]  text-[10px] font-bold">Discover your signature style</p>
@@ -53,7 +53,7 @@ const CategoryGrid = () => {
 
               <div className="absolute bottom-10 left-10 right-10 transition-transform duration-700 transform group-hover:-translate-y-4">
                 <span className="text-gold-500 text-[10px]  tracking-[0.4em] font-bold block mb-4 opacity-80">{cat.subtitle}</span>
-                <h3 className="text-3xl font-serif text-white  tracking-wider mb-6 leading-tight">{cat.title}</h3>
+                <h3 className="text-xl md:text-2xl font-serif text-white tracking-wider mb-6 leading-tight">{cat.title}</h3>
                 <div className="w-12 group-hover:w-full h-px bg-gold-500 transition-all duration-1000" />
               </div>
             </motion.div>

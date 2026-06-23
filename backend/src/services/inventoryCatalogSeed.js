@@ -29,13 +29,6 @@ const SHOE_SIZES = ['40', '41', '42', '43', '44', '45'];
 const BELT_NAMES = [
   'Classic Calfskin Belt — Black/Gold Buckle',
   'Reversible Leather Belt — Black/Brown',
-  'Dress Belt — Dark Brown',
-  'Casual Leather Belt — Tan',
-  'Designer Buckle Belt — Black',
-  'Woven Leather Belt — Brown',
-  'Signature Logo Belt — Black/Gold',
-  'Suede Belt — Navy',
-  'Formal Belt — Burgundy',
 ];
 const BELT_SIZES = ['32', '34', '36', '38', '40'];
 const KHAKI_NAMES = ['Classic Khaki Chino', 'Slim Taper Khaki', 'Stretch Comfort Khaki', 'Flat Front Khaki', 'Pleated Khaki'];

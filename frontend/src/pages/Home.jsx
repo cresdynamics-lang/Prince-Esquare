@@ -72,38 +72,6 @@ const Home = () => {
 
         <ProductShowcase categoryRows={homepageData?.categoryRows} />
 
-        {featuredBlogs.length > 0 && (
-          <section className="py-24 bg-navy-950 border-y border-gold-600/10">
-            <div className="container mx-auto px-6">
-              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-10">
-                <div className="max-w-3xl space-y-4">
-                  <span className="text-gold-500 text-[10px] tracking-[0.4em] font-bold uppercase">
-                    Style Journal
-                  </span>
-                  <h2 className="text-3xl md:text-5xl font-serif text-white leading-tight">
-                    Recent notes from the Prince Esquire journal
-                  </h2>
-                  <p className="text-navy-200 max-w-2xl leading-relaxed">
-                    Short editorial reads, wardrobe guidance, and product-led style ideas that support the collection and keep the brand discoverable.
-                  </p>
-                </div>
-                <Link
-                  to="/blog"
-                  className="inline-flex items-center justify-center bg-gold-600 text-navy-950 px-7 py-3 text-[10px] font-bold tracking-[0.25em] uppercase hover:bg-gold-500 transition-colors"
-                >
-                  View all articles
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {featuredBlogs.map((blog) => (
-                  <BlogShowcase key={blog.id} blog={blog} />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* Quote Section */}
         <section className="py-16 md:py-20 bg-navy-950 text-center relative overflow-hidden border-t border-gold-600/10">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-24 bg-gradient-to-b from-gold-500/50 to-transparent" />
@@ -114,7 +82,7 @@ const Home = () => {
               viewport={{ once: true }}
               className="space-y-8"
             >
-              <h2 className="text-4xl md:text-6xl font-serif italic text-gold-200 leading-tight">
+              <h2 className="text-3xl md:text-4xl font-serif italic text-gold-200 leading-tight">
                 "True elegance is not being noticed, it's being remembered."
               </h2>
               <div className="flex items-center justify-center space-x-6">
@@ -132,7 +100,7 @@ const Home = () => {
           <div className="container mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
             <div className="lg:col-span-5 space-y-6">
               <span className="text-gold-500 text-[10px]  tracking-[0.4em] font-bold">Luxury Fashion Kenya</span>
-              <h1 className="text-4xl md:text-6xl font-serif text-white leading-tight">
+              <h1 className="text-3xl md:text-4xl font-serif text-white leading-tight">
                 Curated Luxury Fashion in Kenya
               </h1>
             </div>
@@ -180,7 +148,7 @@ const Home = () => {
               className="max-w-3xl mx-auto space-y-10"
             >
               <h3 className="text-gold-500 tracking-[0.3em]  text-xs font-bold">The Prince Experience</h3>
-              <h2 className="text-4xl md:text-7xl font-serif text-white  tracking-tighter leading-none">
+              <h2 className="text-3xl md:text-5xl font-serif text-white tracking-tighter leading-none">
                 Crafted For <br />
                 <span className="text-gold-500 italic">Discerning Taste</span>
               </h2>
@@ -215,14 +183,46 @@ const Home = () => {
                   transition={{ delay: i * 0.2 }}
                   className="space-y-8 group"
                 >
-                  <span className="text-6xl font-serif text-gold-600/10 group-hover:text-gold-600/20 transition-colors duration-500 block">{promise.icon}</span>
-                  <h3 className="text-xl font-serif text-gold-400   border-b border-gold-600/10 pb-4">{promise.title}</h3>
+                  <span className="text-5xl font-serif text-gold-600/10 group-hover:text-gold-600/20 transition-colors duration-500 block">{promise.icon}</span>
+                  <h3 className="text-lg md:text-xl font-serif text-gold-400 border-b border-gold-600/10 pb-4">{promise.title}</h3>
                   <p className="text-navy-300 font-light text-sm leading-relaxed">{promise.desc}</p>
                 </motion.div>
               ))}
             </div>
           </div>
         </section>
+
+        {featuredBlogs.length > 0 && (
+          <section className="pt-10 pb-20 bg-navy-950 border-t border-gold-600/10">
+            <div className="container mx-auto px-6">
+              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-8">
+                <div className="max-w-3xl space-y-3">
+                  <span className="text-gold-500 text-[9px] tracking-[0.4em] font-bold uppercase">
+                    Style Journal
+                  </span>
+                  <h2 className="text-2xl md:text-3xl font-serif text-white leading-tight">
+                    Recent notes from the Prince Esquire journal
+                  </h2>
+                  <p className="text-navy-200 text-sm max-w-2xl leading-relaxed">
+                    Short editorial reads, wardrobe guidance, and product-led style ideas that support the collection and keep the brand discoverable.
+                  </p>
+                </div>
+                <Link
+                  to="/blog"
+                  className="inline-flex items-center justify-center bg-gold-600 text-navy-950 px-6 py-3 text-[9px] font-bold tracking-[0.25em] uppercase hover:bg-gold-500 transition-colors"
+                >
+                  View all articles
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {featuredBlogs.map((blog) => (
+                  <BlogShowcase key={blog.id} blog={blog} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

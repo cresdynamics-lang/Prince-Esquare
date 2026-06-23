@@ -91,22 +91,27 @@ export default function Blog() {
         ]}
       />
 
-      <section className="border-b border-gold-600/10 bg-navy-950">
-        <div className="max-w-7xl mx-auto px-4 py-16 md:py-20">
-          <div className="max-w-4xl space-y-5">
-            <span className="text-gold-500 text-[10px] tracking-[0.4em] font-bold uppercase">
+      <section className="relative border-b border-gold-600/10 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: 'url("/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg")' }}
+        />
+        <div className="absolute inset-0 bg-navy-950/80" />
+        <div className="relative max-w-7xl mx-auto px-4 py-16 md:py-20">
+          <div className="max-w-4xl space-y-4">
+            <span className="text-gold-500 text-[9px] tracking-[0.35em] font-bold uppercase">
               Prince Esquire Journal
             </span>
-            <h1 className="text-4xl md:text-6xl font-serif leading-tight text-white">
+            <h1 className="text-3xl md:text-5xl font-serif leading-tight text-white">
               Style notes, wardrobe ideas, and editorial stories from the brand
             </h1>
-            <p className="text-navy-200 text-lg max-w-3xl leading-relaxed">
+            <p className="text-navy-200 text-sm md:text-base max-w-3xl leading-relaxed">
               A tighter, more useful blog built around the products, categories, and styling language already on the site.
             </p>
-            <div className="pt-4">
+            <div className="pt-3">
               <Link
                 to="/"
-                className="inline-flex items-center text-gold-400 text-[10px] font-bold tracking-[0.25em] uppercase hover:text-gold-300 transition-colors"
+                className="inline-flex items-center text-gold-400 text-[9px] font-bold tracking-[0.25em] uppercase hover:text-gold-300 transition-colors"
               >
                 Back to home
               </Link>
