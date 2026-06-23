@@ -39,6 +39,10 @@ export const useAuthStore = create(
           isAdmin: false,
           isSeller: false,
         }),
+      updateUser: (userData) =>
+        set((state) => ({
+          user: { ...(state.user || {}), ...userData },
+        })),
     }),
     {
       name: 'prince-esquire-auth',

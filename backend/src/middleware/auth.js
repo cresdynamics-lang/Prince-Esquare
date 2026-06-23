@@ -23,7 +23,7 @@ const loadUserFromToken = async (decoded) => {
   }
 
   const result = await db.query(
-    'SELECT id, name, email, role, permissions, is_active FROM users WHERE id = $1',
+    'SELECT id, name, email, phone, avatar, role, permissions, is_active, default_shipping_address, created_at FROM users WHERE id = $1',
     [decoded.id]
   );
   if (result.rows.length === 0) return null;
@@ -160,9 +160,16 @@ exports.requireInventoryView = [
 
 exports.requireInventoryManage = [
   exports.protect,
-  (req, res, next) => {
-    if (canManageInventory(req.user)) return next();
-    return formatResponse(res, 403, false, 'Inventory management requires admin permission');
+  async (req, res, next) => {
+    if (!canManageInventory(req.user)) {
+      return formatResponse(res, 403, false, 'Inventory management requires admin permission');
+    }
+    try {
+      req.posActorId = await resolvePosActorId(req.user);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
   },
 ];
 

@@ -141,6 +141,7 @@ exports.getProducts = async (req, res, next) => {
 
         let products = result.rows.map((p) => applyProductImageOptimization(p));
         products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+
         products = forAudience(products, req);
         formatResponse(res, 200, true, 'Products fetched successfully', {
             products,
@@ -172,13 +173,14 @@ exports.getFeaturedProducts = async (req, res, next) => {
 exports.getProductBySlug = async (req, res, next) => {
     try {
         const { slug } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug);
         const productResult = await db.query(
             'SELECT p.*, c.name as category_name, p_cat.name as parent_category_name, b.name as brand_name FROM products p ' +
             'LEFT JOIN categories c ON p.category_id = c.id ' +
             'LEFT JOIN categories p_cat ON c.parent_id = p_cat.id ' +
             'LEFT JOIN brands b ON p.brand_id = b.id ' +
-            'WHERE p.slug = $1 AND p.is_active = true',
-            [slug]
+            `WHERE (p.slug = $1 ${isUuid ? 'OR p.id = $1::uuid' : ''}) AND p.is_active = true`,
+            [decodeURIComponent(slug)]
         );
 
         if (productResult.rows.length === 0) {
@@ -278,9 +280,10 @@ exports.createProduct = async (req, res, next) => {
         await syncPosMetadataFromEcommerce(result.rows[0], posRow);
         const storeQty = Math.max(0, parseInt(inventory_opening_qty, 10) || 0);
         if (posRow?.id && storeQty > 0) {
+            const { resolvePosActorId } = require('../services/staffPosBridge');
             await receiveAtStore(posRow.id, storeQty, {
                 notes: 'Added from Products — warehouse intake',
-                recordedBy: req.user?.id || null,
+                recordedBy: await resolvePosActorId(req.user),
             });
         }
 

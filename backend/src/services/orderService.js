@@ -1,8 +1,8 @@
 const db = require('../config/db');
 const { resolveOrderLines } = require('./orderStock');
 
-const SHIPPING_FLAT = parseFloat(process.env.ORDER_SHIPPING_FLAT || '250');
-const VAT_RATE = parseFloat(process.env.ORDER_VAT_RATE || '0.16');
+const SHIPPING_FLAT = parseFloat(process.env.ORDER_SHIPPING_FLAT || '0');
+const VAT_RATE = parseFloat(process.env.ORDER_VAT_RATE || '0');
 
 const calcTotals = (lines) => {
   let subtotal = 0;

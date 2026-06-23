@@ -38,7 +38,7 @@ exports.stockIn = async (req, res, next) => {
 
     const levels = await transferStoreToShop(value.productId, value.qty, {
       notes: value.notes || STORE_TO_SHOP,
-      recordedBy: req.user?.id || null,
+      recordedBy: req.posActorId || null,
     });
     formatResponse(res, 201, true, 'Moved from store to shop', {
       productId: value.productId,
@@ -59,7 +59,7 @@ exports.stockOut = async (req, res, next) => {
 
     const levels = await transferShopToStore(value.productId, value.qty, {
       notes: value.notes || SHOP_TO_STORE,
-      recordedBy: req.user?.id || null,
+      recordedBy: req.posActorId || null,
     });
     formatResponse(res, 201, true, 'Returned from shop to store', {
       productId: value.productId,
@@ -90,7 +90,7 @@ exports.bulkStockIn = async (req, res, next) => {
       try {
         const levels = await transferStoreToShop(productId, value.qty, {
           notes: value.notes || STORE_TO_SHOP,
-          recordedBy: req.user?.id || null,
+          recordedBy: req.posActorId || null,
         });
         moved.push({ productId, shopQty: levels.shopQty, storeQty: levels.storeQty });
       } catch (e) {
@@ -120,7 +120,7 @@ exports.bulkStockOut = async (req, res, next) => {
       try {
         const levels = await transferShopToStore(productId, value.qty, {
           notes: value.notes || SHOP_TO_STORE,
-          recordedBy: req.user?.id || null,
+          recordedBy: req.posActorId || null,
         });
         moved.push({ productId, shopQty: levels.shopQty, storeQty: levels.storeQty });
       } catch (e) {
@@ -146,7 +146,7 @@ exports.receiveAtStore = async (req, res, next) => {
 
     const result = await receiveAtStore(value.productId, value.qty, {
       notes: value.notes || 'Received at store',
-      recordedBy: req.user?.id || null,
+      recordedBy: req.posActorId || null,
     });
     formatResponse(res, 201, true, 'Store stock received', result);
   } catch (error) {
@@ -299,7 +299,7 @@ exports.stockTake = async (req, res, next) => {
 
     for (const row of value) {
       const result = await applyStockTake(row.productId, row.physicalQty, {
-        recordedBy: req.user?.id || null,
+        recordedBy: req.posActorId || null,
       });
       if (result.variance !== 0) {
         adjustments.push({ productId: row.productId, variance: result.variance });
@@ -326,7 +326,7 @@ exports.storeStockTake = async (req, res, next) => {
     const adjustments = [];
     for (const row of value) {
       const result = await applyStoreStockTake(row.productId, row.physicalQty, {
-        recordedBy: req.user?.id || null,
+        recordedBy: req.posActorId || null,
       });
       if (result.variance !== 0) {
         adjustments.push({ productId: row.productId, variance: result.variance });
@@ -380,11 +380,11 @@ exports.importStockTake = async (req, res, next) => {
       (!forceLocation && parsed.rows[0]?.combined);
     const result = useCombined
       ? await importCombinedStockTakeRows(parsed.rows, {
-          recordedBy: req.user?.id || null,
+          recordedBy: req.posActorId || null,
         })
       : await importStockTakeRows(parsed.rows, {
           location: forceLocation === 'store' ? 'store' : 'shop',
-          recordedBy: req.user?.id || null,
+          recordedBy: req.posActorId || null,
         });
     const label = useCombined ? 'Shop & warehouse' : forceLocation === 'store' ? 'Warehouse' : 'Shop';
     formatResponse(
@@ -429,7 +429,7 @@ exports.importMasterStock = async (req, res, next) => {
     const date = req.body.date ? new Date(`${req.body.date}T12:00:00`) : new Date();
     const result = await importMasterStockRows(rows, {
       date,
-      recordedBy: req.user?.id || null,
+      recordedBy: req.posActorId || null,
     });
     formatResponse(
       res,
@@ -456,7 +456,7 @@ exports.importExcel = async (req, res, next) => {
       const { importCatalogRows } = require('../../services/productCatalogImport');
       const result = await importCatalogRows(rows, {
         date,
-        performedBy: req.user?.id || null,
+        performedBy: req.posActorId || null,
       });
       return formatResponse(
         res,
@@ -474,7 +474,7 @@ exports.importExcel = async (req, res, next) => {
     const result = await importStockRows(rows, {
       date,
       mode,
-      performedBy: req.user?.id || null,
+      performedBy: req.posActorId || null,
       recordMovements: req.body.recordMovements === 'true',
     });
     const msg =
@@ -565,7 +565,7 @@ exports.createInventoryItem = async (req, res, next) => {
           websiteSku: value.website_sku || '',
         },
       ],
-      { performedBy: req.user?.id || null }
+      { performedBy: req.posActorId || null }
     );
 
     const row = result.products[0];
@@ -990,7 +990,7 @@ exports.importVariantStock = async (req, res, next) => {
     }
     const { parseVariantImportBuffer, importVariantStockRows } = require('../../services/variantStockReport');
     const rows = await parseVariantImportBuffer(req.file.buffer);
-    const result = await importVariantStockRows(rows, { performedBy: req.user?.id || null });
+    const result = await importVariantStockRows(rows, { performedBy: req.posActorId || null });
     const msg = `Variant stock updated — ${result.updated} variant(s) on ${result.productsUpdated} product(s)`;
     formatResponse(res, 200, true, msg, result);
   } catch (error) {

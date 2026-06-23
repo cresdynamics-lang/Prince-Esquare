@@ -9,11 +9,17 @@ import Footer from '../components/Footer';
 import { userInitials } from '../lib/format';
 
 const Profile = () => {
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { user, logout, isAuthenticated, updateUser } = useAuthStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('orders');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [detailsForm, setDetailsForm] = useState({ name: '', phone: '' });
+  const [addressForm, setAddressForm] = useState({ delivery_zone: 'nairobi_outside_cbd', line1: '' });
+  const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '' });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -22,6 +28,15 @@ const Profile = () => {
     }
     fetchOrders();
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!user) return;
+    setDetailsForm({ name: user.name || '', phone: user.phone || '' });
+    setAddressForm({
+      delivery_zone: user.default_shipping_address?.delivery_zone || 'nairobi_outside_cbd',
+      line1: user.default_shipping_address?.line1 || '',
+    });
+  }, [user]);
 
   const fetchOrders = async () => {
     try {
@@ -37,6 +52,42 @@ const Profile = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const saveProfile = async (nextAddress = addressForm) => {
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileMessage('');
+    try {
+      const res = await authAPI.updateProfile({
+        name: detailsForm.name,
+        phone: detailsForm.phone,
+        default_shipping_address: nextAddress,
+      });
+      const updated = res.data?.data?.user;
+      if (updated) updateUser(updated);
+      setProfileMessage('Account details saved.');
+    } catch (err) {
+      setProfileError(err.response?.data?.message || 'Could not save account details');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const savePassword = async (e) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileMessage('');
+    try {
+      await authAPI.updatePassword(passwordForm);
+      setPasswordForm({ current_password: '', new_password: '' });
+      setProfileMessage('Password changed.');
+    } catch (err) {
+      setProfileError(err.response?.data?.message || 'Could not change password');
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const tabs = [
@@ -116,6 +167,11 @@ const Profile = () => {
 
             {/* Content Area */}
             <div className="lg:col-span-9">
+              {(profileMessage || profileError) && (
+                <div className={`mb-6 border px-4 py-3 text-sm ${profileError ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-green-500/30 bg-green-500/10 text-green-300'}`}>
+                  {profileError || profileMessage}
+                </div>
+              )}
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
@@ -201,7 +257,11 @@ const Profile = () => {
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                           <div className="space-y-2">
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Full Name</label>
-                            <p className="text-white text-lg font-serif border-b border-gold-600/10 pb-2">{user?.name}</p>
+                            <input
+                              value={detailsForm.name}
+                              onChange={(e) => setDetailsForm((f) => ({ ...f, name: e.target.value }))}
+                              className="w-full bg-navy-950 border border-gold-600/10 py-4 px-5 text-white text-sm outline-none focus:border-gold-500"
+                            />
                           </div>
                           <div className="space-y-2">
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Email Address</label>
@@ -209,7 +269,12 @@ const Profile = () => {
                           </div>
                           <div className="space-y-2">
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Phone Number</label>
-                            <p className="text-white text-lg font-serif border-b border-gold-600/10 pb-2">{user?.phone || 'Not set'}</p>
+                            <input
+                              value={detailsForm.phone}
+                              onChange={(e) => setDetailsForm((f) => ({ ...f, phone: e.target.value }))}
+                              className="w-full bg-navy-950 border border-gold-600/10 py-4 px-5 text-white text-sm outline-none focus:border-gold-500"
+                              placeholder="0712 345 678"
+                            />
                           </div>
                           <div className="space-y-2">
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold">Preferred Style</label>
@@ -217,8 +282,13 @@ const Profile = () => {
                           </div>
                        </div>
                        <div className="pt-8">
-                         <button className="bg-transparent border border-gold-600/30 text-gold-500 px-8 py-4 text-[10px] font-bold   hover:bg-gold-600 hover:text-navy-950 transition-all">
-                           Update Profile
+                         <button
+                           type="button"
+                           onClick={() => saveProfile()}
+                           disabled={profileSaving}
+                           className="bg-transparent border border-gold-600/30 text-gold-500 px-8 py-4 text-[10px] font-bold   hover:bg-gold-600 hover:text-navy-950 transition-all disabled:opacity-50"
+                         >
+                           {profileSaving ? 'Saving...' : 'Update Profile'}
                          </button>
                        </div>
                     </div>
@@ -228,24 +298,46 @@ const Profile = () => {
                     <div className="space-y-8">
                       <div className="flex justify-between items-end border-b border-gold-600/10 pb-6">
                         <h2 className="text-2xl text-white  ">Saved Addresses</h2>
-                        <button className="text-gold-500 text-[10px] font-bold  ">+ Add New</button>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-navy-900/50 border border-gold-600/10 p-8 space-y-4 relative group">
-                          <div className="absolute top-4 right-4">
-                            <span className="text-[8px] border border-gold-600/30 text-gold-600 px-2 py-1  font-bold ">Default</span>
-                          </div>
-                          <h3 className="text-white   text-sm font-bold">Primary Residence</h3>
-                          <div className="text-navy-400 text-xs space-y-1 font-light">
-                            <p>Luxury Avenue, Garden Chambers</p>
-                            <p>Apartment 4B, 3rd Floor</p>
-                            <p>Nairobi, Kenya</p>
-                          </div>
-                          <div className="pt-4 flex gap-6">
-                            <button className="text-[9px] text-gold-600/50 hover:text-gold-500   font-bold">Edit</button>
-                            <button className="text-[9px] text-red-500/50 hover:text-red-400   font-bold">Remove</button>
-                          </div>
+                      <div className="bg-navy-900/50 border border-gold-600/10 p-8 space-y-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {[
+                            ['cbd', 'CBD'],
+                            ['nairobi_outside_cbd', 'Outside CBD'],
+                            ['outside_nairobi', 'Outside Nairobi'],
+                          ].map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setAddressForm((f) => ({ ...f, delivery_zone: value }))}
+                              className={`border px-3 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                addressForm.delivery_zone === value
+                                  ? 'bg-gold-600 text-navy-950 border-gold-600'
+                                  : 'border-gold-500/20 text-gold-400 hover:border-gold-500/60'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
                         </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] text-gold-600/50 tracking-[0.2em] font-bold">Exact Location</label>
+                          <textarea
+                            rows={5}
+                            value={addressForm.line1}
+                            onChange={(e) => setAddressForm((f) => ({ ...f, line1: e.target.value }))}
+                            className="w-full bg-navy-950 border border-gold-600/10 py-4 px-5 text-white text-sm outline-none focus:border-gold-500 resize-y"
+                            placeholder="Estate, street, building, floor, landmark"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => saveProfile(addressForm)}
+                          disabled={profileSaving}
+                          className="bg-gold-600 text-navy-950 px-8 py-4 text-[10px] font-bold hover:bg-gold-500 transition-all disabled:opacity-50"
+                        >
+                          {profileSaving ? 'Saving...' : 'Save Address'}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -259,6 +351,8 @@ const Profile = () => {
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold ml-1">Current Password</label>
                             <input 
                               type="password"
+                              value={passwordForm.current_password}
+                              onChange={(e) => setPasswordForm((f) => ({ ...f, current_password: e.target.value }))}
                               className="w-full bg-navy-950 border border-gold-600/10 py-4 px-6 text-white text-sm outline-none focus:border-gold-500"
                               placeholder="••••••••"
                             />
@@ -267,13 +361,15 @@ const Profile = () => {
                             <label className="text-[10px] text-gold-600/50  tracking-[0.2em] font-bold ml-1">New Password</label>
                             <input 
                               type="password"
+                              value={passwordForm.new_password}
+                              onChange={(e) => setPasswordForm((f) => ({ ...f, new_password: e.target.value }))}
                               className="w-full bg-navy-950 border border-gold-600/10 py-4 px-6 text-white text-sm outline-none focus:border-gold-500"
                               placeholder="••••••••"
                             />
                           </div>
                         </div>
-                        <button className="w-full bg-gold-600 text-navy-950 py-5 text-[10px] font-bold   shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all">
-                          Change Password
+                        <button disabled={profileSaving} className="w-full bg-gold-600 text-navy-950 py-5 text-[10px] font-bold   shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all disabled:opacity-50">
+                          {profileSaving ? 'Saving...' : 'Change Password'}
                         </button>
                       </div>
                     </div>
@@ -291,3 +387,5 @@ const Profile = () => {
 };
 
 export default Profile;
+
+

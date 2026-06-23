@@ -57,8 +57,8 @@ export const useCartStore = create(
 
       getCheckoutTotals: () => {
         const subtotal = get().getTotal();
-        const tax = Math.round(subtotal * 0.16);
-        const shipping = 250;
+        const tax = 0;
+        const shipping = 0;
         const total = subtotal + tax + shipping;
         return { subtotal, tax, shipping, total };
       },
