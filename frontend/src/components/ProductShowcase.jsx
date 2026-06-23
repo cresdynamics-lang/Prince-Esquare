@@ -9,7 +9,7 @@ const needsSizeSelection = (product) =>
     .includes((product.category_name || product.parent_category_name || '').toLowerCase());
 
 const ProductCard = ({ product, onAddToCart, addedProductId }) => (
-  <article className="group flex-shrink-0 w-[46%] sm:w-[32%] md:w-[24%] lg:w-[18%] min-w-[140px]">
+  <article className="group w-full min-w-0">
     <Link to={`/product/${product.slug}`} className="block">
       <div className="relative aspect-[4/5] bg-navy-900 overflow-hidden border border-gold-600/10 group-hover:border-gold-600/60 transition-colors">
         <img
@@ -92,7 +92,7 @@ const ProductShowcase = ({ categoryRows = [] }) => {
               </Link>
             </div>
 
-            <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-gold-600/30 scrollbar-track-transparent">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
               {row.products.map((product) => (
                 <ProductCard
                   key={product.id}

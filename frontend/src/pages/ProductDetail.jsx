@@ -537,29 +537,6 @@ const ProductDetail = () => {
                   />
                 </AnimatePresence>
 
-                <div className="absolute inset-0 z-10 flex items-end justify-start bg-gradient-to-t from-navy-950/95 via-navy-950/60 to-transparent px-5 pb-10 pt-24 md:px-8 md:pb-12 md:pt-28">
-                  <div className="max-w-5xl text-left">
-                    <h1 className="font-serif text-7xl sm:text-8xl md:text-9xl lg:text-[10rem] text-white leading-[0.88] tracking-tight">
-                      {product.name}
-                    </h1>
-                    <div className="mt-5 flex flex-wrap items-baseline gap-3">
-                      <p className="text-4xl md:text-5xl font-light text-gold-400">
-                        KSh {displayPrice.toLocaleString()}
-                      </p>
-                      {compareAtPrice != null && compareAtPrice > displayPrice && (
-                        <p className="text-2xl md:text-3xl text-slate-300/70 line-through font-light">
-                          KSh {compareAtPrice.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                    {variantSummary && (
-                      <p className="mt-4 text-lg md:text-xl text-slate-200/90 font-light max-w-3xl leading-relaxed">
-                        {variantSummary}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
                 {hasColorCarousel && (
                   <>
                     <button
@@ -659,9 +636,28 @@ const ProductDetail = () => {
 
             {/* Purchase + description — scrolls; image stays pinned until this column ends */}
             <div className="space-y-6 lg:pt-2 min-h-0">
-              <div className="sr-only">
-                {product.brand_name ? `${product.brand_name} ` : ''}
-                {product.name}
+              <div className="space-y-3">
+                {product.brand_name && (
+                  <p className="text-[10px] font-bold tracking-[0.3em] text-gold-500">{product.brand_name}</p>
+                )}
+                <h1 className="text-2xl md:text-3xl font-serif text-white leading-tight">{product.name}</h1>
+
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <p className="text-2xl md:text-3xl font-light text-gold-400">
+                    KSh {displayPrice.toLocaleString()}
+                  </p>
+                  {compareAtPrice != null && compareAtPrice > displayPrice && (
+                    <p className="text-lg md:text-xl text-slate-500 line-through font-light">
+                      KSh {compareAtPrice.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {variantSummary && (
+                  <p className="text-sm md:text-base text-slate-400 font-light tracking-wide max-w-2xl">
+                    {variantSummary}
+                  </p>
+                )}
               </div>
 
               {hasMultipleColors && (
