@@ -145,6 +145,9 @@ const Navbar = () => {
               alt="Prince Esquire"
               className="h-10 w-10 lg:h-12 lg:w-12 rounded-full object-cover border border-gold-500/30 bg-navy-950"
             />
+            <span className="text-xl sm:text-2xl lg:text-3xl font-serif tracking-[0.16em] lg:tracking-[0.2em] font-bold text-gradient-gold">
+              PRINCE ESQUIRE
+            </span>
           </motion.div>
         </Link>
 
