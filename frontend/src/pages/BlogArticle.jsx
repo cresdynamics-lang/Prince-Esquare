@@ -11,7 +11,7 @@ export default function BlogArticle() {
   useEffect(() => {
     const fetchBlog = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/blog/${slug}`, {
+        const response = await fetch(`/api/blog/${slug}`, {
           credentials: 'include',
         });
 
@@ -24,7 +24,7 @@ export default function BlogArticle() {
 
         // Increment view count
         try {
-          await fetch(`http://localhost:8000/api/blog/${data.id}/views`, {
+          await fetch(`/api/blog/${data.id}/views`, {
             method: 'PATCH',
             credentials: 'include',
           });

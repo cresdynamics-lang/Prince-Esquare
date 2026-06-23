@@ -25,7 +25,7 @@ export default function BlogsView() {
   const fetchBlogs = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/admin/blog', {
+      const response = await fetch('/api/admin/blog', {
         credentials: 'include',
       });
 
@@ -57,7 +57,7 @@ export default function BlogsView() {
     formDataImg.append('image', file);
 
     try {
-      const response = await fetch('http://localhost:8000/api/admin/blog/upload-image', {
+      const response = await fetch('/api/admin/blog/upload-image', {
         method: 'POST',
         credentials: 'include',
         body: formDataImg,
@@ -83,8 +83,8 @@ export default function BlogsView() {
 
     try {
       const url = editingBlog
-        ? `http://localhost:8000/api/admin/blog/${editingBlog.id}`
-        : 'http://localhost:8000/api/admin/blog';
+        ? `/api/admin/blog/${editingBlog.id}`
+        : '/api/admin/blog';
 
       const method = editingBlog ? 'PUT' : 'POST';
 
@@ -131,7 +131,7 @@ export default function BlogsView() {
     if (!window.confirm('Are you sure you want to delete this blog post?')) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/admin/blog/${id}`, {
+      const response = await fetch(`/api/admin/blog/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });

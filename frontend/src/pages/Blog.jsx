@@ -25,7 +25,7 @@ export default function Blog() {
           ...(searchQuery && { search: searchQuery }),
         });
 
-        const response = await fetch(`http://localhost:8000/api/blog?${params}`, {
+        const response = await fetch(`/api/blog?${params}`, {
           credentials: 'include',
         });
 
@@ -47,7 +47,7 @@ export default function Blog() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/blog?limit=1000', {
+        const response = await fetch('/api/blog?limit=1000', {
           credentials: 'include',
         });
 
