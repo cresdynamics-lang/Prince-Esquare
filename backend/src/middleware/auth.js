@@ -173,3 +173,16 @@ exports.internalKey = (req, res, next) => {
   }
   next();
 };
+
+/** Role-based authorization middleware factory */
+exports.authorize = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return formatResponse(res, 401, false, 'Not authorized');
+    }
+    if (!allowedRoles.includes(req.user.role)) {
+      return formatResponse(res, 403, false, 'Access denied');
+    }
+    next();
+  };
+};
