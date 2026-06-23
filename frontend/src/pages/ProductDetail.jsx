@@ -538,7 +538,7 @@ const ProductDetail = () => {
                 </AnimatePresence>
 
                 <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-navy-950/95 via-navy-950/70 to-transparent px-5 pb-5 pt-20 md:px-8 md:pb-8">
-                  <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white leading-[0.92] tracking-tight max-w-4xl">
+                  <h1 className="font-serif text-6xl sm:text-7xl md:text-8xl lg:text-[9rem] text-white leading-[0.9] tracking-tight max-w-5xl">
                     {product.name}
                   </h1>
                   <div className="mt-4 flex flex-wrap items-baseline gap-3">
