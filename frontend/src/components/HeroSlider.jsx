@@ -67,7 +67,7 @@ const HeroSlider = ({ heroSlides }) => {
   const slide = slides[current];
 
   return (
-    <section className="relative h-screen bg-navy-950 overflow-hidden">
+    <section className="hero-section relative h-screen bg-navy-950 overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={`${slide.link}-${current}`}

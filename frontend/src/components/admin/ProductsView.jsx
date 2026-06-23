@@ -60,6 +60,8 @@ const ProductsView = () => {
     price: '',
     discount_price: '',
     pos_sell_price: '',
+    cost_price: '',
+    cost_price: '',
     inventory_opening_qty: '',
     show_offer: false,
     sku: '',
@@ -457,6 +459,7 @@ const ProductsView = () => {
         price: product.price || '',
         discount_price: product.discount_price || '',
         pos_sell_price: product.pos_sell_price || '',
+        cost_price: product.cost_price ?? '',
         show_offer: Boolean(product.discount_price),
         sku: productSku,
         parent_category_id: parentCategoryId,
@@ -488,6 +491,7 @@ const ProductsView = () => {
         price: '',
         discount_price: '',
         pos_sell_price: '',
+        cost_price: '',
         show_offer: false,
         sku: '',
         parent_category_id: '',
@@ -544,8 +548,8 @@ const ProductsView = () => {
     setSubmitting(true);
     try {
       const payload = { ...formData };
-      payload.variants = flattenColorGroups(formData.color_groups);
-      payload.stock_quantity = totalVariantStock(formData.color_groups);
+      payload.variants = flattenColorGroups(formData.color_groups).map((row) => ({ ...row, stock: 0 }));
+      payload.stock_quantity = 0;
       payload.brand_id = null;
 
       // Remove frontend-only state fields
@@ -558,7 +562,17 @@ const ProductsView = () => {
       delete payload.color_groups;
       delete payload.parent_category_id;
       delete payload.show_offer;
-      delete payload.cost_price;
+      if (currentProduct) {
+        payload.cost_price = formData.cost_price !== '' && formData.cost_price != null
+          ? Number(formData.cost_price)
+          : null;
+        payload.pos_sell_price = formData.price ? Number(formData.price) : null;
+        payload.discount_price = null;
+      } else {
+        delete payload.cost_price;
+        payload.discount_price = formData.show_offer ? formData.discount_price || null : null;
+        payload.pos_sell_price = formData.pos_sell_price ? Number(formData.pos_sell_price) : null;
+      }
       if (typeof payload.thumbnail === 'string' && payload.thumbnail.startsWith('blob:')) {
         payload.thumbnail = '';
       }
@@ -566,11 +580,7 @@ const ProductsView = () => {
         const url = typeof img === 'string' ? img : img?.url;
         return url && !String(url).startsWith('blob:');
       });
-      payload.discount_price = formData.show_offer ? formData.discount_price || null : null;
-      payload.pos_sell_price = formData.pos_sell_price ? Number(formData.pos_sell_price) : null;
-      payload.inventory_opening_qty = formData.inventory_opening_qty
-        ? Number(formData.inventory_opening_qty)
-        : null;
+      delete payload.inventory_opening_qty;
 
       if (currentProduct) {
         await adminProductAPI.update(currentProduct.id, payload);
@@ -592,9 +602,14 @@ const ProductsView = () => {
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-        <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100  ">
-          Products ({filteredProducts.length}{filteredProducts.length !== products.length ? ` of ${products.length}` : ''})
-        </h3>
+        <div>
+          <h3 className="text-lg sm:text-xl font-serif font-bold text-gold-100  ">
+            Products ({filteredProducts.length}{filteredProducts.length !== products.length ? ` of ${products.length}` : ''})
+          </h3>
+          <p className="text-xs text-gold-500/50 mt-1">
+            Add product details and sizes here. Admin sets stock quantities in Inventory.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => handleOpenModal()}
@@ -858,42 +873,75 @@ const ProductsView = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40   font-black">Website Price (KSh)</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={formData.price}
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40   font-black">POS / Shop Price (KSh)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Same as website if empty"
-                      value={formData.pos_sell_price}
-                      onChange={(e) => setFormData({ ...formData, pos_sell_price: e.target.value })}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                    <p className="text-[9px] text-gold-500/35">In-store price for this product — not the category bucket average.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40   font-black">Store intake qty</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Units received in warehouse"
-                      value={formData.inventory_opening_qty}
-                      onChange={(e) => setFormData({ ...formData, inventory_opening_qty: e.target.value })}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                    <p className="text-[9px] text-gold-500/35">Warehouse opening qty — also reflected in Inventory.</p>
-                  </div>
+                  {currentProduct ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-gold-500/40   font-black">Retail Price (KSh)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={formData.price}
+                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-gold-500/40   font-black">Cost Price (KSh)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.cost_price}
+                          onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                          placeholder="What you paid"
+                          className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                        />
+                      </div>
+                      <div className="md:col-span-2 rounded-xl border border-gold-500/10 bg-navy-950/80 p-4 flex flex-col justify-center">
+                        <p className="text-[10px] text-gold-500/40 font-black mb-1">Profit estimate</p>
+                        {(() => {
+                          const retail = Number(formData.price) || 0;
+                          const cost = Number(formData.cost_price) || 0;
+                          const profit = retail - cost;
+                          const margin = retail > 0 ? ((profit / retail) * 100).toFixed(1) : '0.0';
+                          return (
+                            <div className="flex flex-wrap gap-4 text-sm">
+                              <span className="text-green-400 font-bold">KSh {profit.toLocaleString()}</span>
+                              <span className="text-gold-500/60">Margin {margin}%</span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-gold-500/40   font-black">Website Price (KSh)</label>
+                        <input
+                          type="number"
+                          required
+                          value={formData.price}
+                          onChange={(e) => setFormData({...formData, price: e.target.value})}
+                          className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-gold-500/40   font-black">POS / Shop Price (KSh)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Same as website if empty"
+                          value={formData.pos_sell_price}
+                          onChange={(e) => setFormData({ ...formData, pos_sell_price: e.target.value })}
+                          className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
+                        />
+                        <p className="text-[9px] text-gold-500/35">In-store price for this product — not the category bucket average.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
+                {!currentProduct && (
                 <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
@@ -927,6 +975,7 @@ const ProductsView = () => {
                     </div>
                   )}
                 </div>
+                )}
 
                 <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-5">
                   <div>
@@ -1089,7 +1138,7 @@ const ProductsView = () => {
                   <div>
                     <h5 className="text-xs font-black text-gold-500  tracking-[0.3em]">Colors & Sizes</h5>
                     <p className="text-[9px] text-gold-500/40  tracking-wider mt-1">
-                      Pick colors and sizes, then enter stock for each size.
+                      Choose which colors and sizes this product has. Stock is set in Inventory.
                     </p>
                   </div>
                   <button
@@ -1205,7 +1254,6 @@ const ProductsView = () => {
                             <thead className="text-gold-500/40">
                               <tr>
                                 <th className="text-left p-2">Size</th>
-                                <th className="p-2">Stock</th>
                                 <th className="p-2 w-10" />
                               </tr>
                             </thead>
@@ -1213,15 +1261,6 @@ const ProductsView = () => {
                               {group.sizes.map((row) => (
                                 <tr key={row._key} className="border-t border-gold-500/10">
                                   <td className="p-2 font-bold text-gold-100">{row.size}</td>
-                                  <td className="p-2">
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      value={row.stock}
-                                      onChange={(e) => updateSizeInGroup(group._key, row._key, 'stock', e.target.value)}
-                                      className="w-20 bg-navy-950 border border-gold-500/10 rounded-lg py-1.5 px-2 text-gold-100 text-center outline-none focus:border-gold-500/30"
-                                    />
-                                  </td>
                                   <td className="p-2 text-right">
                                     <button type="button" onClick={() => removeSizeFromGroup(group._key, row._key)} className="text-red-400/60 hover:text-red-400">
                                       <Trash2 size={14} />
@@ -1235,9 +1274,6 @@ const ProductsView = () => {
                       )}
                     </div>
                   ))}
-                  <p className="text-[10px] text-gold-500/50 text-right">
-                    Total stock: <span className="text-gold-300 font-bold">{formData.stock_quantity}</span> units
-                  </p>
                 </div>
               </div>
 

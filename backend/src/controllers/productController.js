@@ -297,7 +297,7 @@ exports.createProduct = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, slug, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, sku } = req.body;
+        const { name, slug, description, price, discount_price, pos_sell_price, cost_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, sku } = req.body;
         const isStaff = req.user?.role === 'staff';
         const productSku = generateProductSku({ name, slug, sku });
 
@@ -322,10 +322,12 @@ exports.updateProduct = async (req, res, next) => {
             }
         }
 
+        const parsedCost = cost_price != null && cost_price !== '' ? parseFloat(cost_price) : null;
+
         const result = await db.query(
-            'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, price = $5, discount_price = $6, pos_sell_price = $7, category_id = $8, brand_id = $9, ' +
-            'stock_quantity = $10, is_featured = $11, is_active = $12, thumbnail = $13, images = $14 WHERE id = $15 RETURNING *',
-            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price ?? null, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), id]
+            'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, price = $5, discount_price = $6, pos_sell_price = $7, cost_price = $8, category_id = $9, brand_id = $10, ' +
+            'stock_quantity = $11, is_featured = $12, is_active = $13, thumbnail = $14, images = $15 WHERE id = $16 RETURNING *',
+            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price ?? null, parsedCost, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), id]
         );
 
         if (result.rows.length === 0) {

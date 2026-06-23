@@ -52,6 +52,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
           sku: data?.sku || '',
           category_id: d.category_id || '',
           shop_price: String(data?.shop_price ?? ''),
+          cost_price: data?.cost_price != null ? String(data.cost_price) : '',
           opening_qty: data?.shop_qty ?? 0,
           store_qty: data?.store_qty ?? 0,
           brand_id: d.brand_id || '',
@@ -81,6 +82,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
     description: form.description,
     price: Number(form.price || form.shop_price),
     discount_price: form.discount_price ? Number(form.discount_price) : null,
+    cost_price: form.cost_price !== '' && form.cost_price != null ? Number(form.cost_price) : null,
     thumbnail: form.thumbnail || null,
     images: form.images,
     color_groups: form.color_groups.map((g) => ({
@@ -298,10 +300,32 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
                   <label className={labelCls}>Shop price (POS) KES</label>
                   <input type="number" min={0} className={inputCls} value={form.shop_price} onChange={(e) => setForm({ ...form, shop_price: e.target.value })} />
                 </div>
+                {!isNew && (
+                  <div>
+                    <label className={labelCls}>Cost price KES</label>
+                    <input type="number" min={0} className={inputCls} value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} placeholder="What you paid" />
+                  </div>
+                )}
                 <div>
                   <label className={labelCls}>Website price KES</label>
                   <input type="number" min={0} className={inputCls} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
                 </div>
+                {!isNew && (
+                  <div className="md:col-span-2 rounded-lg border border-gold-500/15 bg-navy-950/60 p-3">
+                    <p className="text-[10px] text-gold-500/50 mb-1">Profit (shop retail − cost)</p>
+                    {(() => {
+                      const retail = Number(form.shop_price) || 0;
+                      const cost = Number(form.cost_price) || 0;
+                      const profit = retail - cost;
+                      const margin = retail > 0 ? ((profit / retail) * 100).toFixed(1) : '0.0';
+                      return (
+                        <p className="text-sm text-green-400 font-medium">
+                          KSh {profit.toLocaleString()} <span className="text-gold-500/50 font-normal">· {margin}% margin</span>
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
                 <div>
                   <label className={labelCls}>Sale price (optional)</label>
                   <input type="number" min={0} className={inputCls} value={form.discount_price} onChange={(e) => setForm({ ...form, discount_price: e.target.value })} />

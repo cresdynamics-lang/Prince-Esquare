@@ -37,35 +37,76 @@
 }
 
 * {
-  text-transform: lowercase !important;
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+  letter-spacing: normal;
 }
 
-/* Typography Hierarchy */
+/* Typography — modest defaults; hero keeps its own scale via .hero-section */
 h1, h2, h3, h4, h5, h6 {
   font-family: "DM Sans", sans-serif;
-  line-height: 1.1;
+  line-height: 1.2;
   margin-bottom: 0.5em;
   color: #f2f6fa;
-  font-weight: 700;
-  letter-spacing: -0.04em; /* Tighter tracking for brutalist feel */
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-h1 { font-size: 3.5rem; font-weight: 700; letter-spacing: -0.02em; }
-h2 { font-size: 2.5rem; font-weight: 600; letter-spacing: -0.01em; }
-h3 { font-size: 2rem; font-weight: 600; }
-h4 { font-size: 1.5rem; font-weight: 500; }
-h5 { font-size: 1.25rem; font-weight: 500; }
-h6 { font-size: 1rem; font-weight: 700; letter-spacing: 0.05em; }
+h1 { font-size: 1.875rem; font-weight: 700; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.125rem; font-weight: 500; }
+h5 { font-size: 1rem; font-weight: 500; }
+h6 { font-size: 0.875rem; font-weight: 600; }
+
+.hero-section h1,
+.hero-section h2,
+.hero-section h3,
+.hero-section h4,
+.hero-section h5,
+.hero-section h6 {
+  font-size: unset;
+  letter-spacing: unset;
+  margin-bottom: unset;
+  font-weight: unset;
+  line-height: unset;
+}
+
+/* Tighter labels outside hero — removes the wide “dashed” letter spacing */
+:not(.hero-section) .tracking-widest,
+:not(.hero-section) .tracking-\[0\.16em\],
+:not(.hero-section) .tracking-\[0\.18em\],
+:not(.hero-section) .tracking-\[0\.2em\],
+:not(.hero-section) .tracking-\[0\.24em\],
+:not(.hero-section) .tracking-\[0\.25em\],
+:not(.hero-section) .tracking-\[0\.3em\],
+:not(.hero-section) .tracking-\[0\.35em\],
+:not(.hero-section) .tracking-\[0\.4em\],
+:not(.hero-section) .tracking-\[0\.5em\] {
+  letter-spacing: 0.04em !important;
+}
+
+.hero-section .tracking-\[0\.2em\] { letter-spacing: 0.2em !important; }
+.hero-section .tracking-\[0\.4em\] { letter-spacing: 0.4em !important; }
+.hero-section .tracking-\[1em\] { letter-spacing: 1em !important; }
+
+.admin-app {
+  font-size: 14px;
+}
+
+.admin-app h1 { font-size: 1.375rem; }
+.admin-app h2 { font-size: 1.25rem; }
+.admin-app h3 { font-size: 1.125rem; }
 
 p {
   line-height: 1.6;
-  color: #c1c8da; /* Soft navy-200 for readability */
+  color: #c1c8da;
 }
 
 /* Custom Utilities */

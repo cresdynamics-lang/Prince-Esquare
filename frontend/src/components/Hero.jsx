@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 const Hero = () => {
   return (
-    <section className="relative h-screen flex items-center overflow-hidden bg-navy-950">
+    <section className="hero-section relative h-screen flex items-center overflow-hidden bg-navy-950">
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
         <div className="absolute top-0 right-0 w-1/2 h-full">

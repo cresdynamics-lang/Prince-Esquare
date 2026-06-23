@@ -122,9 +122,10 @@ const syncPosMetadataFromEcommerce = async (product, posRow = null) => {
   await db.query(
     `UPDATE pos_products
      SET name = $1, category = $2, shop_price = $3, online_price = $4,
-         ecommerce_product_id = COALESCE(ecommerce_product_id, $5)
-     WHERE id = $6`,
-    [product.name, categoryName, shopPrice, listPrice, product.id, posId]
+         cost_price = COALESCE($5, cost_price),
+         ecommerce_product_id = COALESCE(ecommerce_product_id, $6)
+     WHERE id = $7`,
+    [product.name, categoryName, shopPrice, listPrice, product.cost_price != null ? parseFloat(product.cost_price) : null, product.id, posId]
   );
 
   await syncPosWebsiteDetailsFromEcommerce(product.id, posId);

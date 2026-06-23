@@ -120,8 +120,8 @@ const Footer = () => {
         </div>
 
         <div className="text-center pt-12">
-          <p className="text-[10px] text-navy-500  tracking-[0.4em]">
-            © 2026 PRINCE ESQUIRE. ALL RIGHTS RESERVED.
+          <p className="text-xs text-navy-500">
+            © 2026 Prince Esquire. All rights reserved.
           </p>
         </div>
       </div>

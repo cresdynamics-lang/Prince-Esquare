@@ -110,6 +110,7 @@ export const emptyProductForm = () => ({
   description: '',
   price: '',
   discount_price: '',
+  cost_price: '',
   thumbnail: '',
   thumbnailPreview: '',
   images: [],

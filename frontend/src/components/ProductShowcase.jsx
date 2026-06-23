@@ -86,7 +86,7 @@ const ProductShowcase = ({ categoryRows = [] }) => {
               </h2>
               <Link
                 to={row.path || '/products'}
-                className="text-gold-500 text-[10px] font-bold  tracking-[0.3em] flex items-center gap-2 hover:gap-3 transition-all shrink-0"
+                className="text-gold-500 text-xs font-medium flex items-center gap-2 hover:gap-3 transition-all shrink-0"
               >
                 View All <ArrowRight size={14} />
               </Link>
@@ -108,7 +108,7 @@ const ProductShowcase = ({ categoryRows = [] }) => {
         <div className="pt-4 flex justify-center">
           <Link
             to="/products"
-            className="inline-flex items-center gap-3 border border-gold-500/50 text-gold-500 px-10 py-4 text-[10px] font-bold  tracking-[0.35em] hover:bg-gold-500 hover:text-navy-950 transition-all"
+            className="inline-flex items-center gap-3 border border-gold-500/50 text-gold-500 px-10 py-4 text-xs font-semibold hover:bg-gold-500 hover:text-navy-950 transition-all"
           >
             View All Products <ArrowRight size={14} />
           </Link>
