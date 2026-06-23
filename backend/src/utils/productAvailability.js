@@ -5,18 +5,34 @@ const attachVariantAvailability = async (products, { includePosStock = false } =
   const ids = list.map((p) => p.id).filter(Boolean);
   if (!ids.length) return products;
 
-  const variantR = await db.query(
-    `SELECT product_id,
-            COUNT(*)::int AS variant_count,
-            COALESCE(SUM(stock_quantity), 0)::int AS variant_stock_total,
-            COUNT(*) FILTER (WHERE stock_quantity > 0)::int AS variants_in_stock
-     FROM product_variants
-     WHERE product_id = ANY($1::uuid[])
-     GROUP BY product_id`,
-    [ids]
-  );
+  let variantR;
+  try {
+    variantR = await db.query(
+      `SELECT product_id,
+              COUNT(*)::bigint AS variant_count,
+              COALESCE(SUM(stock_quantity), 0)::bigint AS variant_stock_total,
+              COUNT(*) FILTER (WHERE stock_quantity > 0)::bigint AS variants_in_stock
+       FROM product_variants
+       WHERE product_id = ANY($1::uuid[])
+       GROUP BY product_id`,
+      [ids]
+    );
+  } catch (error) {
+    console.warn('Variant availability lookup failed; returning products without enrichment:', error.message);
+    return products;
+  }
 
-  const byProduct = Object.fromEntries(variantR.rows.map((r) => [r.product_id, r]));
+  const toSafeInt = (value) => {
+    const n = Number.parseInt(value, 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const byProduct = Object.fromEntries(variantR.rows.map((r) => [r.product_id, {
+    ...r,
+    variant_count: toSafeInt(r.variant_count),
+    variant_stock_total: toSafeInt(r.variant_stock_total),
+    variants_in_stock: toSafeInt(r.variants_in_stock),
+  }]));
 
   const enriched = list.map((p) => {
     const v = byProduct[p.id];
