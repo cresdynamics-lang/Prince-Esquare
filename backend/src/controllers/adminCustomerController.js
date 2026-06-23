@@ -118,6 +118,27 @@ exports.createStaff = async (req, res, next) => {
     }
 };
 
+exports.createAdmin = async (req, res, next) => {
+    const { name, email, password } = req.body;
+    try {
+        if (!name || !email || !password) {
+            return formatResponse(res, 400, false, 'Missing required fields');
+        }
+        const bcrypt = require('bcryptjs');
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const result = await db.query(
+            'INSERT INTO users (name, email, password, role, is_active) VALUES ($1, $2, $3, $4, true) RETURNING id, name, email, role, COALESCE(is_active, true) AS is_active',
+            [name.trim(), email.trim().toLowerCase(), hashedPassword, 'admin']
+        );
+
+        formatResponse(res, 201, true, 'Admin created successfully', result.rows[0]);
+    } catch (error) {
+        next(error);
+    }
+};
+
 exports.updateStaffPermissions = async (req, res, next) => {
     const { id } = req.params;
     const { permissions } = req.body;

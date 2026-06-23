@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
 const API = axios.create({
@@ -46,11 +46,11 @@ API.interceptors.response.use(
   (res) => res,
   (error) => {
     const status = error.response?.status;
-    // 401 = session expired; 403 = role mismatch (e.g. seller hitting admin-only API) — don't kick sellers out
+    // 401 = session expired; 403 = role mismatch (e.g. seller hitting admin-only API) â€” don't kick sellers out
     if (status === 401 && typeof window !== 'undefined') {
       const path = window.location.pathname;
       const hadToken = Boolean(useAuthStore.getState().token);
-      // Only redirect when an existing session expired — not during login attempts
+      // Only redirect when an existing session expired â€” not during login attempts
       if (path.startsWith('/admin') && path !== '/admin/login' && hadToken) {
         useAuthStore.getState().logout();
         window.location.href = '/admin/login';
@@ -71,7 +71,7 @@ API.interceptors.response.use(
   }
 );
 
-// ── AUTH ──────────────────────────────────────────────────────────────
+// â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const authAPI = {
   register: (data) => API.post('/auth/register', data),
   login: (data) => API.post('/auth/login', data),
@@ -118,7 +118,7 @@ export const adminAuthAPI = {
   logout: () => API.post('/admin/auth/logout'),
 };
 
-// ── ADMIN – DASHBOARD / ANALYTICS ────────────────────────────────────
+// â”€â”€ ADMIN â€“ DASHBOARD / ANALYTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminAnalyticsAPI = {
   getStats: () => API.get('/admin/dashboard/stats'),
   getSalesChart: (params) => API.get('/admin/dashboard/sales-chart', { params }),
@@ -127,7 +127,7 @@ export const adminAnalyticsAPI = {
   getOrderReport: () => API.get('/admin/reports/orders'),
 };
 
-// ── ADMIN – ORDERS ────────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ ORDERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminOrderAPI = {
   getAll: (params) => API.get('/admin/orders', { params }),
   getOne: (id) => API.get(`/admin/orders/${id}`),
@@ -138,7 +138,7 @@ export const adminOrderAPI = {
   refund: (id) => API.post(`/admin/orders/${id}/refund`),
 };
 
-// ── ADMIN – PRODUCTS ──────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ PRODUCTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminProductAPI = {
   getAll: (params) => API.get('/admin/products', { params }),
   create: (data) => API.post('/admin/products', data),
@@ -148,7 +148,7 @@ export const adminProductAPI = {
   remove: (id) => API.delete(`/admin/products/${id}`),
 };
 
-// ── ADMIN – CATEGORIES (public GET, admin mutate) ─────────────────────
+// â”€â”€ ADMIN â€“ CATEGORIES (public GET, admin mutate) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminCategoryAPI = {
   getAll: () => API.get('/categories'),               // public endpoint
   create: (data) => API.post('/admin/categories', data),
@@ -156,7 +156,7 @@ export const adminCategoryAPI = {
   remove: (id) => API.delete(`/admin/categories/${id}`),
 };
 
-// ── ADMIN – BRANDS (public GET, admin mutate) ─────────────────────────
+// â”€â”€ ADMIN â€“ BRANDS (public GET, admin mutate) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminBrandAPI = {
   getAll: () => API.get('/brands'),                   // public endpoint
   create: (data) => API.post('/admin/brands', data),
@@ -164,7 +164,7 @@ export const adminBrandAPI = {
   remove: (id) => API.delete(`/admin/brands/${id}`),
 };
 
-// ── ADMIN – CUSTOMERS & STAFF ─────────────────────────────────────────
+// â”€â”€ ADMIN â€“ CUSTOMERS & STAFF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminCustomerAPI = {
   getAll: (params) => API.get('/admin/customers/all', { params }),
   getCustomers: () => API.get('/admin/customers/all', { params: { role: 'customer' } }),
@@ -177,15 +177,16 @@ export const adminCustomerAPI = {
   updateStaffPermissions: (id, permissions) =>
     API.patch(`/admin/customers/staff/${id}/permissions`, { permissions }),
   deleteStaff: (id) => API.delete(`/admin/customers/staff/${id}`),
+  createAdmin: (data) => API.post('/admin/customers/admin', data),
 };
 
-// ── FRONTEND – BANNERS ───────────────────────────────────────────────────
+// â”€â”€ FRONTEND â€“ BANNERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const bannerAPI = {
   getAll: () => API.get('/banners'),
   getHomepageData: () => API.get('/homepage'),
 };
 
-// ── ADMIN – COUPONS ───────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ COUPONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminCouponAPI = {
   getAll: () => API.get('/admin/coupons'),
   create: (data) => API.post('/admin/coupons', data),
@@ -193,7 +194,7 @@ export const adminCouponAPI = {
   remove: (id) => API.delete(`/admin/coupons/${id}`),
 };
 
-// ── ADMIN – BANNERS ───────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ BANNERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminBannerAPI = {
   getAll: () => API.get('/admin/banners'),
   create: (data) => API.post('/admin/banners', data),
@@ -201,12 +202,12 @@ export const adminBannerAPI = {
   remove: (id) => API.delete(`/admin/banners/${id}`),
 };
 
-// ── ADMIN – NEWSLETTER ────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ NEWSLETTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminNewsletterAPI = {
   getSubscribers: () => API.get('/newsletter/admin/subscribers'),
 };
 
-// ── ADMIN – REVIEWS ───────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ REVIEWS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminReviewAPI = {
   getAll: () => API.get('/admin/reviews'),
   approve: (id) => API.patch(`/admin/reviews/${id}/approve`),
@@ -225,7 +226,7 @@ export const adminUploadAPI = {
   }),
 };
 
-// ── ADMIN – INVENTORY ─────────────────────────────────────────────────
+// â”€â”€ ADMIN â€“ INVENTORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const adminInventoryAPI = {
   // Shops
   getShops: () => API.get('/admin/inventory/shops'),
@@ -247,12 +248,12 @@ export const adminInventoryAPI = {
   getTransfers: () => API.get('/admin/inventory/transfers'),
 };
 
-// ── POS AUTH ──────────────────────────────────────────────────────────
+// â”€â”€ POS AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const posAuthAPI = {
   login: (data) => API.post('/auth/pos/login', data),
 };
 
-// ── POS TERMINAL ──────────────────────────────────────────────────────
+// â”€â”€ POS TERMINAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const posAPI = {
   searchProducts: (params = {}) => {
     const p = typeof params === 'string' ? { search: params } : params;

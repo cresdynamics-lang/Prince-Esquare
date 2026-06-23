@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+﻿const { Pool } = require('pg');
 
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
@@ -113,10 +113,10 @@ exports.updateBlogPostViews = async (req, res) => {
 
 exports.getAllBlogPosts = async (req, res) => {
   try {
-    const { page = 1, limit = 20, category, search, status } = req.query;
+    const { page = 1, limit = 12, category, search, status } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT * FROM blog_posts';
+    let query = 'SELECT id, title, slug, excerpt, category, author_name, featured_image_url, is_published, views, published_date, created_at, updated_at FROM blog_posts';
     let countQuery = 'SELECT COUNT(*) FROM blog_posts';
     const params = [];
     const whereConditions = [];
@@ -157,6 +157,22 @@ exports.getAllBlogPosts = async (req, res) => {
   } catch (error) {
     console.error('Error fetching all blog posts:', error);
     res.status(500).json({ error: 'Failed to fetch blog posts' });
+  }
+};
+
+exports.getBlogPostById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM blog_posts WHERE id = $1', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Blog post not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching blog post by id:', error);
+    res.status(500).json({ error: 'Failed to fetch blog post' });
   }
 };
 
@@ -296,3 +312,4 @@ exports.uploadBlogImage = async (req, res) => {
     res.status(500).json({ error: 'Failed to upload image' });
   }
 };
+

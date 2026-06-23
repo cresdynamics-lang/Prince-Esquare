@@ -1,4 +1,4 @@
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+﻿import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Package, ShoppingBag, Tag, Award, Users, 
@@ -401,7 +401,7 @@ const AdminDashboard = () => {
               </button>
               <div
                 className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform text-sm"
-                title={[user?.fullName, user?.name, user?.full_name, user?.email].filter(Boolean).join(' · ')}
+                title={[user?.fullName, user?.name, user?.full_name, user?.email].filter(Boolean).join(' Â· ')}
               >
                 {userInitials(user)}
               </div>
@@ -496,7 +496,7 @@ const DashboardView = ({ onOpenPos }) => {
   const statCards = [
     { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard, detail: stats?.posRevenue != null ? `POS KSh ${Math.round(stats.posRevenue).toLocaleString()} + online` : null },
     { label: 'Total Profit', value: `KSh ${stats?.profit?.toLocaleString()}`, icon: Tag },
-    { label: 'Total Sales', value: stats?.orders || 0, icon: Package, detail: stats?.posSales != null ? `${stats.posSales} POS · ${stats.onlineOrders} online` : null },
+    { label: 'Total Sales', value: stats?.orders || 0, icon: Package, detail: stats?.posSales != null ? `${stats.posSales} POS Â· ${stats.onlineOrders} online` : null },
     { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock },
   ];
 
@@ -593,7 +593,7 @@ const DashboardView = ({ onOpenPos }) => {
                           disabled={closingShiftId === shift.shiftId}
                           className="text-[10px] font-bold   text-red-300/80 hover:text-red-300 disabled:opacity-50"
                         >
-                          {closingShiftId === shift.shiftId ? 'Closing…' : 'Close shift'}
+                          {closingShiftId === shift.shiftId ? 'Closingâ€¦' : 'Close shift'}
                         </button>
                       )}
                     </div>
@@ -655,7 +655,7 @@ const parseOrderAddress = (value) => {
 const formatPaymentLabel = (method) => {
   if (method === 'whatsapp_mpesa') return 'WhatsApp + M-Pesa';
   if (method === 'mpesa') return 'M-Pesa';
-  return method || '—';
+  return method || 'â€”';
 };
 
 const OrdersView = ({ readOnly = false }) => {
@@ -975,7 +975,7 @@ const OrdersView = ({ readOnly = false }) => {
                   <div>
                     <p className="text-[10px]   text-gold-500/40 mb-1">Payment</p>
                     <p className="text-gold-100 text-xs">
-                      {formatPaymentLabel(detailOrder.payment_method)} · {detailOrder.payment_status}
+                      {formatPaymentLabel(detailOrder.payment_method)} Â· {detailOrder.payment_status}
                     </p>
                   </div>
                 </div>
@@ -1000,8 +1000,8 @@ const OrdersView = ({ readOnly = false }) => {
                           <p className="text-gold-100">{item.name}</p>
                           <p className="text-gold-500/50 text-xs">
                             Qty {item.quantity}
-                            {item.size_label ? ` · Size ${item.size_label}` : ''}
-                            {(item.variant_sku || item.product_sku) ? ` · SKU ${item.variant_sku || item.product_sku}` : ''}
+                            {item.size_label ? ` Â· Size ${item.size_label}` : ''}
+                            {(item.variant_sku || item.product_sku) ? ` Â· SKU ${item.variant_sku || item.product_sku}` : ''}
                           </p>
                         </div>
                         <p className="text-gold-400 shrink-0">
@@ -1042,7 +1042,7 @@ const OrdersView = ({ readOnly = false }) => {
               <div>
                 <h3 className="text-xl font-serif text-gold-100">Edit Order</h3>
                 <p className="text-gold-500/50 text-xs mt-1  ">
-                  #{editOrder.id.substring(0, 8).toUpperCase()} · {editOrder.customer_name}
+                  #{editOrder.id.substring(0, 8).toUpperCase()} Â· {editOrder.customer_name}
                 </p>
               </div>
               <button type="button" onClick={closeEdit} className="text-gold-500/40 hover:text-gold-500">
@@ -1118,7 +1118,7 @@ const OrdersView = ({ readOnly = false }) => {
                   disabled={saving}
                   className="flex-1 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 disabled:opacity-50"
                 >
-                  {saving ? 'Saving…' : 'Save Changes'}
+                  {saving ? 'Savingâ€¦' : 'Save Changes'}
                 </button>
               )}
             </div>
@@ -1713,7 +1713,7 @@ const UsersView = () => {
           </div>
           <div>
             <p className="text-sm font-bold text-gold-100">{currentUser.fullName || currentUser.name}</p>
-            <p className="text-xs text-gold-500/50">{currentUser.email} · Staff</p>
+            <p className="text-xs text-gold-500/50">{currentUser.email} Â· Staff</p>
           </div>
         </div>
       )}
@@ -1727,9 +1727,12 @@ const UsersView = () => {
 
 
 const CustomersView = ({ embedded = false }) => {
+  const confirm = useConfirm();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -1745,38 +1748,55 @@ const CustomersView = ({ embedded = false }) => {
     fetchCustomers();
   }, []);
 
-  const filteredCustomers = customers.filter(c => 
-    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredCustomers = customers.filter((c) =>
+    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleToggleStatus = async (id, currentStatus) => {
     try {
       await adminCustomerAPI.updateStatus(id, !currentStatus);
-      setCustomers(customers.map(c => c.id === id ? { ...c, is_active: !currentStatus } : c));
+      setCustomers(customers.map((c) => (c.id === id ? { ...c, is_active: !currentStatus } : c)));
+      setSelectedCustomer((current) => (
+        current && current.id === id ? { ...current, is_active: !currentStatus } : current
+      ));
     } catch (error) {
       console.error('Error updating customer status:', error);
     }
   };
 
+  const handleViewCustomer = async (id) => {
+    setDetailLoading(true);
+    try {
+      const res = await adminCustomerAPI.getOne(id);
+      setSelectedCustomer(res.data.data || res.data);
+    } catch (error) {
+      console.error('Error fetching customer detail:', error);
+      adminToast.error(apiErrorMessage(error, 'Could not load customer details'));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeModal = () => setSelectedCustomer(null);
 
   return (
     <div className="space-y-6">
       {!embedded && (
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+      <div className="flex flex-col gap-4 mb-6 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col">
           <h3 className="text-xl sm:text-2xl font-serif font-bold text-gold-100">Customer Directory</h3>
           <p className="text-xs text-gold-500/40 mt-1">Managing {customers.length} registered clients</p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
-          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2">
+          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2 w-full sm:w-auto">
             <Search size={16} className="text-gold-500/40" />
             <input 
               type="text" 
               placeholder="Search customers..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20" 
+              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20 w-full sm:w-56" 
             />
           </div>
         </div>
@@ -1785,28 +1805,28 @@ const CustomersView = ({ embedded = false }) => {
       {embedded && (
         <div className="flex flex-wrap gap-3 items-center justify-between">
           <p className="text-xs text-gold-500/40">{customers.length} registered customers</p>
-          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2">
+          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2 w-full sm:w-auto">
             <Search size={16} className="text-gold-500/40" />
             <input 
               type="text" 
               placeholder="Search customers..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20 w-48" 
+              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20 w-full sm:w-48" 
             />
           </div>
         </div>
       )}
 
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+      <div className="overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-900/40 backdrop-blur-sm">
         {loading ? (
           <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gold-500"></div>
           </div>
         ) : filteredCustomers.length > 0 ? (
           <AdminTable>
-          <table className="w-full text-left min-w-[720px]">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
+          <table className="w-full min-w-[720px] text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold tracking-[0.2em] text-gold-500/40">
               <tr>
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Contact Info</th>
@@ -1818,31 +1838,31 @@ const CustomersView = ({ embedded = false }) => {
             </thead>
             <tbody className="divide-y divide-gold-500/5">
               {filteredCustomers.map((c) => (
-                <tr key={c.id} className="hover:bg-navy-800/30 transition-colors">
+                <tr key={c.id} className="transition-colors hover:bg-navy-800/30">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 bg-gold-600 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 shadow-lg`}>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-navy-800 bg-gold-600 font-bold text-navy-950 shadow-lg">
                         {userInitials(c)}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gold-100 flex items-center gap-2">
+                        <div className="flex items-center gap-2 text-sm font-bold text-gold-100">
                           {c.name}
                           {c.is_verified && <CheckCircle2 size={14} className="text-blue-400" />}
                         </div>
-                        <div className="text-[10px] text-gold-500/40   mt-0.5">ID: {c.id.substring(0, 8)}</div>
+                        <div className="mt-0.5 text-[10px] text-gold-500/40">ID: {String(c.id).substring(0, 8)}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-xs text-gold-100">{c.email}</div>
-                    <div className="text-[10px] text-gold-500/40 mt-1 flex items-center gap-1">
+                    <div className="mt-1 flex items-center gap-1 text-[10px] text-gold-500/40">
                       <Phone size={10} /> {c.phone || 'No phone'}
                     </div>
                   </td>
                   <td className="px-6 py-4 font-serif font-bold text-gold-100">KSh {parseFloat(c.total_spent || 0).toLocaleString()}</td>
                   <td className="px-6 py-4 text-xs text-gold-500/60">{new Date(c.created_at).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-[9px] font-black  px-2 py-0.5 rounded tracking-[0.1em] ${
+                    <span className={`rounded px-2 py-0.5 text-[9px] font-black tracking-[0.1em] ${
                       c.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
                     }`}>
                       {c.is_active !== false ? 'Active' : 'Suspended'}
@@ -1852,12 +1872,19 @@ const CustomersView = ({ embedded = false }) => {
                     <div className="flex justify-end gap-2">
                       <button 
                         onClick={() => handleToggleStatus(c.id, c.is_active !== false)}
-                        className={`p-2 rounded-lg transition-all ${c.is_active !== false ? 'text-red-400/40 hover:text-red-400 hover:bg-red-400/5' : 'text-green-400/40 hover:text-green-400 hover:bg-green-400/5'}`}
+                        className={`rounded-lg p-2 transition-all ${c.is_active !== false ? 'text-red-400/40 hover:bg-red-400/5 hover:text-red-400' : 'text-green-400/40 hover:bg-green-400/5 hover:text-green-400'}`}
                         title={c.is_active !== false ? 'Suspend Account' : 'Activate Account'}
                       >
                         {c.is_active !== false ? <UserMinus size={16} /> : <UserPlus size={16} />}
                       </button>
-                      <button className="p-2 text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="View History"><Eye size={16} /></button>
+                      <button
+                        type="button"
+                        onClick={() => handleViewCustomer(c.id)}
+                        className="rounded-lg p-2 text-gold-500/40 transition-all hover:bg-navy-800 hover:text-gold-500"
+                        title="View details"
+                      >
+                        <Eye size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1866,16 +1893,122 @@ const CustomersView = ({ embedded = false }) => {
           </table>
           </AdminTable>
         ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
+          <div className="py-24 text-center text-sm text-gold-500/40">
             No customers found matching your search.
           </div>
         )}
       </div>
+
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <button
+            type="button"
+            aria-label="Close customer details"
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+          <div className="relative flex min-h-full items-center justify-center p-4 py-8">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative flex max-h-[min(90dvh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gold-500/20 bg-navy-900 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-gold-500/10 p-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-gold-500/10 bg-gold-600 text-lg font-bold text-navy-950">
+                    {userInitials(selectedCustomer)}
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-xl font-bold text-gold-100">{selectedCustomer.name}</h3>
+                    <p className="text-sm text-gold-500/50">Customer details and order history</p>
+                  </div>
+                </div>
+                <button type="button" onClick={closeModal} className="rounded-lg p-2 text-gold-500/40 transition-colors hover:text-gold-500">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="grid min-h-0 gap-6 overflow-hidden p-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {[
+                      { label: 'Email', value: selectedCustomer.email, icon: Mail },
+                      { label: 'Phone', value: selectedCustomer.phone || 'No phone', icon: Phone },
+                      { label: 'Joined', value: new Date(selectedCustomer.created_at).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }), icon: Clock },
+                      { label: 'Total Spent', value: `KSh ${parseFloat(selectedCustomer.total_spent || 0).toLocaleString()}`, icon: Package },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-gold-500/10 bg-navy-950/50 p-4">
+                        <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-500/40">
+                          <item.icon size={12} /> {item.label}
+                        </div>
+                        <div className="text-sm font-bold text-gold-100 break-words">{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-2xl border border-gold-500/10 bg-navy-950/50 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-gold-100">Account status</h4>
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${selectedCustomer.is_active !== false ? 'bg-green-400 text-navy-950' : 'bg-red-400 text-navy-950'}`}>
+                        {selectedCustomer.is_active !== false ? 'Active' : 'Suspended'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(selectedCustomer.id, selectedCustomer.is_active !== false)}
+                        className="rounded-xl bg-gold-600 px-4 py-3 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-500"
+                      >
+                        Toggle status
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        className="rounded-xl border border-gold-500/15 px-4 py-3 text-sm font-bold text-gold-100 hover:border-gold-500/40"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-950/50">
+                  <div className="border-b border-gold-500/10 px-4 py-3">
+                    <h4 className="text-sm font-bold text-gold-100">Orders</h4>
+                    <p className="text-xs text-gold-500/40">{detailLoading ? 'Loading details...' : `${selectedCustomer.orders?.length || 0} order(s)`}</p>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+                    {!detailLoading && (selectedCustomer.orders || []).length > 0 ? (
+                      selectedCustomer.orders.map((order) => (
+                        <div key={order.id} className="rounded-xl border border-gold-500/10 bg-navy-900/60 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-gold-100">Order #{String(order.id).slice(0, 8)}</div>
+                              <div className="text-[10px] uppercase tracking-[0.2em] text-gold-500/40">{new Date(order.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <span className="rounded-full border border-gold-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-gold-500/60">
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="mt-3 text-sm font-bold text-gold-100">KSh {parseFloat(order.total_amount || 0).toLocaleString()}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gold-500/10 py-10 text-center text-sm text-gold-500/40">
+                        No orders recorded.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-
 const AdminsView = ({ roleFilter = null }) => {
   const confirm = useConfirm();
   const [admins, setAdmins] = useState([]);
@@ -2158,7 +2291,7 @@ const AdminsView = ({ roleFilter = null }) => {
                     value={formData.password}
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
                     className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   />
                 </div>
                 )}
@@ -2370,10 +2503,16 @@ const SettingsView = () => {
     store_name: '',
     support_email: '',
     phone_number: '',
-    store_currency: ''
+    store_currency: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [adminForm, setAdminForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+  });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -2402,18 +2541,32 @@ const SettingsView = () => {
     }
   };
 
+  const handleCreateAdmin = async (e) => {
+    e.preventDefault();
+    setCreatingAdmin(true);
+    try {
+      await adminCustomerAPI.createAdmin(adminForm);
+      adminToast.success('Admin account created');
+      setAdminForm({ name: '', email: '', password: '' });
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not create admin account'));
+    } finally {
+      setCreatingAdmin(false);
+    }
+  };
+
   return (
     <div className="space-y-8 pb-12">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
-            <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="space-y-8 lg:col-span-2">
+          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
+            <h4 className="mb-6 flex items-center gap-3 font-serif text-xl font-bold text-gold-100">
               <Settings size={20} className="text-gold-500" /> Store Information
             </h4>
             {loading ? (
-              <div className="py-12 text-center text-gold-500/40   text-xs">Retrieving configurations...</div>
+              <div className="py-12 text-center text-xs text-gold-500/40">Retrieving configurations...</div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {[
                   { label: 'Store Name', key: 'store_name' },
                   { label: 'Support Email', key: 'support_email' },
@@ -2421,7 +2574,7 @@ const SettingsView = () => {
                   { label: 'Store Currency', key: 'store_currency' },
                 ].map((f, i) => (
                   <div key={i} className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40   font-black">{f.label}</label>
+                    <label className="text-[10px] font-black text-gold-500/40">{f.label}</label>
                     <input 
                       type="text" 
                       value={settings[f.key] || ''} 
@@ -2430,9 +2583,9 @@ const SettingsView = () => {
                         if (!f.key.includes('email') && !f.key.includes('phone')) {
                           val = val.toUpperCase();
                         }
-                        setSettings({...settings, [f.key]: val});
+                        setSettings({ ...settings, [f.key]: val });
                       }}
-                      className={`w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold ${(!f.key.includes('email') && !f.key.includes('phone')) ? '' : ''}`} 
+                      className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 font-bold text-gold-100 outline-none transition-all focus:border-gold-500/40"
                     />
                   </div>
                 ))}
@@ -2440,8 +2593,8 @@ const SettingsView = () => {
             )}
           </div>
 
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
-            <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
+          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
+            <h4 className="mb-6 flex items-center gap-3 font-serif text-xl font-bold text-gold-100">
               <Mail size={20} className="text-gold-500" /> Notification Preferences
             </h4>
             <div className="space-y-4">
@@ -2449,12 +2602,12 @@ const SettingsView = () => {
                 'Order Confirmation Emails',
                 'Low Stock Alerts',
                 'New Customer Registrations',
-                'Daily Sales Summaries'
+                'Daily Sales Summaries',
               ].map((pref, i) => (
-                <label key={i} className="flex items-center justify-between p-4 bg-navy-950/50 rounded-xl border border-gold-500/5 cursor-pointer group">
-                  <span className="text-xs font-bold text-gold-100 group-hover:text-gold-500 transition-colors ">{pref}</span>
-                  <div className="w-12 h-6 bg-navy-800 rounded-full relative border border-gold-500/20">
-                    <div className="absolute top-1 right-1 w-4 h-4 bg-gold-600 rounded-full" />
+                <label key={i} className="flex items-center justify-between rounded-xl border border-gold-500/5 bg-navy-950/50 p-4">
+                  <span className="text-xs font-bold text-gold-100 transition-colors">{pref}</span>
+                  <div className="relative h-6 w-12 rounded-full border border-gold-500/20 bg-navy-800">
+                    <div className="absolute right-1 top-1 h-4 w-4 rounded-full bg-gold-600" />
                   </div>
                 </label>
               ))}
@@ -2463,8 +2616,8 @@ const SettingsView = () => {
         </div>
 
         <div className="space-y-8">
-           <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
-             <h5 className="text-[10px] font-black text-gold-500/40   mb-6 border-b border-gold-500/10 pb-2">System Integrations</h5>
+           <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
+             <h5 className="mb-6 border-b border-gold-500/10 pb-2 text-[10px] font-black text-gold-500/40">System Integrations</h5>
              <div className="space-y-6">
                 {[
                   { label: 'Daraja API', val: 'Connected', color: 'text-green-400' },
@@ -2473,17 +2626,60 @@ const SettingsView = () => {
                   { label: 'SendGrid', val: 'Operational', color: 'text-green-400' },
                 ].map((h, i) => (
                   <div key={i} className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gold-100 ">{h.label}</span>
-                    <span className={`text-[10px] font-black  ${h.color}`}>{h.val}</span>
+                    <span className="text-[10px] font-bold text-gold-100">{h.label}</span>
+                    <span className={`text-[10px] font-black ${h.color}`}>{h.val}</span>
                   </div>
                 ))}
              </div>
            </div>
 
+           <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
+             <div className="mb-5 flex items-center gap-3">
+               <ShieldCheck size={20} className="text-gold-500" />
+               <div>
+                 <h5 className="font-serif text-lg font-bold text-gold-100">Add another admin</h5>
+                 <p className="text-xs text-gold-500/40">Create a full admin account from the settings page.</p>
+               </div>
+             </div>
+             <form onSubmit={handleCreateAdmin} className="space-y-4">
+               <input
+                 type="text"
+                 required
+                 value={adminForm.name}
+                 onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
+                 placeholder="Full name"
+                 className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
+               />
+               <input
+                 type="email"
+                 required
+                 value={adminForm.email}
+                 onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                 placeholder="Email address"
+                 className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
+               />
+               <input
+                 type="password"
+                 required
+                 value={adminForm.password}
+                 onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                 placeholder="Temporary password"
+                 className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
+               />
+               <button 
+                type="submit"
+                disabled={creatingAdmin}
+                className="w-full rounded-2xl bg-gold-600 py-4 font-black tracking-[0.2em] text-navy-950 shadow-xl shadow-gold-600/10 transition-all hover:bg-gold-500 disabled:opacity-50"
+               >
+                 {creatingAdmin ? 'CREATING...' : 'CREATE ADMIN'}
+               </button>
+             </form>
+           </div>
+
            <button 
             onClick={handleSave}
             disabled={saving}
-            className="w-full py-5 bg-gold-600 text-navy-950 rounded-2xl font-black  tracking-[0.2em] shadow-xl shadow-gold-600/10 hover:bg-gold-500 transition-all disabled:opacity-50"
+            className="w-full rounded-2xl bg-gold-600 py-5 font-black tracking-[0.2em] text-navy-950 shadow-xl shadow-gold-600/10 transition-all hover:bg-gold-500 disabled:opacity-50"
            >
              {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
            </button>
@@ -2492,5 +2688,5 @@ const SettingsView = () => {
     </div>
   );
 };
-
 export default AdminDashboard;
+
