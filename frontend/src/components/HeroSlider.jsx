@@ -67,7 +67,7 @@ const HeroSlider = ({ heroSlides }) => {
   const slide = slides[current];
 
   return (
-    <section className="hero-section relative min-h-[90vh] bg-navy-950 overflow-hidden">
+    <section className="hero-section relative min-h-[95vh] bg-navy-950 overflow-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={`${slide.link}-${current}`}
@@ -91,8 +91,8 @@ const HeroSlider = ({ heroSlides }) => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-20 md:pb-24 relative z-10">
-        <div className="w-full max-w-5xl space-y-8 text-left pl-0 md:pl-4 lg:pl-8">
+      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-14 md:pb-16 relative z-10">
+        <div className="w-full max-w-6xl space-y-8 text-left pl-0 md:pl-4 lg:pl-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={`content-${slide.link}-${current}`}
@@ -104,12 +104,12 @@ const HeroSlider = ({ heroSlides }) => {
             >
               <div className="flex items-center space-x-4">
                 <div className="h-px w-12 bg-gold-600" />
-                <p className="text-gold-500 tracking-[0.4em]  text-[10px] font-bold">
+                <p className="text-gold-500 tracking-[0.4em] text-[11px] font-bold">
                   {slide.subtitle}
                 </p>
               </div>
 
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif text-white leading-tight tracking-tighter max-w-4xl">
+              <h1 className="text-6xl md:text-8xl lg:text-[7rem] font-serif text-white leading-tight tracking-tighter max-w-5xl">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -117,14 +117,14 @@ const HeroSlider = ({ heroSlides }) => {
                 ))}
               </h1>
 
-              <p className="text-lg md:text-xl text-slate-300 max-w-2xl font-light leading-relaxed line-clamp-3">
+              <p className="text-xl md:text-2xl text-slate-300 max-w-3xl font-light leading-relaxed line-clamp-3">
                 {slide.desc}
               </p>
 
               <div className="pt-8">
                 <Link
                   to={slide.link}
-                className="bg-gold-600 text-navy-950 px-10 py-4 text-[10px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
+                  className="bg-gold-600 text-navy-950 px-10 py-4 text-[11px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
                 >
                   <span>{slide.cta}</span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
@@ -166,12 +166,6 @@ const HeroSlider = ({ heroSlides }) => {
           </button>
         </div>
       )}
-
-      <div className="absolute right-10 top-1/2 -translate-y-1/2 origin-center rotate-90 hidden lg:block">
-        <p className="text-gold-600/20 text-[9px] font-bold tracking-[0.8em] whitespace-nowrap">
-          ESTABLISHED 2026 • NAIROBI • LUXURY
-        </p>
-      </div>
     </section>
   );
 };

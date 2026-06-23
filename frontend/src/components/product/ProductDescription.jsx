@@ -83,7 +83,7 @@ const ProductDescription = ({
         <Section title={isShoe ? 'Available Sizes (EU)' : 'Available Sizes'} icon="*">
           <Callout>
             <p className="text-[14px] font-light leading-relaxed text-slate-300/90">
-              {Array.isArray(sizeLines) ? sizeLines.join(' · ') : sizeLines}
+              {Array.isArray(sizeLines) ? sizeLines.join(', ') : sizeLines}
             </p>
             {isShoe && (
               <p className="mt-2 text-[12px] text-slate-500">
@@ -94,7 +94,7 @@ const ProductDescription = ({
         </Section>
       )}
 
-      <Section title="Delivery & Service" icon="*">
+        <Section title="Delivery and Service" icon="*">
         <Callout>
           <ul className="space-y-2 text-[14px] font-light leading-relaxed text-slate-300/90">
             {(deliveryLines.length ? deliveryLines : [
@@ -117,7 +117,7 @@ const ProductDescription = ({
           {(whyLines.length ? whyLines : [
             'Curated luxury fashion with transparent pricing',
             'Fast, reliable delivery across Kenya',
-            'In-store availability at our Nairobi location',
+            'In store availability at our Nairobi location',
             'Dedicated customer support before and after your purchase',
           ]).map((line) => (
             <li key={line} className="flex gap-2">
