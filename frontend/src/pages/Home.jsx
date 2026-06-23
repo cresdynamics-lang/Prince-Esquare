@@ -119,7 +119,7 @@ const Home = () => {
                 delivery across Kenya and attentive customer care.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
-                {['Curated premium labels', 'Nairobi-based service', 'Delivery across Kenya'].map((item) => (
+                {['Curated premium labels', 'Nairobi service', 'Delivery across Kenya'].map((item) => (
                   <div key={item} className="border-l border-gold-600/30 pl-5">
                     <p className="text-gold-400 text-[10px]  tracking-[0.25em] font-bold">{item}</p>
                   </div>

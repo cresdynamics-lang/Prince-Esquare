@@ -48,10 +48,10 @@ export const routeSeo = {
   },
   suits: {
     title: 'Luxury Suits Nairobi | Prince Esquire',
-    description: 'Find luxury suits in Nairobi for weddings, business and formal occasions. Shop curated two-piece and three-piece tailoring today.',
+    description: 'Find luxury suits in Nairobi for weddings, business and formal occasions. Shop curated two piece and three piece tailoring today.',
     path: '/suits',
     introTitle: 'Luxury Suits Nairobi',
-    introCopy: 'Prince Esquire curates luxury suits in Nairobi for men who understand the power of presence. Explore two-piece and three-piece tailoring selected for clean lines, elevated fabrics and formal confidence. Whether dressing for a wedding, executive engagement, gala or private celebration, each suit is chosen to bring structure, poise and distinction to your wardrobe. Complete the look with premium shirts, leather shoes and accessories from our Nairobi luxury fashion edit.',
+    introCopy: 'Prince Esquire curates luxury suits in Nairobi for men who understand the power of presence. Explore two piece and three piece tailoring selected for clean lines, elevated fabrics and formal confidence. Whether dressing for a wedding, executive engagement, gala or private celebration, each suit is chosen to bring structure, poise and distinction to your wardrobe. Complete the look with premium shirts, leather shoes and accessories from our Nairobi luxury fashion edit.',
   },
   trousers: {
     title: 'Premium Trousers Kenya | Prince Esquire',
@@ -62,10 +62,10 @@ export const routeSeo = {
   },
   linen: {
     title: 'Luxury Linen Kenya | Prince Esquire',
-    description: 'Shop luxury linen in Kenya for warm-weather elegance, from linen shirts to relaxed sets curated for refined Nairobi style. Explore now.',
+    description: 'Shop luxury linen in Kenya for warm weather elegance, from linen shirts to relaxed sets curated for refined Nairobi style. Explore now.',
     path: '/linen',
     introTitle: 'Luxury Linen Kenya',
-    introCopy: 'Luxury linen in Kenya belongs in a wardrobe built for climate, comfort and effortless polish. Prince Esquire curates linen shirts, sets, trousers and shorts with a relaxed sophistication suited to Nairobi weekends, coastal escapes and warm-weather events. The collection favours breathable textures, calm colour and silhouettes that feel composed without stiffness. Explore linen pieces that make ease look deliberate.',
+    introCopy: 'Luxury linen in Kenya belongs in a wardrobe built for climate, comfort and effortless polish. Prince Esquire curates linen shirts, sets, trousers and shorts with a relaxed sophistication suited to Nairobi weekends, coastal escapes and warm weather events. The collection favours breathable textures, calm colour and silhouettes that feel composed without stiffness. Explore linen pieces that make ease look deliberate.',
   },
   blog: {
     title: 'Prince Esquire Style Journal',

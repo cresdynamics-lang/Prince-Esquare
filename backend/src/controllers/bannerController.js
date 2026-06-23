@@ -29,11 +29,11 @@ const categoryKey = (row) => row.parent_category_slug || row.category_slug;
 
 const HERO_COPY = {
   shirts: 'Presidential shirts cut for clean collars, confident structure, and a polished finish that reads well in boardrooms and formal settings.',
-  suits: 'Tailored two-piece and three-piece suits selected for weddings, boardrooms, and evening occasions where sharp presentation matters.',
+  suits: 'Tailored two piece and three piece suits selected for weddings, boardrooms, and evening occasions where sharp presentation matters.',
   shoes: 'Polished loafers and formal shoes with refined leather, balanced shape, and the kind of finish that lifts the full outfit.',
-  linen: 'Breathable linen sets and trousers built for warm-weather dressing with ease, texture, and a clean silhouette.',
-  'track-suits': 'Relaxed tracksuits in elevated fabrics for off-duty hours, travel days, and polished casual dressing.',
-  'polo-t-shirts': 'Signature polos with a neat shape and premium hand-feel for smart weekends, lunches, and everyday wear.',
+  linen: 'Breathable linen sets and trousers built for warm weather dressing with ease, texture, and a clean silhouette.',
+  'track-suits': 'Relaxed tracksuits in elevated fabrics for relaxed hours, travel days, and polished casual dressing.',
+  'polo-t-shirts': 'Signature polos with a neat shape and premium hand feel for smart weekends, lunches, and everyday wear.',
   belts: 'Refined leather belts chosen to finish the outfit with quiet structure and a clean, polished line.',
 };
 

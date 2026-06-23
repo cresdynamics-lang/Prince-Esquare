@@ -58,7 +58,7 @@ const ProductDescription = ({
           <ul className="space-y-3 pl-1 text-[15px] leading-relaxed text-slate-300/90 font-light">
             {sections.features.map((item) => (
               <li key={item} className="flex gap-3">
-                <span className="text-gold-500 shrink-0 mt-1">-</span>
+                <span className="text-gold-500 shrink-0 mt-1">•</span>
                 <span>{item}</span>
               </li>
             ))}
@@ -87,7 +87,7 @@ const ProductDescription = ({
             </p>
             {isShoe && (
               <p className="mt-2 text-[12px] text-slate-500">
-                Unisex fit - suitable for men and women. Select your size above before adding to cart.
+                Unisex fit suitable for men and women. Select your size above before adding to cart.
               </p>
             )}
           </Callout>
@@ -99,12 +99,12 @@ const ProductDescription = ({
           <ul className="space-y-2 text-[14px] font-light leading-relaxed text-slate-300/90">
             {(deliveryLines.length ? deliveryLines : [
               'All orders are confirmed by our team before dispatch.',
-              'Nairobi CBD and surrounding areas may qualify for in-house rider delivery.',
+              'Nairobi CBD and surrounding areas may qualify for in house rider delivery.',
               'Prepaid orders are shipped via your preferred courier nationwide.',
               'Fulfilment is subject to availability of your selected size and colour.',
             ]).map((line) => (
               <li key={line} className="flex gap-2">
-                <span className="shrink-0 text-gold-500/70">-</span>
+                <span className="shrink-0 text-gold-500/70">•</span>
                 <span>{line}</span>
               </li>
             ))}
@@ -121,8 +121,8 @@ const ProductDescription = ({
             'Dedicated customer support before and after your purchase',
           ]).map((line) => (
             <li key={line} className="flex gap-2">
-              <span className="shrink-0 text-gold-500">-</span>
-              <span>{line.replace(/^-\s*/, '')}</span>
+                <span className="shrink-0 text-gold-500">•</span>
+                <span>{line.replace(/^[-•]\s*/, '')}</span>
             </li>
           ))}
         </ul>

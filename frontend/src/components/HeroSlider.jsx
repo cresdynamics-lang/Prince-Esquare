@@ -91,7 +91,7 @@ const HeroSlider = ({ heroSlides }) => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="container mx-auto px-6 h-full flex items-center justify-start relative z-10">
+      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-20 md:pb-24 relative z-10">
         <div className="w-full max-w-5xl space-y-8 text-left pl-0 md:pl-4 lg:pl-8">
           <AnimatePresence mode="wait">
             <motion.div
@@ -109,7 +109,7 @@ const HeroSlider = ({ heroSlides }) => {
                 </p>
               </div>
 
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif text-white leading-tight tracking-tighter max-w-4xl">
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif text-white leading-tight tracking-tighter max-w-4xl">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -169,7 +169,7 @@ const HeroSlider = ({ heroSlides }) => {
 
       <div className="absolute right-10 top-1/2 -translate-y-1/2 origin-center rotate-90 hidden lg:block">
         <p className="text-gold-600/20 text-[9px] font-bold tracking-[0.8em] whitespace-nowrap">
-          ESTABLISHED 2026 · NAIROBI · LUXURY
+          ESTABLISHED 2026 • NAIROBI • LUXURY
         </p>
       </div>
     </section>

@@ -102,7 +102,7 @@ export default function BlogArticle() {
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="mb-8">
           <Link to="/blog" className="text-gold-400 hover:text-gold-300 text-sm font-medium">
-            {"<- Back to blog"}
+            Back to blog
           </Link>
         </div>
 
@@ -113,7 +113,7 @@ export default function BlogArticle() {
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-navy-200 mb-4">
             <span className="font-medium">{blog.author_name}</span>
-            <span>-</span>
+            <span>•</span>
             <time dateTime={blog.published_date}>
               {new Date(blog.published_date).toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -121,11 +121,11 @@ export default function BlogArticle() {
                 day: 'numeric',
               })}
             </time>
-            <span>-</span>
+            <span>•</span>
             <span className="inline-block bg-gold-600/10 px-3 py-1 rounded-full border border-gold-600/15 text-gold-400">
               {blog.category}
             </span>
-            <span>-</span>
+            <span>•</span>
             <span>{blog.views || 0} views</span>
           </div>
         </header>
