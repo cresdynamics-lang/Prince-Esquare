@@ -9,6 +9,22 @@ const { emitStockUpdated, emitStoreStockUpdated } = require('../utils/posHelpers
 
 const STORE_TO_SHOP = 'Store -> Shop';
 const SHOP_TO_STORE = 'Shop -> Store';
+const MAX_QTY = 9223372036854775807n;
+
+const normalizeQty = (qty) => {
+  try {
+    const raw = typeof qty === 'bigint'
+      ? qty
+      : BigInt(String(qty ?? 0).trim() || '0');
+    if (raw < 0n) return '0';
+    if (raw > MAX_QTY) return MAX_QTY.toString();
+    return raw.toString();
+  } catch {
+    const fallback = Number.parseInt(qty, 10);
+    if (!Number.isFinite(fallback) || fallback <= 0) return '0';
+    return String(Math.min(fallback, Number.MAX_SAFE_INTEGER));
+  }
+};
 
 const ensureShopStockRow = async (client, productId) => {
   await client.query(
@@ -261,12 +277,13 @@ const transferShopToStore = async (productId, qty, { notes, recordedBy, client: 
 const setShopQty = async (productId, qty, { client: extClient } = {}) => {
   const client = extClient || db;
   await ensureShopStockRow(client, productId);
+  const normalizedQty = normalizeQty(qty);
   const r = await client.query(
     `INSERT INTO pos_stock_levels (product_id, current_qty, updated_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (product_id) DO UPDATE SET current_qty = $2, updated_at = NOW()
      RETURNING current_qty`,
-    [productId, Math.max(0, parseInt(qty, 10) || 0)]
+    [productId, normalizedQty]
   );
   return r.rows[0].current_qty;
 };
@@ -274,12 +291,13 @@ const setShopQty = async (productId, qty, { client: extClient } = {}) => {
 const setStoreQty = async (productId, qty, { client: extClient } = {}) => {
   const client = extClient || db;
   await ensureStoreStockRow(client, productId);
+  const normalizedQty = normalizeQty(qty);
   const r = await client.query(
     `INSERT INTO pos_store_stock_levels (product_id, current_qty, updated_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (product_id) DO UPDATE SET current_qty = $2, updated_at = NOW()
      RETURNING current_qty`,
-    [productId, Math.max(0, parseInt(qty, 10) || 0)]
+    [productId, normalizedQty]
   );
   return r.rows[0].current_qty;
 };
@@ -389,6 +407,7 @@ module.exports = {
   SHOP_TO_STORE,
   ensureShopStockRow,
   ensureStoreStockRow,
+  normalizeQty,
   readLevels,
   afterInventoryChange,
   receiveAtStore,

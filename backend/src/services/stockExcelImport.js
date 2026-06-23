@@ -1,7 +1,7 @@
 // MODIFIED — Import Stock.xlsx (set/update opening stock + optional full sheet)
 const db = require('../config/db');
 const { parseStockExcelBuffer, skuFromName } = require('../utils/stockExcelParser');
-const { afterInventoryChange } = require('./inventoryMovement');
+const { afterInventoryChange, normalizeQty } = require('./inventoryMovement');
 const { toDateStr } = require('./dailyStockSnapshot');
 const { resolvePriceForPosName } = require('./productPosLink');
 
@@ -21,6 +21,11 @@ const findProduct = async (client, name, sku) => {
 };
 
 const upsertSnapshot = async (client, productId, dateStr, snapshot) => {
+  const openingQty = normalizeQty(snapshot.opening);
+  const stockInQty = normalizeQty(snapshot.stockIn);
+  const stockOutQty = normalizeQty(snapshot.stockOut);
+  const salesQty = normalizeQty(snapshot.sales);
+  const closingQty = normalizeQty(snapshot.closing);
   await client.query(
     `INSERT INTO pos_daily_stock_snapshots
        (product_id, date, opening_qty, stock_in_qty, stock_out_qty, sales_qty, closing_qty)
@@ -34,11 +39,11 @@ const upsertSnapshot = async (client, productId, dateStr, snapshot) => {
     [
       productId,
       dateStr,
-      snapshot.opening,
-      snapshot.stockIn,
-      snapshot.stockOut,
-      snapshot.sales,
-      snapshot.closing,
+      openingQty,
+      stockInQty,
+      stockOutQty,
+      salesQty,
+      closingQty,
     ]
   );
 };
@@ -62,14 +67,14 @@ const updateOpeningOnly = async (client, productId, dateStr, opening) => {
      ON CONFLICT (product_id, date) DO UPDATE SET
        opening_qty = EXCLUDED.opening_qty,
        closing_qty = EXCLUDED.closing_qty`,
-    [productId, dateStr, opening, stockIn, stockOut, sales, closing]
+    [productId, dateStr, normalizeQty(opening), normalizeQty(stockIn), normalizeQty(stockOut), normalizeQty(sales), normalizeQty(closing)]
   );
 
   await client.query(
     `INSERT INTO pos_stock_levels (product_id, current_qty, updated_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (product_id) DO UPDATE SET current_qty = $2, updated_at = NOW()`,
-    [productId, closing]
+    [productId, normalizeQty(closing)]
   );
 
   return closing;
@@ -149,7 +154,7 @@ const importStockRows = async (
           `INSERT INTO pos_stock_levels (product_id, current_qty, updated_at)
            VALUES ($1, $2, NOW())
            ON CONFLICT (product_id) DO UPDATE SET current_qty = $2, updated_at = NOW()`,
-          [productId, currentQty]
+          [productId, normalizeQty(currentQty)]
         );
       } else {
         currentQty = Math.max(0, row.closing);
@@ -168,7 +173,7 @@ const importStockRows = async (
           `INSERT INTO pos_stock_levels (product_id, current_qty, updated_at)
            VALUES ($1, $2, NOW())
            ON CONFLICT (product_id) DO UPDATE SET current_qty = $2, updated_at = NOW()`,
-          [productId, currentQty]
+          [productId, normalizeQty(currentQty)]
         );
       }
 
