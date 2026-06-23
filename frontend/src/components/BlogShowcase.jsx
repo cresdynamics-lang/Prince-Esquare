@@ -1,8 +1,9 @@
+import { resolveDisplayImageUrl } from '../utils/cloudinary';
 import { Link } from 'react-router-dom';
 
 export default function BlogShowcase({ blog }) {
-  const fallbackImage = '/default-blog-image.jpg';
-  const imageUrl = blog.featured_image_url || fallbackImage;
+  const fallbackImage = '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg';
+  const imageUrl = resolveDisplayImageUrl(blog.featured_image_url, { width: 1200 }) || fallbackImage;
 
   return (
     <Link
@@ -14,7 +15,7 @@ export default function BlogShowcase({ blog }) {
           src={imageUrl} 
           alt={blog.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          onError={(e) => {e.target.src = fallbackImage;}}
+          onError={(e) => { e.currentTarget.src = fallbackImage; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent" />
       </div>

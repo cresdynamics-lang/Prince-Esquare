@@ -1,3 +1,4 @@
+import { resolveDisplayImageUrl } from '../../utils/cloudinary';
 ﻿import { useEffect, useState } from 'react';
 import { Image as ImageIcon, PencilLine, Plus, Save, Trash2, X } from 'lucide-react';
 import API from '../../services/api';
@@ -259,7 +260,7 @@ export default function BlogsView() {
               {uploadingImage && <p className="mt-3 text-xs text-gold-500/40">Uploading image...</p>}
               {formData.featured_image_url && (
                 <img
-                  src={formData.featured_image_url}
+                  src={resolveDisplayImageUrl(formData.featured_image_url, { width: 1200 })}
                   alt="Featured preview"
                   className="mt-4 h-44 w-full rounded-xl object-cover"
                 />
@@ -311,7 +312,7 @@ export default function BlogsView() {
               <article key={blog.id} className="overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-950/55 transition-transform hover:-translate-y-0.5">
                 <div className="relative h-44 bg-navy-800">
                   {blog.featured_image_url ? (
-                    <img src={blog.featured_image_url} alt={blog.title} className="h-full w-full object-cover" />
+                    <img src={resolveDisplayImageUrl(blog.featured_image_url, { width: 1200 })} alt={blog.title} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg'; }} />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-gold-500/30">
                       <ImageIcon size={32} />

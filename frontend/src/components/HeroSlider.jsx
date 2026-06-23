@@ -91,8 +91,8 @@ const HeroSlider = ({ heroSlides }) => {
         </motion.div>
       </AnimatePresence>
 
-      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-14 md:pb-16 relative z-10">
-        <div className="w-full max-w-6xl space-y-8 text-left pl-0 md:pl-4 lg:pl-8">
+      <div className="container mx-auto px-6 h-full flex items-end justify-start pb-20 md:pb-24 lg:pb-28 relative z-10">
+        <div className="w-full max-w-7xl space-y-10 text-left pl-0 md:pl-4 lg:pl-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={`content-${slide.link}-${current}`}
@@ -100,7 +100,7 @@ const HeroSlider = ({ heroSlides }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
               transition={{ duration: 0.45 }}
-              className="space-y-6"
+              className="space-y-8"
             >
               <div className="flex items-center space-x-4">
                 <div className="h-px w-12 bg-gold-600" />
@@ -109,7 +109,7 @@ const HeroSlider = ({ heroSlides }) => {
                 </p>
               </div>
 
-              <h1 className="text-6xl md:text-8xl lg:text-[7rem] font-serif text-white leading-tight tracking-tighter max-w-5xl">
+              <h1 className="text-7xl md:text-[7.5rem] lg:text-[8.5rem] font-serif text-white leading-[0.9] tracking-tighter max-w-5xl">
                 {slide.title.split(' ').map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
                     {word}{' '}
@@ -117,14 +117,14 @@ const HeroSlider = ({ heroSlides }) => {
                 ))}
               </h1>
 
-              <p className="text-xl md:text-2xl text-slate-300 max-w-3xl font-light leading-relaxed line-clamp-3">
+              <p className="text-2xl md:text-3xl text-slate-300 max-w-3xl font-light leading-relaxed line-clamp-3">
                 {slide.desc}
               </p>
 
               <div className="pt-8">
                 <Link
                   to={slide.link}
-                  className="bg-gold-600 text-navy-950 px-10 py-4 text-[11px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
+                  className="bg-gold-600 text-navy-950 px-12 py-5 text-[11px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
                 >
                   <span>{slide.cta}</span>
                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />

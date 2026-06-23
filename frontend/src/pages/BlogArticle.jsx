@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { buildBreadcrumbSchema, buildBlogPostingSchema } from '../seo/seoData';
+import { resolveDisplayImageUrl } from '../utils/cloudinary';
 
 export default function BlogArticle() {
   const { slug } = useParams();
@@ -64,8 +65,8 @@ export default function BlogArticle() {
     );
   }
 
-  const fallbackImage = '/default-blog-image.jpg';
-  const imageUrl = blog.featured_image_url || fallbackImage;
+  const fallbackImage = '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg';
+  const imageUrl = resolveDisplayImageUrl(blog.featured_image_url, { width: 1600 }) || fallbackImage;
 
   return (
     <div className="min-h-screen bg-navy-950 text-white">
@@ -73,7 +74,7 @@ export default function BlogArticle() {
         title={blog.title}
         description={blog.excerpt || blog.title}
         path={`/blog/${blog.slug}`}
-        image={blog.featured_image_url}
+        image={imageUrl}
         keywords={[blog.title, blog.category, 'Prince Esquire blog', 'menswear Kenya'].filter(Boolean)}
         schema={[
           buildBreadcrumbSchema([
@@ -92,7 +93,7 @@ export default function BlogArticle() {
             alt={blog.title}
             className="w-full h-full object-cover"
             onError={(e) => {
-              e.target.src = fallbackImage;
+              e.currentTarget.src = fallbackImage;
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent" />

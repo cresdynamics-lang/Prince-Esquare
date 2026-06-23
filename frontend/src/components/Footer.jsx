@@ -1,6 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
-import { Globe, MessageSquare, Mail, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { Globe, Mail, Phone, MapPin } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import { SITE_URL, SOCIAL_INSTAGRAM, SOCIAL_FACEBOOK } from '../seo/seoData';
 import { WHATSAPP_NUMBER } from '../lib/storeContact';
 
@@ -121,7 +123,7 @@ const Footer = () => {
 
         <div className="text-center pt-12">
           <p className="text-[10px] text-navy-500  tracking-[0.4em]">
-            © 2026 PRINCE ESQUIRE. ALL RIGHTS RESERVED.
+            Â© 2026 PRINCE ESQUIRE. ALL RIGHTS RESERVED.
           </p>
         </div>
       </div>
@@ -130,13 +132,14 @@ const Footer = () => {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat on WhatsApp"
-        className="group fixed bottom-6 right-6 bg-[#25D366] rounded-full flex items-center overflow-hidden transition-all duration-300 w-12 h-12 hover:w-48 shadow-lg"
+        className="group fixed bottom-6 right-6 flex h-12 w-12 items-center overflow-hidden rounded-full bg-[#25D366] shadow-lg transition-all duration-300 hover:w-48"
       >
-        <MessageSquare size={24} className="text-white p-2 shrink-0" />
-        <span className="text-white font-medium ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center">
+          <FontAwesomeIcon icon={faWhatsapp} className="text-[22px] text-white" />
+        </span>
+        <span className="ml-1 whitespace-nowrap text-white font-medium opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           WhatsApp
         </span>
-        <ArrowRight size={20} className="text-white ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shrink-0" />
       </a>
     </footer>
   );

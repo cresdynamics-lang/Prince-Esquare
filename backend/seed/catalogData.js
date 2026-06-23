@@ -1,4 +1,4 @@
-/** Catalog aligned with storefront (slugs stable for URLs). */
+﻿/** Catalog aligned with storefront (slugs stable for URLs). */
 module.exports = [
   // SHOES
   { 
@@ -341,6 +341,17 @@ module.exports = [
     description: 'Signature Stefano Ricci buckle on premium calfskin leather.', 
     thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg', 
     colors: ['Black/Gold'] 
+  { 
+    name: 'Black Pebbled Leather Dress Belt', 
+    slug: 'black-pebbled-leather-dress-belt', 
+    brandName: 'Prince Esquire', 
+    categorySlug: 'belts-ties', 
+    price: 2100, 
+    featured: true, 
+    description: 'Black coarse-pebbled leather dress belt with brushed silver-tone rectangular buckle.', 
+    thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.22 PM.jpeg', 
+    colors: ['Black'] 
+  },
   },
 
   // ADDITIONAL SHOES
