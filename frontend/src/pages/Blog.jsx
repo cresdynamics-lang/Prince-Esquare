@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import BlogShowcase from '../components/BlogShowcase';
-import { useApi } from '../hooks/useApi';
 
 const BLOGS_PER_PAGE = 9;
 
 export default function Blog() {
-  const api = useApi();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);

@@ -9,7 +9,7 @@ import {
   UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight, ChevronDown,
   Phone, Globe, Truck, CreditCard, CreditCard as CardIcon,
   Warehouse,
-  Store
+  Store, BookOpen
 } from 'lucide-react';
 import { AdminPosTerminalInfo, PosSalesView } from '../components/admin/pos/PosAdminViews';
 import PosTerminalView from '../components/pos/PosTerminalView';
@@ -58,6 +58,7 @@ import {
 const FinanceHub = lazy(() => import('../components/admin/FinanceHub'));
 const PosInventoryHub = lazy(() => import('../components/admin/pos/PosInventoryHub'));
 const ProductsView = lazy(() => import('../components/admin/ProductsView'));
+const BlogsView = lazy(() => import('../components/admin/BlogsView'));
 
 const SectionLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -117,6 +118,7 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
+    { id: 'blogs', label: 'Blog', icon: BookOpen, section: 'Store' },
     { id: 'users', label: 'Users', icon: Users, section: 'People' },
     { id: 'inventory', label: 'Inventory', icon: Warehouse, section: 'Operations' },
     { id: 'finance', label: 'Finance', icon: CreditCard, section: 'Operations' },
@@ -197,6 +199,7 @@ const AdminDashboard = () => {
         (activeSection === 'products' && canAccessProducts(user)) ||
         (activeSection === 'inventory' && canViewInventory(user)) ||
         (activeSection === 'finance' && canAccessFinance(user)) ||
+        (activeSection === 'blogs' && hasPermission(user, 'blogs')) ||
         (activeSection === 'pos-terminal' && canUsePosTerminal(user, { isSeller }));
       if (!allowed) {
         return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
@@ -231,6 +234,7 @@ const AdminDashboard = () => {
       case 'finance':
       case 'inventory':
         return heavySection;
+      case 'blogs': return <BlogsView />;
       case 'users': return <UsersView />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
