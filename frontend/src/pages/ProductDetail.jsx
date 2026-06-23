@@ -537,25 +537,27 @@ const ProductDetail = () => {
                   />
                 </AnimatePresence>
 
-                <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-navy-950/95 via-navy-950/70 to-transparent px-5 pb-8 pt-8 md:px-8 md:pb-10 md:pt-10">
-                  <h1 className="font-serif text-6xl sm:text-7xl md:text-8xl lg:text-[9rem] text-white leading-[0.9] tracking-tight max-w-5xl">
-                    {product.name}
-                  </h1>
-                  <div className="mt-4 flex flex-wrap items-baseline gap-3">
-                    <p className="text-3xl md:text-4xl font-light text-gold-400">
-                      KSh {displayPrice.toLocaleString()}
-                    </p>
-                    {compareAtPrice != null && compareAtPrice > displayPrice && (
-                      <p className="text-xl md:text-2xl text-slate-300/70 line-through font-light">
-                        KSh {compareAtPrice.toLocaleString()}
+                <div className="absolute inset-0 z-10 flex items-end justify-start bg-gradient-to-t from-navy-950/95 via-navy-950/60 to-transparent px-5 pb-10 pt-24 md:px-8 md:pb-12 md:pt-28">
+                  <div className="max-w-5xl text-left">
+                    <h1 className="font-serif text-7xl sm:text-8xl md:text-9xl lg:text-[10rem] text-white leading-[0.88] tracking-tight">
+                      {product.name}
+                    </h1>
+                    <div className="mt-5 flex flex-wrap items-baseline gap-3">
+                      <p className="text-4xl md:text-5xl font-light text-gold-400">
+                        KSh {displayPrice.toLocaleString()}
+                      </p>
+                      {compareAtPrice != null && compareAtPrice > displayPrice && (
+                        <p className="text-2xl md:text-3xl text-slate-300/70 line-through font-light">
+                          KSh {compareAtPrice.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    {variantSummary && (
+                      <p className="mt-4 text-lg md:text-xl text-slate-200/90 font-light max-w-3xl leading-relaxed">
+                        {variantSummary}
                       </p>
                     )}
                   </div>
-                  {variantSummary && (
-                    <p className="mt-3 text-base md:text-lg text-slate-200/85 font-light max-w-2xl leading-relaxed">
-                      {variantSummary}
-                    </p>
-                  )}
                 </div>
 
                 {hasColorCarousel && (
