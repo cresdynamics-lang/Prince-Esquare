@@ -6,7 +6,7 @@ const toImage = (row) => row?.thumbnail || row?.image_url || row?.image || null;
 
 /** Carousel picks â€” full-product shots that read clearly at hero size (not tight close-ups). */
 const HERO_CATEGORY_PRODUCT_SLUGS = {
-  'belts-ties': 'black-pebbled-leather-dress-belt',
+  'belts-ties': 'black-leather-belt-set',
   'track-suits': 'blue-white-nike-tracksuit-set-f54cbfb3',
 };
 

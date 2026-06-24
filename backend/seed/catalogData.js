@@ -332,26 +332,26 @@ module.exports = [
 
   // ACCESSORIES
   { 
-    name: 'Stefano Ricci Leather Belt', 
-    slug: 'stefano-ricci-leather-belt', 
-    brandName: 'Stefano Ricci', 
-    categorySlug: 'belts-ties', 
-    price: 65000, 
-    featured: true, 
-    description: 'Signature Stefano Ricci buckle on premium calfskin leather.', 
-    thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg', 
-    colors: ['Black/Gold'] 
-  },
-  { 
-    name: 'Black Pebbled Leather Dress Belt', 
-    slug: 'black-pebbled-leather-dress-belt', 
+    name: 'Black Leather Belt Set', 
+    slug: 'black-leather-belt-set', 
     brandName: 'Prince Esquire', 
     categorySlug: 'belts-ties', 
-    price: 2100, 
+    price: 2400, 
     featured: true, 
-    description: 'Black coarse-pebbled leather dress belt with brushed silver-tone rectangular buckle.', 
-    thumbnail: '/WhatsApp Image 2026-05-12 at 8.07.22 PM.jpeg', 
+    description: 'A clean black leather belt set with mixed buckle shapes and smooth-to-textured finishes for formal and smart-casual dressing. Adjustable and easy to pair with trousers, suits, and weekend tailoring.', 
+    thumbnail: '/belt-001.jpeg', 
     colors: ['Black'] 
+  },
+  { 
+    name: 'Dark Brown Leather Belt Set', 
+    slug: 'dark-brown-leather-belt-set', 
+    brandName: 'Prince Esquire', 
+    categorySlug: 'belts-ties', 
+    price: 2400, 
+    featured: true, 
+    description: 'A refined dark brown leather belt set with polished metal buckles and balanced grain for office and evening dressing. Versatile with navy, charcoal, and tan tailoring.', 
+    thumbnail: '/belt-002.jpeg', 
+    colors: ['Dark Brown'] 
   },
 
   // ADDITIONAL SHOES
