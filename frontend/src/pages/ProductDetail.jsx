@@ -637,7 +637,7 @@ const ProductDetail = () => {
             {/* Purchase + description — scrolls; image stays pinned until this column ends */}
             <div className="space-y-6 lg:pt-2 min-h-0">
               <div className="space-y-3">
-                {product.brand_name && (
+                {product.brand_name && !['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase()) && (
                   <p className="text-[10px] font-bold tracking-[0.3em] text-gold-500">{product.brand_name}</p>
                 )}
                 <h1 className="text-2xl md:text-3xl font-serif text-white leading-tight">{product.name}</h1>

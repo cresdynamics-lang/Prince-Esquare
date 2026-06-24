@@ -1,10 +1,10 @@
-[
-  {"slug": "prince-esquire-polo-black", "name": "Prince Esquire Polo in Black", "type": "clothing", "color": "black", "item": "polo shirt"},
-  {"slug": "prince-esquire-polo-brown", "name": "Prince Esquire Polo in Brown", "type": "clothing", "color": "brown", "item": "polo shirt"},
-  {"slug": "prince-esquire-polo-dark-black", "name": "Prince Esquire Polo in Dark Black", "type": "clothing", "color": "dark black", "item": "polo shirt"},
-  {"slug": "prince-esquire-polo-light-blue", "name": "Prince Esquire Polo in Light Blue", "type": "clothing", "color": "light blue", "item": "polo shirt"},
-  {"slug": "prince-esquire-polo-red", "name": "Prince Esquire Polo in Red", "type": "clothing", "color": "red", "item": "polo shirt"},
-  {"slug": "prince-esquire-polo-white", "name": "Prince Esquire Polo in White", "type": "clothing", "color": "white", "item": "polo shirt"},
+﻿[
+  {"slug": "classic-pique-polo-black", "name": "Classic Pique Polo in Black", "type": "clothing", "color": "black", "item": "polo shirt"},
+  {"slug": "prince-esquire-polo-brown", "name": "Classic Pique Polo in Brown", "type": "clothing", "color": "brown", "item": "polo shirt"},
+  {"slug": "prince-esquire-polo-dark-black", "name": "Classic Pique Polo in Dark Black", "type": "clothing", "color": "dark black", "item": "polo shirt"},
+  {"slug": "prince-esquire-polo-light-blue", "name": "Classic Pique Polo in Light Blue", "type": "clothing", "color": "light blue", "item": "polo shirt"},
+  {"slug": "prince-esquire-polo-red", "name": "Classic Pique Polo in Red", "type": "clothing", "color": "red", "item": "polo shirt"},
+  {"slug": "prince-esquire-polo-white", "name": "Classic Pique Polo in White", "type": "clothing", "color": "white", "item": "polo shirt"},
   {"slug": "prada-tracksuit-black", "name": "Prada Classic Tracksuit in Black", "type": "clothing", "color": "black", "item": "tracksuit"},
   {"slug": "prada-tracksuit-navy", "name": "Prada Classic Tracksuit in Navy", "type": "clothing", "color": "navy", "item": "tracksuit"},
   {"slug": "zegna-tracksuit-dark-green", "name": "Zegna Luxury Tracksuit in Dark Green", "type": "clothing", "color": "dark green", "item": "tracksuit"},

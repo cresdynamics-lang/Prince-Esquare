@@ -8,6 +8,8 @@ const needsSizeSelection = (product) =>
   ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts', 'polo-t-shirts']
     .includes((product.category_name || product.parent_category_name || '').toLowerCase());
 
+const hideBrandLabel = (product) => ['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase());
+
 const ProductCard = ({ product, onAddToCart, addedProductId }) => (
   <article className="group flex-shrink-0 w-[46%] sm:w-[32%] md:w-[24%] lg:w-[18%] min-w-[140px]">
     <Link to={`/product/${product.slug}`} className="block">
@@ -35,7 +37,9 @@ const ProductCard = ({ product, onAddToCart, addedProductId }) => (
       </div>
     </Link>
     <div className="pt-3 space-y-1">
-      <p className="text-[11px] font-bold text-gold-600/50">{product.brand_name}</p>
+      {!hideBrandLabel(product) && (
+        <p className="text-[11px] font-bold text-gold-600/50">{product.brand_name}</p>
+      )}
         <h3 className="text-[9px] md:text-[11px] font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">
           {product.name}
         </h3>

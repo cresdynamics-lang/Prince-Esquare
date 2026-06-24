@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Generates backend/data/knitted-polos-specs.json (keyed by image UUID).
  */
 const fs = require('fs');
@@ -8,18 +8,18 @@ const DEFAULT_PRICE = 3200;
 const BRANDED_PRICE = 3500;
 const VALUE_PRICE = 3000;
 
-const rich = (intro, features, fit, sizes = 'M–3XL') =>
+const rich = (intro, features, fit, sizes = 'Mâ€“3XL') =>
   [
     intro,
     '',
     'Key features:',
-    ...features.map((f) => `• ${f}`),
+    ...features.map((f) => `â€¢ ${f}`),
     '',
     `Fit & styling: ${fit}`,
     '',
     'Care: Machine wash cold on gentle cycle. Lay flat or tumble dry low. Do not bleach.',
     '',
-    `Available sizes ${sizes}. Exclusively at Prince Esquire.`,
+    `Available sizes ${sizes}. Available in our collection.`,
   ].join('\n');
 
 const poloFeatures = (color) => [
@@ -41,7 +41,7 @@ const make = (name, color, brand, price, featured = false, intro) => ({
   price,
   featured,
   description: rich(
-    intro || `${name} — refined men's knitted polo combining breathable comfort with polished Prince Esquire style.`,
+    intro || `${name} â€” refined men's knitted polo combining breathable comfort with polished Prince Esquire style.`,
     poloFeatures(color),
     fit
   ),
@@ -54,7 +54,7 @@ const OVERRIDES = {
     'Polo Ralph Lauren',
     BRANDED_PRICE,
     true,
-    'Polo Ralph Lauren black knitted polo with signature pony embroidery — timeless preppy essential.'
+    'Polo Ralph Lauren black knitted polo with signature pony embroidery â€” timeless preppy essential.'
   ),
   '12239389': make(
     'BEIGE POLO RALPH LAUREN KNITTED POLO',
@@ -62,7 +62,7 @@ const OVERRIDES = {
     'Polo Ralph Lauren',
     BRANDED_PRICE,
     true,
-    'Polo Ralph Lauren beige piqué knit polo with classic collar and embroidered pony logo.'
+    'Polo Ralph Lauren beige piquÃ© knit polo with classic collar and embroidered pony logo.'
   ),
   '416072c1': make(
     'WHITE LACOSTE KNITTED POLO',
@@ -73,12 +73,12 @@ const OVERRIDES = {
     'Lacoste white knitted polo with iconic crocodile branding and clean resort styling.'
   ),
   '07ca2382': make(
-    'GREEN LACOSTE STRETCH PIQUÉ KNITTED POLO',
+    'GREEN LACOSTE STRETCH PIQUÃ‰ KNITTED POLO',
     'Green',
     'Lacoste',
     BRANDED_PRICE,
     false,
-    'Lacoste regular-fit stretch piqué polo in sequoia green — breathable luxury knit.'
+    'Lacoste regular-fit stretch piquÃ© polo in sequoia green â€” breathable luxury knit.'
   ),
   '7d7a6c4e': make(
     'FOREST GREEN PERCIVAL TIPPED KNITTED POLO',
@@ -134,7 +134,7 @@ const OVERRIDES = {
     'Prince Esquire',
     DEFAULT_PRICE,
     false,
-    'Olive green knitted polo with tan stripe-trim collar and cuffs — structured casual polish.'
+    'Olive green knitted polo with tan stripe-trim collar and cuffs â€” structured casual polish.'
   ),
   d9268f60: make(
     'WHITE TAN-COLLAR KNITTED POLO',
@@ -150,7 +150,7 @@ const OVERRIDES = {
     'Polo Ralph Lauren',
     BRANDED_PRICE,
     false,
-    'Polo Ralph Lauren chocolate brown custom slim-fit piqué knit polo with signature pony logo.'
+    'Polo Ralph Lauren chocolate brown custom slim-fit piquÃ© knit polo with signature pony logo.'
   ),
   '86c3e5f5': make(
     'MAROON NEONOMAD LOGO KNIT POLO',
@@ -291,7 +291,7 @@ const inferColor = (label) => {
   return 'Natural';
 };
 
-const labelToName = (label) => {
+const labelToName = (label, color = 'Natural') => {
   let name = label
     .replace(/_/g, ' ')
     .replace(/\s+/g, ' ')
@@ -323,7 +323,7 @@ for (const uuid of BATCH_UUIDS) {
   const label = labelsByUuid[uuid] || uuid;
   const { brand, price: brandPrice } = inferBrand(label);
   const color = inferColor(label);
-  const name = labelToName(label);
+  const name = labelToName(label, color);
   const price = brand === 'Prince Esquire' ? VALUE_PRICE + (idx % 3) * 250 : brandPrice;
   SPECS[uuid] = make(name, color, brand, price);
 }

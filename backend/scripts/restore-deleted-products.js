@@ -10,7 +10,7 @@ const path = require('path');
 const db = require('../src/config/db');
 
 const DELETED_SLUGS = [
-  'prince-esquire-polo-black',
+  'classic-pique-polo-black',
   'santoni-dark-brown-leather-monk-strap',
   'clarks-gereld-tie-tan',
   'prince-esquire-polo-dark-black',

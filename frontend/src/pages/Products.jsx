@@ -27,6 +27,8 @@ const isBeltCategory = (value) => {
   return normalized.includes('belt') || normalized.includes('tie');
 };
 
+const shouldHideBrand = (product) => ['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase());
+
 const CATEGORY_DATA = [
   { id: 'All', name: 'All', sub: [] },
   { id: 'polo-t-shirts', name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
@@ -429,7 +431,9 @@ const Products = ({ categoryOverride = null }) => {
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</span>
+                          {!shouldHideBrand(product) && (
+                            <span className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</span>
+                          )}
                         </div>
                         <h3 className="text-[0.72rem] md:text-sm font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">{product.name}</h3>
                         <p className="text-gold-500 font-light italic">KSh {parseFloat(product.price).toLocaleString()}</p>
