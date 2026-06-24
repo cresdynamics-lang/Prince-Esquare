@@ -1,4 +1,4 @@
-﻿-- Rename the stale polo records to their actual catalog names.
+-- Rename the stale polo records to their actual catalog names.
 
 UPDATE products
 SET name = 'Classic Pique Polo in Black',
