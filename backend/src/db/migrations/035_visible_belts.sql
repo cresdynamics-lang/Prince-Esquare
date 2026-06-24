@@ -1,4 +1,4 @@
-﻿-- Make the restored belt products visible on the homepage again.
+-- Make the restored belt products visible on the homepage again.
 
 UPDATE products
 SET stock_quantity = 1,
