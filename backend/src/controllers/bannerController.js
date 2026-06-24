@@ -26,6 +26,7 @@ const fetchHeroProductRow = async (slug) => {
 };
 
 const categoryKey = (row) => row.parent_category_slug || row.category_slug;
+const isBeltContent = (value) => /belt|tie/i.test(String(value || ''));
 
 const HERO_COPY = {
   shirts: 'Presidential shirts cut for clean collars, confident structure, and a polished finish that reads well in boardrooms and formal settings.',
@@ -137,6 +138,9 @@ const buildCategoryProductRows = async () => {
 
   for (const row of result.rows) {
     if (HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(row.category_slug)) continue;
+    if ((row.category_slug === 'belts-ties' || row.parent_category_slug === 'belts-ties') && !isBeltContent(row.slug) && !isBeltContent(row.name)) {
+      continue;
+    }
 
     const key = row.category_slug;
     if (!groups.has(key)) {

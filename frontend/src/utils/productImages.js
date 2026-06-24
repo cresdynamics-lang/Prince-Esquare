@@ -76,7 +76,7 @@ export const PREMIUM_IMAGES = {
   'jackets': '/WhatsApp Image 2026-05-12 at 8.07.21 PM (1).jpeg',
   'linen': '/WhatsApp Image 2026-05-12 at 8.07.21 PM.jpeg',
   'watch': '/WhatsApp Image 2026-05-12 at 8.07.22 PM (1).jpeg',
-  'belt': '/WhatsApp Image 2026-05-12 at 8.07.22 PM.jpeg',
+  'belt': '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg',
   'wallet': '/WhatsApp Image 2026-05-12 at 8.07.25 PM.jpeg',
 };
 

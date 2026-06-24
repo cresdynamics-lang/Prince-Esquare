@@ -105,7 +105,7 @@ export const CATEGORY_TILES = [
   {
     title: 'The Finishing Room',
     subtitle: 'Belts, Ties & Final Details',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.22 PM.jpeg',
+    image: '/WhatsApp Image 2026-05-12 at 8.07.27 PM.jpeg',
     span: 'md:col-span-2 md:row-span-1',
     category: 'belts-ties',
   },

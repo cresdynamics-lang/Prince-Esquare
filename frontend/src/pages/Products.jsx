@@ -10,6 +10,22 @@ import { getPremiumImage } from '../utils/productImages';
 import { catalogueAPI, productAPI, adminCategoryAPI } from '../services/api';
 import { buildBreadcrumbSchema, categoryFallbackIntro, routeSeo } from '../seo/seoData';
 const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
+const beltProductSlugs = new Set([
+  'stefano-ricci-leather-belt',
+  'black-pebbled-leather-dress-belt',
+  'black-brown-reversible-dress-belt-09a9e37b',
+  'black-metal-buckle-leather-belt-e27421c0',
+  'black-rectangle-buckle-leather-belt-4a5ef43a',
+  'brown-casual-genuine-leather-belt-130cm-c4dd74b8',
+  'black-genuine-leather-ratchet-dress-belt-8016d7f1',
+  'brown-italian-leather-ratchet-dress-belt-fa8cb090',
+  'veteran-vintage-burnished-cognac-leather-belt-6098025d',
+]);
+
+const isBeltCategory = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  return normalized.includes('belt') || normalized.includes('tie');
+};
 
 const CATEGORY_DATA = [
   { id: 'All', name: 'All', sub: [] },
@@ -60,7 +76,30 @@ const orderDatabaseCategories = (categories) => {
 const matchesText = (value, target) => (value || '').toLowerCase() === (target || '').toLowerCase();
 
 const filterCatalogueProducts = (allProducts, category, sub) => {
+  const beltOnly = isBeltCategory(category);
   return allProducts.filter((product) => {
+    if (beltOnly) {
+      const slug = String(product.slug || '').toLowerCase();
+      const name = String(product.name || '').toLowerCase();
+      const categoryText = [
+        product.category_slug,
+        product.category_name,
+        product.parent_category_slug,
+        product.parent_category_name,
+        product.subcategory,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const matchesBeltContent =
+        beltProductSlugs.has(slug) ||
+        /belt|tie/.test(slug) ||
+        /belt|tie/.test(name) ||
+        /belt|tie/.test(categoryText);
+
+      if (!matchesBeltContent) return false;
+    }
+
     const productCategory = product.category_slug || product.category_name;
     const parentCategory = product.parent_category_slug || product.parent_category_name;
 
