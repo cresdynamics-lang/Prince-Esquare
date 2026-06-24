@@ -4,9 +4,9 @@ const { applyProductImageOptimization, optimizeCloudinaryUrl } = require('../uti
 
 const toImage = (row) => row?.thumbnail || row?.image_url || row?.image || null;
 
-/** Carousel picks — full-product shots that read clearly at hero size (not tight close-ups). */
+/** Carousel picks â€” full-product shots that read clearly at hero size (not tight close-ups). */
 const HERO_CATEGORY_PRODUCT_SLUGS = {
-  'belts-ties': 'black-brown-reversible-dress-belt-09a9e37b',
+  'belts-ties': 'black-pebbled-leather-dress-belt',
   'track-suits': 'blue-white-nike-tracksuit-set-f54cbfb3',
 };
 
@@ -34,6 +34,7 @@ const HERO_COPY = {
   linen: 'Breathable linen sets and trousers built for warm weather dressing with ease, texture, and a clean silhouette.',
   'track-suits': 'Relaxed tracksuits in elevated fabrics for relaxed hours, travel days, and polished casual dressing.',
   'polo-t-shirts': 'Signature polos with a neat shape and premium hand feel for smart weekends, lunches, and everyday wear.',
+  'belts-ties': 'Refined leather belts chosen to finish the outfit with quiet structure and a clean, polished line.',
   belts: 'Refined leather belts chosen to finish the outfit with quiet structure and a clean, polished line.',
 };
 
