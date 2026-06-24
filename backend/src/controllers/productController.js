@@ -203,7 +203,7 @@ exports.getProductBySlug = async (req, res, next) => {
     }
 };
 
-// @desc    Admin: Create product — inventory-first: record stock in Inventory before website listing
+// @desc    Admin: Create product ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â inventory-first: record stock in Inventory before website listing
 // @route   POST /api/admin/products
 exports.createProduct = async (req, res, next) => {
     try {
@@ -282,14 +282,14 @@ exports.createProduct = async (req, res, next) => {
         if (posRow?.id && storeQty > 0) {
             const { resolvePosActorId } = require('../services/staffPosBridge');
             await receiveAtStore(posRow.id, storeQty, {
-                notes: 'Added from Products — warehouse intake',
+                notes: 'Added from Products ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â warehouse intake',
                 recordedBy: await resolvePosActorId(req.user),
             });
         }
 
         const { invalidateCatalogueCache } = require('./catalogueController');
         invalidateCatalogueCache();
-        formatResponse(res, 201, true, 'Product created — recorded in store inventory', result.rows[0]);
+        formatResponse(res, 201, true, 'Product created ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â recorded in store inventory', result.rows[0]);
     } catch (error) {
         next(error);
     }
@@ -476,7 +476,7 @@ exports.patchProductFlags = async (req, res, next) => {
                         res,
                         400,
                         false,
-                        'Item must exist in inventory before publishing. Use Inventory → Stock Management.'
+                        'Item must exist in inventory before publishing. Use Inventory ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Stock Management.'
                     );
                 }
             }
@@ -538,14 +538,36 @@ exports.getBestSellers = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+const BELT_RELATED_PRODUCT_SLUGS = new Set([
+    'black-leather-belt-set',
+    'dark-brown-leather-belt-set',
+]);
+
 exports.getRelatedProducts = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const product = await db.query('SELECT category_id FROM products WHERE id = $1', [id]);
+        const product = await db.query(
+            `SELECT p.category_id, c.slug AS category_slug, parent.slug AS parent_category_slug
+             FROM products p
+             LEFT JOIN categories c ON p.category_id = c.id
+             LEFT JOIN categories parent ON c.parent_id = parent.id
+             WHERE p.id = $1`,
+            [id]
+        );
         if (product.rows.length === 0) return formatResponse(res, 404, false, 'Product not found');
-        
-        const result = await db.query('SELECT * FROM products WHERE category_id = $1 AND id != $2 LIMIT 4', [product.rows[0].category_id, id]);
-        formatResponse(res, 200, true, 'Related products fetched', result.rows);
+
+        const result = await db.query(
+            'SELECT * FROM products WHERE category_id = $1 AND id != $2 AND is_active = true ORDER BY created_at DESC LIMIT 12',
+            [product.rows[0].category_id, id]
+        );
+
+        let related = result.rows;
+        const categorySlug = `${product.rows[0].category_slug || ''} ${product.rows[0].parent_category_slug || ''}`.toLowerCase();
+        if (categorySlug.includes('belt')) {
+            related = related.filter((row) => BELT_RELATED_PRODUCT_SLUGS.has(String(row.slug || '').toLowerCase()));
+        }
+
+        formatResponse(res, 200, true, 'Related products fetched', related.slice(0, 4));
     } catch (error) { next(error); }
 };
 

@@ -53,6 +53,10 @@ const getProductBaseImage = (product) => (
   product?.image_url
 );
 
+const BELT_RELATED_PRODUCT_SLUGS = new Set([
+  'black-leather-belt-set',
+  'dark-brown-leather-belt-set',
+]);
 /** One carousel slide per color variant (multi-color products). */
 const buildColorCarouselSlides = (variantMeta, product) => {
   if (!product || variantMeta.colors.length <= 1) return [];
@@ -95,7 +99,7 @@ const enrichShoeVariants = (variants, categoryName) => {
   return enriched;
 };
 
-/** Thumbnail carousel — color slides first (multi-color), then gallery + angles for selected color. */
+/** Thumbnail carousel ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â color slides first (multi-color), then gallery + angles for selected color. */
 const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides = []) => {
   if (!product) return [];
 
@@ -244,6 +248,10 @@ const ProductDetail = () => {
       try {
         const relRes = await productAPI.related(found.id);
         rel = relRes.data.data || [];
+        const categoryText = `${found.category_name || ''} ${found.parent_category_name || ''}`.toLowerCase();
+        if (categoryText.includes('belt')) {
+          rel = rel.filter((item) => BELT_RELATED_PRODUCT_SLUGS.has(String(item.slug || '').toLowerCase()));
+        }
       } catch {
         console.error('Could not fetch related products');
       }
@@ -352,8 +360,8 @@ const ProductDetail = () => {
     variantMeta.isShoe
   );
   const sizeLine = variantMeta.isShoe
-    ? `EU ${allSizes[0]} – ${allSizes[allSizes.length - 1]}`
-    : allSizes.join(' · ');
+    ? `EU ${allSizes[0]} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ ${allSizes[allSizes.length - 1]}`
+    : allSizes.join(' Ãƒâ€šÃ‚Â· ');
   const parsedSizes = isBelt ? [] : [sizeLine];
   const buildPayload = () => ({
     productId: product?.id,
@@ -467,7 +475,7 @@ const ProductDetail = () => {
   if (!product) {
     return (
       <div className="min-h-screen pt-32 text-center text-gold-500 bg-navy-950 font-serif text-[10px]  ">
-        Loading…
+        LoadingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
       </div>
     );
   }
@@ -502,7 +510,7 @@ const ProductDetail = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
-            {/* Gallery — pins on desktop until the full right column (incl. description) has scrolled */}
+            {/* Gallery ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â pins on desktop until the full right column (incl. description) has scrolled */}
             <div className="space-y-4">
               <div className="lg:sticky lg:top-24 lg:self-start">
               <div className="relative aspect-square bg-white overflow-hidden rounded-sm border border-gold-600/10 group">
@@ -634,7 +642,7 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Purchase + description — scrolls; image stays pinned until this column ends */}
+            {/* Purchase + description ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â scrolls; image stays pinned until this column ends */}
             <div className="space-y-6 lg:pt-2 min-h-0">
               <div className="space-y-3">
                 {product.brand_name && !['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase()) && (

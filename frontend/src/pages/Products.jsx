@@ -11,15 +11,8 @@ import { catalogueAPI, productAPI, adminCategoryAPI } from '../services/api';
 import { buildBreadcrumbSchema, categoryFallbackIntro, routeSeo } from '../seo/seoData';
 const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
 const beltProductSlugs = new Set([
-  'stefano-ricci-leather-belt',
-  'black-pebbled-leather-dress-belt',
-  'black-brown-reversible-dress-belt-09a9e37b',
-  'black-metal-buckle-leather-belt-e27421c0',
-  'black-rectangle-buckle-leather-belt-4a5ef43a',
-  'brown-casual-genuine-leather-belt-130cm-c4dd74b8',
-  'black-genuine-leather-ratchet-dress-belt-8016d7f1',
-  'brown-italian-leather-ratchet-dress-belt-fa8cb090',
-  'veteran-vintage-burnished-cognac-leather-belt-6098025d',
+  'black-leather-belt-set',
+  'dark-brown-leather-belt-set',
 ]);
 
 const isBeltCategory = (value) => {
@@ -377,7 +370,7 @@ const Products = ({ categoryOverride = null }) => {
           )}
 
           {loading ? (
-            <p className="text-center text-gold-600/50 text-[10px]   py-24">Loading collection…</p>
+            <p className="text-center text-gold-600/50 text-[10px]   py-24">Loading collectionÃ¢â‚¬Â¦</p>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-10 gap-y-12 sm:gap-y-20">
               <AnimatePresence mode="popLayout">
