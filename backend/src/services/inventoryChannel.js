@@ -65,9 +65,20 @@ const createPosInventoryItem = async (
 /** When an admin creates a website product, ensure a dedicated POS inventory row exists. */
 const ensurePosForEcommerceProduct = async (product, options = {}) => {
   const shopPriceOverride = options.shop_price ?? options.shopPrice;
+
   if (product.pos_stock_product_id) {
     const linked = await db.query('SELECT * FROM pos_products WHERE id = $1', [product.pos_stock_product_id]);
-    if (linked.rows.length) return linked.rows[0];
+    if (linked.rows.length) {
+      const pos = linked.rows[0];
+      if (!pos.ecommerce_product_id || pos.ecommerce_product_id !== product.id) {
+        await db.query(
+          `UPDATE pos_products SET ecommerce_product_id = $1 WHERE id = $2`,
+          [product.id, pos.id]
+        );
+        pos.ecommerce_product_id = product.id;
+      }
+      return pos;
+    }
   }
 
   const byEcom = await db.query(`SELECT * FROM pos_products WHERE ecommerce_product_id = $1`, [product.id]);
@@ -76,6 +87,25 @@ const ensurePosForEcommerceProduct = async (product, options = {}) => {
       await linkProductPair(product.id, byEcom.rows[0].id, { syncPrices: false });
     }
     return byEcom.rows[0];
+  }
+
+  if (product.sku) {
+    const bySku = await db.query(
+      `SELECT * FROM pos_products WHERE UPPER(TRIM(sku)) = UPPER(TRIM($1)) LIMIT 1`,
+      [product.sku]
+    );
+    if (bySku.rows.length) {
+      const pos = bySku.rows[0];
+      await db.query(
+        `UPDATE pos_products
+         SET ecommerce_product_id = $1,
+             name = COALESCE($2, name)
+         WHERE id = $3`,
+        [product.id, product.name, pos.id]
+      );
+      await linkProductPair(product.id, pos.id, { syncPrices: false });
+      return { ...pos, ecommerce_product_id: product.id };
+    }
   }
 
   let categorySlug = null;
@@ -244,6 +274,15 @@ const needsDedicatedInventoryRow = async (product) => {
 };
 
 const ensureAllEcommerceProductsInPos = async () => {
+  const beltRepair = await db.query(
+    `SELECT p.*, c.slug AS category_slug, c.name AS category_name
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     WHERE p.is_active = true
+       AND p.slug IN ('black-leather-belt-set', 'dark-brown-leather-belt-set')
+     ORDER BY p.name`
+  );
+
   const products = await db.query(
     `SELECT p.*, c.slug AS category_slug, c.name AS category_name
      FROM products p
@@ -255,7 +294,12 @@ const ensureAllEcommerceProductsInPos = async () => {
   let split = 0;
   let stockSeeded = 0;
 
-  for (const product of products.rows) {
+  const rows = [
+    ...beltRepair.rows,
+    ...products.rows.filter((p) => !beltRepair.rows.some((b) => b.id === p.id)),
+  ];
+
+  for (const product of rows) {
     const hadLink = Boolean(product.pos_stock_product_id);
     let posRow;
 
@@ -278,7 +322,7 @@ const ensureAllEcommerceProductsInPos = async () => {
     if (seed.seeded) stockSeeded += 1;
   }
 
-  return { scanned: products.rows.length, linked, split, stockSeeded };
+  return { scanned: rows.length, linked, split, stockSeeded };
 };
 
 /** Publish an inventory-only POS item to the website (or re-activate an existing link). */
