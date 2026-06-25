@@ -229,11 +229,9 @@ const syncPosWebsiteDetailsFromEcommerce = async (ecommerceProductId, posProduct
   );
 
   const totalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
-  if (totalStock > 0) {
-    const { setShopQty, afterInventoryChange } = require('./inventoryMovement');
-    const shopQty = await setShopQty(posId, totalStock);
-    await afterInventoryChange(posId, { shopQty });
-  }
+  const { setShopQty, afterInventoryChange } = require('./inventoryMovement');
+  const shopQty = await setShopQty(posId, totalStock);
+  await afterInventoryChange(posId, { shopQty });
 
   return { posId, totalStock, variantCount: variants.length };
 };

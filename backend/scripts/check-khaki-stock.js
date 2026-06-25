@@ -64,6 +64,20 @@ const db = require('../src/config/db');
   `);
   console.log('=== Legacy POS-KHAKIS bucket ===');
   console.table(legacy.rows);
+
+  const bad = await db.query(`
+    SELECT p.name, p.slug, pp.sku, s.current_qty,
+           (SELECT COALESCE(SUM(pv.stock_quantity),0)::int FROM product_variants pv WHERE pv.product_id = p.id) AS variant_total
+    FROM pos_products pp
+    JOIN products p ON p.id = pp.ecommerce_product_id
+    LEFT JOIN pos_stock_levels s ON s.product_id = pp.id
+    JOIN categories c ON c.id = p.category_id
+    WHERE (c.slug ILIKE '%khaki%' OR c.name ILIKE '%khaki%')
+      AND COALESCE(s.current_qty, 0) > 50
+    ORDER BY s.current_qty DESC
+  `);
+  console.log('=== Khaki POS rows with shop qty > 50 ===');
+  console.table(bad.rows);
   process.exit(0);
 })().catch((e) => {
   console.error(e);
