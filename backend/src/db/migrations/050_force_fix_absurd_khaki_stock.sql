@@ -5,7 +5,7 @@ WITH khaki_variant_targets AS (
     pv.id,
     7 + (((ROW_NUMBER() OVER (
       ORDER BY p.slug, COALESCE(pv.color, ''), COALESCE(pv.size, ''), pv.id
-    ) - 1) % 9) AS realistic_qty
+    ) - 1) % 9)) AS realistic_qty
   FROM product_variants pv
   JOIN products p ON p.id = pv.product_id
   LEFT JOIN pos_products pp ON pp.ecommerce_product_id = p.id AND pp.sku NOT LIKE 'POS-%'
@@ -24,7 +24,7 @@ WHERE khaki_variant_targets.id = pv.id;
 WITH khaki_product_targets AS (
   SELECT
     p.id,
-    7 + (((ROW_NUMBER() OVER (ORDER BY p.slug, p.id) - 1) % 9) AS realistic_qty
+    7 + (((ROW_NUMBER() OVER (ORDER BY p.slug, p.id) - 1) % 9)) AS realistic_qty
   FROM products p
   LEFT JOIN pos_products pp ON pp.ecommerce_product_id = p.id AND pp.sku NOT LIKE 'POS-%'
   WHERE p.stock_quantity > 15
