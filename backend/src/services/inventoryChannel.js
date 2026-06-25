@@ -70,14 +70,20 @@ const ensurePosForEcommerceProduct = async (product, options = {}) => {
     const linked = await db.query('SELECT * FROM pos_products WHERE id = $1', [product.pos_stock_product_id]);
     if (linked.rows.length) {
       const pos = linked.rows[0];
-      if (!pos.ecommerce_product_id || pos.ecommerce_product_id !== product.id) {
-        await db.query(
-          `UPDATE pos_products SET ecommerce_product_id = $1 WHERE id = $2`,
-          [product.id, pos.id]
-        );
-        pos.ecommerce_product_id = product.id;
+      const posSku = String(pos.sku || '');
+      const productSku = String(product.sku || '').trim();
+      if (posSku.startsWith('POS-') && productSku && !productSku.startsWith('POS-')) {
+        // Dedicated split row — prefer the real product SKU inventory row below.
+      } else {
+        if (!pos.ecommerce_product_id || pos.ecommerce_product_id !== product.id) {
+          await db.query(
+            `UPDATE pos_products SET ecommerce_product_id = $1 WHERE id = $2`,
+            [product.id, pos.id]
+          );
+          pos.ecommerce_product_id = product.id;
+        }
+        return pos;
       }
-      return pos;
     }
   }
 
