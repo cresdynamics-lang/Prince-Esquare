@@ -32,6 +32,38 @@ const db = require('../src/config/db');
   console.table(variants.rows);
   console.log('=== Khaki variants with stock > 20 ===');
   console.table(high.rows);
+
+  const posAll = await db.query(`
+    SELECT pp.name, pp.sku, pp.category, s.current_qty
+    FROM pos_products pp
+    LEFT JOIN pos_stock_levels s ON s.product_id = pp.id
+    WHERE pp.category ILIKE '%khaki%' OR pp.sku ILIKE '%KHAKI%'
+    ORDER BY s.current_qty DESC NULLS LAST
+    LIMIT 30
+  `);
+  console.log('=== All POS khaki-related rows ===');
+  console.table(posAll.rows);
+
+  const peCat = await db.query(`
+    SELECT pp.name, pp.sku, s.current_qty
+    FROM pos_products pp
+    LEFT JOIN pos_stock_levels s ON s.product_id = pp.id
+    WHERE pp.sku LIKE 'PE-CAT-%'
+      AND (pp.category ILIKE '%khaki%' OR pp.name ILIKE '%khaki%')
+    ORDER BY s.current_qty DESC
+    LIMIT 20
+  `);
+  console.log('=== PE-CAT khaki pieces ===');
+  console.table(peCat.rows);
+
+  const legacy = await db.query(`
+    SELECT pp.sku, s.current_qty
+    FROM pos_products pp
+    LEFT JOIN pos_stock_levels s ON s.product_id = pp.id
+    WHERE pp.sku IN ('POS-KHAKIS', 'POS-KHAKI')
+  `);
+  console.log('=== Legacy POS-KHAKIS bucket ===');
+  console.table(legacy.rows);
   process.exit(0);
 })().catch((e) => {
   console.error(e);
