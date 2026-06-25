@@ -154,7 +154,7 @@ const ProductsView = () => {
         }
       } catch (error) {
         console.error('Thumbnail upload failed:', error);
-        adminToast.info('Image could not be uploaded. You can still save the product — add the image later or configure Cloudinary.');
+        adminToast.info('Image could not be uploaded. You can still save the product â€” add the image later or configure Cloudinary.');
       } finally {
         setUploading(false);
       }
@@ -549,7 +549,7 @@ const ProductsView = () => {
     try {
       const payload = { ...formData };
       payload.variants = flattenColorGroups(formData.color_groups).map((row) => ({ ...row, stock: 0 }));
-      payload.stock_quantity = 0;
+      payload.stock_quantity = sizeOptions.length ? 0 : Number(formData.stock_quantity || currentProduct?.stock_quantity || 0);
       payload.brand_id = null;
 
       // Remove frontend-only state fields
@@ -626,7 +626,7 @@ const ProductsView = () => {
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search name, SKU, slug…"
+            placeholder="Search name, SKU, slugâ€¦"
             className="w-full pl-9 pr-3 py-2.5 bg-navy-950 border border-gold-500/20 rounded-xl text-white text-sm outline-none focus:border-gold-500/40"
           />
         </div>
@@ -767,7 +767,7 @@ const ProductsView = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono text-[10px] text-gold-500/70 ">{p.sku || '—'}</td>
+                  <td className="px-6 py-4 font-mono text-[10px] text-gold-500/70 ">{p.sku || 'â€”'}</td>
                   <td className="px-6 py-4 text-[10px] font-bold text-gold-500/60 ">{p.category_name || 'Uncategorized'}</td>
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.price).toLocaleString()}</td>
                   <td className="px-6 py-4">
@@ -935,7 +935,7 @@ const ProductsView = () => {
                           onChange={(e) => setFormData({ ...formData, pos_sell_price: e.target.value })}
                           className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                         />
-                        <p className="text-[9px] text-gold-500/35">In-store price for this product — not the category bucket average.</p>
+                        <p className="text-[9px] text-gold-500/35">In-store price for this product â€” not the category bucket average.</p>
                       </div>
                     </>
                   )}
@@ -1132,7 +1132,7 @@ const ProductsView = () => {
                 </div>
               </div>
 
-              {/* Variants — colors & sizes */}
+              {/* Variants â€” colors & sizes */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
                   <div>

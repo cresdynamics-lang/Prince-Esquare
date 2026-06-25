@@ -1,5 +1,8 @@
 export const getSizeOptionsForCategory = (categoryName = '') => {
   const name = (categoryName || '').toLowerCase();
+  if (name.includes('belt') || name.includes('tie')) {
+    return [];
+  }
   if (name.includes('shoe') || name.includes('sneaker') || name.includes('loafer') || name.includes('boot')) {
     return ['38', '39', '40', '41', '42', '43', '44', '45', '46'];
   }

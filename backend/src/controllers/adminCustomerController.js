@@ -139,6 +139,66 @@ exports.createAdmin = async (req, res, next) => {
     }
 };
 
+exports.updateAdmin = async (req, res, next) => {
+    const { id } = req.params;
+    const { name, email, password, is_active } = req.body;
+    try {
+        const existing = await db.query('SELECT id, name, email FROM users WHERE id = $1 AND role = $2', [id, 'admin']);
+        if (!existing.rows.length) {
+            return formatResponse(res, 404, false, 'Admin not found');
+        }
+
+        const updates = [];
+        const params = [];
+        let i = 1;
+
+        if (typeof name === 'string' && name.trim()) {
+            updates.push('name = $' + i++);
+            params.push(name.trim());
+        }
+        if (typeof email === 'string' && email.trim()) {
+            const nextEmail = email.trim().toLowerCase();
+            const emailCheck = await db.query(
+                'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id <> $2 LIMIT 1',
+                [nextEmail, id]
+            );
+            if (emailCheck.rows.length) {
+                return formatResponse(res, 400, false, 'Email already exists');
+            }
+            updates.push('email = $' + i++);
+            params.push(nextEmail);
+        }
+        if (typeof password === 'string' && password.trim()) {
+            const bcrypt = require('bcryptjs');
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(password, salt);
+            updates.push('password = $' + i++);
+            params.push(hashedPassword);
+        }
+        if (typeof is_active === 'boolean') {
+            updates.push('is_active = $' + i++);
+            params.push(is_active);
+        }
+
+        if (!updates.length) {
+            return formatResponse(res, 400, false, 'Nothing to update');
+        }
+
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(id);
+
+        const query = 'UPDATE users SET ' + updates.join(', ') + " WHERE id = $" + i + " AND role = 'admin' RETURNING id, name, email, role, COALESCE(is_active, true) AS is_active";
+        const result = await db.query(query, params);
+
+        if (!result.rows.length) {
+            return formatResponse(res, 404, false, 'Admin not found');
+        }
+
+        formatResponse(res, 200, true, 'Admin updated successfully', result.rows[0]);
+    } catch (error) {
+        next(error);
+    }
+};
 exports.updateStaffPermissions = async (req, res, next) => {
     const { id } = req.params;
     const { permissions } = req.body;

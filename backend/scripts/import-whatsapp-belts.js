@@ -1,5 +1,5 @@
 /**
- * Import 4 dress belts from WhatsApp batch image (group photo).
+ * Import the two belt products from the uploaded WhatsApp images.
  *
  * Usage: node scripts/import-whatsapp-belts.js
  */
@@ -8,58 +8,33 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/db');
 const { uploadToCloudinary } = require('../src/utils/cloudinaryUpload');
-const { generateProductSku, generateVariantSku } = require('../src/utils/sku');
+const { generateProductSku } = require('../src/utils/sku');
 const { invalidateCatalogueCache } = require('../src/controllers/catalogueController');
 const { ensurePosForEcommerceProduct, seedPosOpeningStockIfEmpty } = require('../src/services/inventoryChannel');
 
-const SIZES = ['32', '34', '36', '38', '40', '42'];
-const STOCK_PER_SIZE = 6;
-
-const ASSETS = path.join(
-  process.env.USERPROFILE || '',
-  '.cursor',
-  'projects',
-  'c-Users-Spine-Prince-Esquare',
-  'assets'
-);
+const STOCK_PER_ITEM = 12;
+const ASSETS = path.join(__dirname, '..', '..', 'frontend', 'public');
 
 const CATALOG = [
   {
-    image: 'c__Users_Spine_AppData_Roaming_Cursor_User_workspaceStorage_c8f3ce83148d02272f6bffebdb3e27f0_images_WhatsApp_Image_2026-06-14_at_00.07.12-1ed63341-7870-4c0d-916f-0bb5fc880880.png',
-    name: 'BLACK SMOOTH LEATHER DRESS BELT',
-    slug: 'black-smooth-leather-dress-belt',
+    image: 'belt-001.jpeg',
+    name: 'BLACK LEATHER BELT SET',
+    slug: 'black-leather-belt-set',
     color: 'Black',
-    price: 2100,
-    description:
-      'Classic black smooth leather dress belt with brushed silver-tone rectangular pin buckle. Clean formal profile for suits and office wear.',
-  },
-  {
-    image: 'c__Users_Spine_AppData_Roaming_Cursor_User_workspaceStorage_c8f3ce83148d02272f6bffebdb3e27f0_images_WhatsApp_Image_2026-06-14_at_00.07.12-1ed63341-7870-4c0d-916f-0bb5fc880880.png',
-    name: 'DARK BROWN PEBBLED LEATHER DRESS BELT',
-    slug: 'dark-brown-pebbled-leather-dress-belt',
-    color: 'Brown',
-    price: 2100,
-    description:
-      'Dark chocolate brown pebbled leather dress belt with brushed silver-tone rectangular buckle. Fine grain texture for smart-casual and formal styling.',
-  },
-  {
-    image: 'c__Users_Spine_AppData_Roaming_Cursor_User_workspaceStorage_c8f3ce83148d02272f6bffebdb3e27f0_images_WhatsApp_Image_2026-06-14_at_00.07.13-aba73202-8b90-4c23-86ee-aa82c66ab226.png',
-    name: 'DARK BROWN SAFFIANO LEATHER DRESS BELT',
-    slug: 'dark-brown-saffiano-leather-dress-belt',
-    color: 'Brown',
-    price: 2200,
+    price: 2400,
     featured: true,
     description:
-      'Dark brown Saffiano cross-hatch leather dress belt with rounded gunmetal pin buckle. Scratch-resistant textured finish with silver logo keeper accent.',
+      'A clean black leather belt set with mixed buckle shapes and smooth-to-textured finishes for formal and smart-casual dressing. Adjustable and easy to pair with trousers, suits, and weekend tailoring.',
   },
   {
-    image: 'c__Users_Spine_AppData_Roaming_Cursor_User_workspaceStorage_c8f3ce83148d02272f6bffebdb3e27f0_images_WhatsApp_Image_2026-06-14_at_00.07.13-aba73202-8b90-4c23-86ee-aa82c66ab226.png',
-    name: 'BLACK PEBBLED LEATHER DRESS BELT',
-    slug: 'black-pebbled-leather-dress-belt',
-    color: 'Black',
-    price: 2100,
+    image: 'belt-002.jpeg',
+    name: 'DARK BROWN LEATHER BELT SET',
+    slug: 'dark-brown-leather-belt-set',
+    color: 'Dark Brown',
+    price: 2400,
+    featured: true,
     description:
-      'Black coarse-pebbled leather dress belt with brushed silver-tone rectangular buckle. Durable textured strap for daily formal and business wear.',
+      'A refined dark brown leather belt set with polished metal buckles and balanced grain for office and evening dressing. Versatile with navy, charcoal, and tan tailoring.',
   },
 ];
 
@@ -84,7 +59,7 @@ async function ensureCategory(name, parentId = null) {
   if (bySlug.rows.length) return bySlug.rows[0].id;
   const r = await db.query(
     'INSERT INTO categories (name, slug, description, parent_id) VALUES ($1, $2, $3, $4) RETURNING id',
-    [name, slug, `${name} — Prince Esquire`, parentId]
+    [name, slug, `${name} — Prince Esquare`, parentId]
   );
   return r.rows[0].id;
 }
@@ -101,11 +76,11 @@ async function ensureBrand(name) {
 }
 
 const buildDescription = (item) =>
-  `${item.description}\n\nKey features:\n• Genuine leather strap with tonal edge stitching.\n• Classic dress width for suit trousers and chinos.\n• Pin buckle closure with leather keeper loop(s).\n• Formal-to-smart-casual versatility.\n\nCare: Wipe with a damp cloth. Condition leather periodically. Store flat or coiled loosely.\n\nAvailable waist sizes 32–42. Exclusively at Prince Esquire.`;
+  `${item.description}\n\nKey features:\n• Genuine leather strap with tonal edge stitching.\n• Classic dress width for suit trousers and chinos.\n• Pin buckle closure with leather keeper loop(s).\n• Formal-to-smart-casual versatility.\n\nCare: Wipe with a damp cloth. Condition leather periodically. Store flat or coiled loosely.\n\nExclusively at Prince Esquare.`;
 
 (async () => {
   const beltsId = await ensureCategory('Belts & Ties');
-  const brandId = await ensureBrand('Prince Esquire');
+  const brandId = await ensureBrand('Prince Esquare');
 
   let imported = 0;
   for (const item of CATALOG) {
@@ -120,16 +95,22 @@ const buildDescription = (item) =>
     const uploaded = await uploadToCloudinary(buffer, undefined, 'image/png');
     const imageUrl = uploaded.secure_url || uploaded.url;
     const productSku = generateProductSku({ name: item.name, slug: item.slug });
-    const totalStock = SIZES.length * STOCK_PER_SIZE;
 
     const result = await db.query(
       `INSERT INTO products (name, slug, sku, description, price, category_id, brand_id, stock_quantity, is_featured, thumbnail, images, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, true)
        ON CONFLICT (slug) DO UPDATE SET
-         name = EXCLUDED.name, sku = EXCLUDED.sku, description = EXCLUDED.description,
-         price = EXCLUDED.price, category_id = EXCLUDED.category_id, brand_id = EXCLUDED.brand_id,
-         thumbnail = EXCLUDED.thumbnail, images = EXCLUDED.images, is_featured = EXCLUDED.is_featured,
-         is_active = true, stock_quantity = EXCLUDED.stock_quantity
+         name = EXCLUDED.name,
+         sku = EXCLUDED.sku,
+         description = EXCLUDED.description,
+         price = EXCLUDED.price,
+         category_id = EXCLUDED.category_id,
+         brand_id = EXCLUDED.brand_id,
+         thumbnail = EXCLUDED.thumbnail,
+         images = EXCLUDED.images,
+         is_featured = EXCLUDED.is_featured,
+         is_active = true,
+         stock_quantity = EXCLUDED.stock_quantity
        RETURNING *`,
       [
         item.name,
@@ -139,7 +120,7 @@ const buildDescription = (item) =>
         item.price,
         beltsId,
         brandId,
-        totalStock,
+        STOCK_PER_ITEM,
         Boolean(item.featured),
         imageUrl,
         JSON.stringify([{ url: imageUrl, alt: item.name }]),
@@ -148,28 +129,8 @@ const buildDescription = (item) =>
 
     const product = result.rows[0];
     await db.query('DELETE FROM product_variants WHERE product_id = $1', [product.id]);
-
-    for (const size of SIZES) {
-      const variant = { size, color: item.color, image_url: imageUrl };
-      const variantSku = generateVariantSku(productSku, variant);
-      await db.query(
-        `INSERT INTO product_variants (product_id, name, value, price_modifier, stock_quantity, image_url, color, size, sku, stock_id)
-         VALUES ($1, 'Variant', $2, 0, $3, $4, $5, $6, $7, $8)`,
-        [
-          product.id,
-          `Waist ${size} / ${item.color}`,
-          STOCK_PER_SIZE,
-          imageUrl,
-          item.color,
-          size,
-          variantSku,
-          variantSku,
-        ]
-      );
-    }
-
     const posRow = await ensurePosForEcommerceProduct(product);
-    await seedPosOpeningStockIfEmpty(posRow?.id, totalStock);
+    await seedPosOpeningStockIfEmpty(posRow?.id, STOCK_PER_ITEM);
     imported += 1;
   }
 

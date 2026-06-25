@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Package, ShoppingBag, Tag, Award, Users, 
@@ -2507,7 +2507,10 @@ const SettingsView = () => {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [adminsLoading, setAdminsLoading] = useState(true);
   const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [admins, setAdmins] = useState([]);
+  const [editingAdminId, setEditingAdminId] = useState(null);
   const [adminForm, setAdminForm] = useState({
     name: '',
     email: '',
@@ -2528,6 +2531,20 @@ const SettingsView = () => {
     fetchSettings();
   }, []);
 
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const res = await adminCustomerAPI.getAdmins();
+        setAdmins(res.data?.data || []);
+      } catch (error) {
+        console.error('Error fetching admins:', error);
+      } finally {
+        setAdminsLoading(false);
+      }
+    };
+    fetchAdmins();
+  }, []);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -2541,15 +2558,49 @@ const SettingsView = () => {
     }
   };
 
+  const resetAdminForm = () => {
+    setEditingAdminId(null);
+    setAdminForm({ name: '', email: '', password: '' });
+  };
+
+  const handleEditAdmin = (admin) => {
+    setEditingAdminId(admin.id);
+    setAdminForm({
+      name: admin.name || '',
+      email: admin.email || '',
+      password: '',
+    });
+  };
+
+  const refreshAdmins = async () => {
+    try {
+      const res = await adminCustomerAPI.getAdmins();
+      setAdmins(res.data?.data || []);
+    } catch (error) {
+      console.error('Error refreshing admins:', error);
+    }
+  };
+
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
     setCreatingAdmin(true);
     try {
-      await adminCustomerAPI.createAdmin(adminForm);
-      adminToast.success('Admin account created');
-      setAdminForm({ name: '', email: '', password: '' });
+      if (editingAdminId) {
+        const payload = {
+          name: adminForm.name,
+          email: adminForm.email,
+        };
+        if (adminForm.password) payload.password = adminForm.password;
+        await adminCustomerAPI.updateAdmin(editingAdminId, payload);
+        adminToast.success('Admin account updated');
+      } else {
+        await adminCustomerAPI.createAdmin(adminForm);
+        adminToast.success('Admin account created');
+      }
+      await refreshAdmins();
+      resetAdminForm();
     } catch (error) {
-      adminToast.error(apiErrorMessage(error, 'Could not create admin account'));
+      adminToast.error(apiErrorMessage(error, editingAdminId ? 'Could not update admin account' : 'Could not create admin account'));
     } finally {
       setCreatingAdmin(false);
     }
@@ -2616,73 +2667,102 @@ const SettingsView = () => {
         </div>
 
         <div className="space-y-8">
-           <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
-             <h5 className="mb-6 border-b border-gold-500/10 pb-2 text-[10px] font-black text-gold-500/40">System Integrations</h5>
-             <div className="space-y-6">
-                {[
-                  { label: 'Daraja API', val: 'Connected', color: 'text-green-400' },
-                  { label: 'Cloudinary', val: 'Operational', color: 'text-green-400' },
-                  { label: 'PostgreSQL', val: 'Connected', color: 'text-green-400' },
-                  { label: 'SendGrid', val: 'Operational', color: 'text-green-400' },
-                ].map((h, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gold-100">{h.label}</span>
-                    <span className={`text-[10px] font-black ${h.color}`}>{h.val}</span>
+          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
+            <div className="mb-5 flex items-center gap-3">
+              <ShieldCheck size={20} className="text-gold-500" />
+              <div>
+                <h5 className="font-serif text-lg font-bold text-gold-100">Admin accounts</h5>
+                <p className="text-xs text-gold-500/40">Edit existing admin access or select one to update.</p>
+              </div>
+            </div>
+            {adminsLoading ? (
+              <div className="py-10 text-center text-xs text-gold-500/40">Loading admins...</div>
+            ) : admins.length ? (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+                {admins.map((admin) => (
+                  <div key={admin.id} className="rounded-xl border border-gold-500/10 bg-navy-950/50 p-4 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-gold-100">{admin.name}</p>
+                        {admin.is_active === false && <span className="h-2 w-2 rounded-full bg-red-500" />}
+                      </div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/35">{admin.email}</p>
+                      <p className="mt-1 text-[10px] text-gold-500/30">ID: {String(admin.id).substring(0, 8)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleEditAdmin(admin)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gold-500/15 px-3 py-2 text-[10px] font-bold text-gold-100 hover:border-gold-500/40"
+                    >
+                      <Edit size={12} /> Edit
+                    </button>
                   </div>
                 ))}
-             </div>
-           </div>
+              </div>
+            ) : (
+              <div className="py-10 text-center text-xs text-gold-500/40">No admin accounts found.</div>
+            )}
+          </div>
 
-           <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
-             <div className="mb-5 flex items-center gap-3">
-               <ShieldCheck size={20} className="text-gold-500" />
-               <div>
-                 <h5 className="font-serif text-lg font-bold text-gold-100">Add another admin</h5>
-                 <p className="text-xs text-gold-500/40">Create a full admin account from the settings page.</p>
-               </div>
-             </div>
-             <form onSubmit={handleCreateAdmin} className="space-y-4">
-               <input
-                 type="text"
-                 required
-                 value={adminForm.name}
-                 onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
-                 placeholder="Full name"
-                 className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
-               />
-               <input
-                 type="email"
-                 required
-                 value={adminForm.email}
-                 onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                 placeholder="Email address"
-                 className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
-               />
-               <input
-                 type="password"
-                 required
-                 value={adminForm.password}
-                 onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                 placeholder="Temporary password"
-                 className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
-               />
-               <button 
+          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
+            <div className="mb-5 flex items-center gap-3">
+              <ShieldCheck size={20} className="text-gold-500" />
+              <div>
+                <h5 className="font-serif text-lg font-bold text-gold-100">{editingAdminId ? 'Edit admin account' : 'Add another admin'}</h5>
+                <p className="text-xs text-gold-500/40">{editingAdminId ? 'Update the selected admin details below.' : 'Create a full admin account from the settings page.'}</p>
+              </div>
+            </div>
+            <form onSubmit={handleCreateAdmin} className="space-y-4">
+              <input
+                type="text"
+                required
+                value={adminForm.name}
+                onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
+                placeholder="Full name"
+                className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
+              />
+              <input
+                type="email"
+                required
+                value={adminForm.email}
+                onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                placeholder="Email address"
+                className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
+              />
+              <input
+                type="password"
+                required={!editingAdminId}
+                value={adminForm.password}
+                onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                placeholder={editingAdminId ? 'New password (optional)' : 'Temporary password'}
+                className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
+              />
+              <button 
                 type="submit"
                 disabled={creatingAdmin}
                 className="w-full rounded-2xl bg-gold-600 py-4 font-black tracking-[0.2em] text-navy-950 shadow-xl shadow-gold-600/10 transition-all hover:bg-gold-500 disabled:opacity-50"
-               >
-                 {creatingAdmin ? 'CREATING...' : 'CREATE ADMIN'}
-               </button>
-             </form>
-           </div>
+              >
+                {creatingAdmin ? 'SAVING...' : editingAdminId ? 'UPDATE ADMIN' : 'CREATE ADMIN'}
+              </button>
+              {editingAdminId && (
+                <button
+                  type="button"
+                  onClick={resetAdminForm}
+                  className="w-full rounded-2xl border border-gold-500/15 py-4 font-black tracking-[0.2em] text-gold-100 transition-all hover:border-gold-500/40"
+                >
+                  CANCEL EDIT
+                </button>
+              )}
+            </form>
+          </div>
 
-           <button 
+          <button 
             onClick={handleSave}
             disabled={saving}
             className="w-full rounded-2xl bg-gold-600 py-5 font-black tracking-[0.2em] text-navy-950 shadow-xl shadow-gold-600/10 transition-all hover:bg-gold-500 disabled:opacity-50"
-           >
-             {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
-           </button>
+          >
+            {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
+          </button>
         </div>
       </div>
     </div>
