@@ -65,39 +65,14 @@ const enrichStockRows = async (rows) => {
     }
   }
 
-  let physicalMap = null;
-  if (webIds.length && rows.length <= 150) {
-    const { fetchPhysicalAggregates } = require('../services/variantStockReport');
-    physicalMap = await fetchPhysicalAggregates('');
-  }
-
   return rows.map((p) => {
     const draft = parseDraft(p.website_details);
     const webId = p.ecommerce_product_id || p.website_product_id;
     const liveVariants = webId ? variantsByProduct[webId] : null;
     const variants = liveVariants?.length ? liveVariants : (draft.variants || []);
-    let color_groups = variants.length
+    const color_groups = variants.length
       ? groupVariantsByColor(variants)
       : (draft.color_groups || []);
-
-    if (physicalMap && color_groups.length && p.category) {
-      const { aggKey } = require('../services/variantStockReport');
-      color_groups = color_groups.map((g) => ({
-        ...g,
-        sizes: (g.sizes || []).map((s) => {
-          const phys = physicalMap.get(
-            aggKey(p.category, g.color || 'Unspecified', s.size || 'Standard')
-          );
-          const shopPhysical = phys?.shopQty ?? null;
-          return {
-            ...s,
-            physicalQty: shopPhysical,
-            warehouseQty: phys?.warehouseQty ?? null,
-            stock: shopPhysical != null ? shopPhysical : (s.stock ?? 0),
-          };
-        }),
-      }));
-    }
 
     return {
       ...p,

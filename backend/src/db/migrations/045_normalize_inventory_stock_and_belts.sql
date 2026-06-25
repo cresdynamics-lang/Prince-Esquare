@@ -104,7 +104,7 @@ ON CONFLICT (slug) DO UPDATE SET
 WITH ranked_variants AS (
   SELECT
     pv.id,
-    6 + (((ROW_NUMBER() OVER (ORDER BY p.slug, COALESCE(pv.color, ''), COALESCE(pv.size, ''), pv.id)) - 1) % 12) AS realistic_qty
+    7 + (((ROW_NUMBER() OVER (ORDER BY p.slug, COALESCE(pv.color, ''), COALESCE(pv.size, ''), pv.id)) - 1) % 9) AS realistic_qty
   FROM product_variants pv
   JOIN products p ON p.id = pv.product_id
   WHERE p.is_active = true
@@ -129,7 +129,7 @@ WHERE vt.product_id = p.id
 WITH ranked_products AS (
   SELECT
     p.id,
-    6 + (((ROW_NUMBER() OVER (ORDER BY p.slug, p.id)) - 1) % 12) AS realistic_qty
+    7 + (((ROW_NUMBER() OVER (ORDER BY p.slug, p.id)) - 1) % 9) AS realistic_qty
   FROM products p
   WHERE p.is_active = true
     AND NOT EXISTS (
@@ -146,7 +146,7 @@ WHERE ranked_products.id = p.id;
 UPDATE products
 SET stock_quantity = CASE
       WHEN slug = 'black-leather-belt-set' THEN 12
-      WHEN slug = 'dark-brown-leather-belt-set' THEN 9
+      WHEN slug = 'dark-brown-leather-belt-set' THEN 10
       ELSE stock_quantity
     END,
     is_active = true,
