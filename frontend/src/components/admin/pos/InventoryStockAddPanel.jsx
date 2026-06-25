@@ -53,6 +53,7 @@ const InventoryStockAddPanel = ({ product, onDone, onCancel }) => {
   const [detail, setDetail] = useState(null);
   const [colorGroups, setColorGroups] = useState([]);
   const [additions, setAdditions] = useState({});
+  const [singleShopAdd, setSingleShopAdd] = useState('');
   const [storeAdd, setStoreAdd] = useState('');
 
   useEffect(() => {
@@ -103,6 +104,7 @@ const InventoryStockAddPanel = ({ product, onDone, onCancel }) => {
   );
 
   const totalToAdd = useMemo(() => {
+    if (!hasSizes) return parseInt(singleShopAdd, 10) || 0;
     let sum = 0;
     for (const group of colorGroups) {
       for (const row of group.sizes || []) {
@@ -110,13 +112,57 @@ const InventoryStockAddPanel = ({ product, onDone, onCancel }) => {
       }
     }
     return sum;
-  }, [colorGroups, additions]);
+  }, [colorGroups, additions, hasSizes, singleShopAdd]);
 
   const setAdd = (key, value) => {
     setAdditions((prev) => ({ ...prev, [key]: value.replace(/[^\d]/g, '') }));
   };
 
   const handleSave = async () => {
+    const storeQty = parseInt(storeAdd, 10) || 0;
+
+    if (!hasSizes) {
+      const singleQty = parseInt(singleShopAdd, 10) || 0;
+      if (singleQty < 1 && storeQty < 1) {
+        toast.error('Enter quantity to add for shop or at store');
+        return;
+      }
+
+      setBusy(true);
+      try {
+        if (singleQty > 0) {
+          await inventoryAPI.saveProductDetails(product.id, {
+            name: detail?.name || product.name,
+            sku: detail?.sku || product.sku,
+            category: detail?.category || product.category,
+            shop_price: detail?.shop_price ?? product.shop_price,
+            variants: [],
+            color_groups: [],
+          });
+          await inventoryAPI.stockTake([{ productId: product.id, physicalQty: (product.currentQty ?? 0) + singleQty }]);
+        }
+
+        if (storeQty > 0) {
+          await inventoryAPI.receiveAtStore({
+            productId: product.id,
+            qty: storeQty,
+            notes: 'Added via inventory',
+          });
+        }
+
+        const parts = [];
+        if (singleQty > 0) parts.push(singleQty + ' to shop');
+        if (storeQty > 0) parts.push(storeQty + ' to store');
+        toast.success('Added ' + parts.join(', ') + ' - ' + product.name);
+        onDone?.();
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Could not add stock');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     const perSizeAdds = [];
     let totalShopAdd = 0;
 
@@ -136,8 +182,6 @@ const InventoryStockAddPanel = ({ product, onDone, onCancel }) => {
         }
       }
     }
-
-    const storeQty = parseInt(storeAdd, 10) || 0;
 
     if (totalShopAdd < 1 && storeQty < 1) {
       toast.error('Enter quantity to add for at least one size or at store');
@@ -188,9 +232,9 @@ const InventoryStockAddPanel = ({ product, onDone, onCancel }) => {
       }
 
       const parts = [];
-      if (totalShopAdd > 0) parts.push(`${totalShopAdd} to shop`);
-      if (storeQty > 0) parts.push(`${storeQty} to store`);
-      toast.success(`Added ${parts.join(', ')} — ${product.name}`);
+      if (totalShopAdd > 0) parts.push(totalShopAdd + ' to shop');
+      if (storeQty > 0) parts.push(storeQty + ' to store');
+      toast.success('Added ' + parts.join(', ') + ' - ' + product.name);
       onDone?.();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not add stock');
@@ -278,7 +322,20 @@ const InventoryStockAddPanel = ({ product, onDone, onCancel }) => {
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gold-500/50">No sizes found for this product. Use Edit details to set up sizes first.</p>
+        <div className="space-y-2">
+          <p className="text-xs text-gold-500/50">This product has no sizes. Manage stock as a single quantity.</p>
+          <label className="block space-y-1 max-w-xs">
+            <span className="text-[10px] text-gold-500/50">Shop stock to add</span>
+            <input
+              type="number"
+              min={0}
+              value={singleShopAdd}
+              onChange={(e) => setSingleShopAdd(e.target.value.replace(/[^\d]/g, ''))}
+              className="w-full bg-navy-950 border border-gold-500/20 rounded px-2 py-1.5 text-white text-sm"
+              placeholder="0"
+            />
+          </label>
+        </div>
       )}
 
       <label className="block space-y-1 max-w-xs">

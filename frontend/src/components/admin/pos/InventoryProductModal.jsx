@@ -151,7 +151,7 @@ const InventoryProductModal = ({ itemId, defaultCategoryId, onClose, onSaved }) 
   };
 
   const addSizeToGroup = (groupKey, size) => {
-    if (!size?.trim()) return;
+    if (!sizeOptions.length || !size?.trim()) return;
     setForm((f) => ({
       ...f,
       color_groups: f.color_groups.map((g) => {

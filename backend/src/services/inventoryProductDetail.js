@@ -105,6 +105,10 @@ const getInventoryProductDetail = async (posProductId) => {
   if (pos.ecommerce_product_id) {
     const live = await fetchLiveWebsiteProduct(pos.ecommerce_product_id);
     if (live) {
+      const draftVariants = Array.isArray(draft.variants) && draft.variants.length ? draft.variants : null;
+      const draftColorGroups = Array.isArray(draft.color_groups) && draft.color_groups.length ? draft.color_groups : null;
+      const liveVariants = live.variants || [];
+      const resolvedVariants = draftVariants || liveVariants;
       return {
         id: pos.id,
         name: live.name || pos.name,
@@ -127,8 +131,8 @@ const getInventoryProductDetail = async (posProductId) => {
           discount_price: live.discount_price != null ? parseFloat(live.discount_price) : null,
           thumbnail: live.thumbnail,
           images: live.images || [],
-          variants: live.variants,
-          color_groups: groupVariantsByColor(live.variants),
+          variants: resolvedVariants,
+          color_groups: draftColorGroups || groupVariantsByColor(resolvedVariants),
         },
       };
     }

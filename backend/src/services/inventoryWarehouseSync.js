@@ -274,19 +274,16 @@ const applyWebsiteStockRow = async (client, row) => {
       [shopQty, row.web_id]
     );
   } else {
-    const qty = shopQty;
-    await client.query(
-      `UPDATE product_variants SET stock_quantity = $1 WHERE product_id = $2`,
-      [qty, row.web_id]
-    );
     const sumR = await client.query(
       `SELECT COALESCE(SUM(stock_quantity), 0)::int AS total
        FROM product_variants WHERE product_id = $1`,
       [row.web_id]
     );
+    const total = sumR.rows[0]?.total ?? 0;
+    const resolvedTotal = total > 0 ? total : shopQty;
     await client.query(
       `UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2`,
-      [sumR.rows[0]?.total ?? qty, row.web_id]
+      [resolvedTotal, row.web_id]
     );
   }
   return 1;

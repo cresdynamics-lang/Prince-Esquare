@@ -162,6 +162,14 @@ const syncPosWebsiteDetailsFromEcommerce = async (ecommerceProductId, posProduct
     image_url: v.image_url,
   }));
 
+  const posDraftR = await db.query('SELECT website_details FROM pos_products WHERE id = $1', [posId]);
+  const posDraft = (() => {
+    try { return JSON.parse(posDraftR.rows[0]?.website_details || '{}'); } catch { return {}; }
+  })();
+  const draftVariants = Array.isArray(posDraft.variants) && posDraft.variants.length ? posDraft.variants : null;
+  const draftColorGroups = Array.isArray(posDraft.color_groups) && posDraft.color_groups.length ? posDraft.color_groups : null;
+  const resolvedVariants = draftVariants || variants;
+
   const images = typeof product.images === 'string'
     ? (() => { try { return JSON.parse(product.images); } catch { return []; } })()
     : (product.images || []);
@@ -175,8 +183,8 @@ const syncPosWebsiteDetailsFromEcommerce = async (ecommerceProductId, posProduct
     discount_price: product.discount_price != null ? parseFloat(product.discount_price) : null,
     thumbnail: product.thumbnail,
     images,
-    variants,
-    color_groups: groupVariantsByColor(variants),
+    variants: resolvedVariants,
+    color_groups: draftColorGroups || groupVariantsByColor(resolvedVariants),
   };
 
   await db.query(
