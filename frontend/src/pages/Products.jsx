@@ -127,6 +127,7 @@ const Products = ({ categoryOverride = null }) => {
   const [stockFilter, setStockFilter] = useState('all');
   const [addedProductId, setAddedProductId] = useState(null);
   const [fetchError, setFetchError] = useState('');
+  const [visibleCount, setVisibleCount] = useState(12);
 
   const isDedicatedCategoryPage = Boolean(categoryOverride);
   const currentCategory = categoryOverride || searchParams.get('category') || 'All';
@@ -246,6 +247,13 @@ const Products = ({ categoryOverride = null }) => {
     if (stockFilter === 'out_of_stock' && !product.out_of_stock) return false;
     return true;
   });
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [currentCategory, currentSub, searchQuery, stockFilter]);
+
+  const displayedProducts = filteredProducts.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredProducts.length;
 
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
@@ -373,8 +381,8 @@ const Products = ({ categoryOverride = null }) => {
             <p className="text-center text-gold-600/50 text-[10px]   py-24">Loading collectionÃ¢â‚¬Â¦</p>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-10 gap-y-12 sm:gap-y-20">
-              <AnimatePresence mode="popLayout">
-                {filteredProducts.map((product, index) => {
+               <AnimatePresence mode="popLayout">
+                 {displayedProducts.map((product, index) => {
                   const outOfStock = product.out_of_stock === true;
                   return (
                   <motion.div
@@ -435,6 +443,17 @@ const Products = ({ categoryOverride = null }) => {
                   </motion.div>
                 );})}
               </AnimatePresence>
+            </div>
+          )}
+
+          {hasMore && !loading && (
+            <div className="flex justify-center mt-12">
+              <button
+                onClick={() => setVisibleCount(prev => prev + 12)}
+                className="px-8 py-3 bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 transition-colors"
+              >
+                Show More
+              </button>
             </div>
           )}
 
