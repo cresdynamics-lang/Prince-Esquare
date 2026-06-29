@@ -10,7 +10,6 @@
 #   SKIP_BACKUP=1        skip pg_dump
 #   SKIP_BUILD=1         skip frontend build
 #   RUN_MIGRATE=1        run db:migrate (default 1)
-#   AUTO_BOOTSTRAP=false set in backend/.env before restart if you want no auto POS link sync
 
 set -euo pipefail
 
@@ -121,4 +120,3 @@ echo "=== Done ==="
 echo "Skipped on purpose (do NOT run on live without review):"
 echo "  - seed scripts"
 echo "  - angles:apply (overwrites product angle images)"
-echo "  - import:stock (resets stock from Excel)"

@@ -16,8 +16,28 @@ const OUT_DIR = path.join(__dirname, '..', 'data', 'formal-shoes-images');
 const OUT_JSON = path.join(__dirname, '..', 'data', 'formal-shoes.json');
 const SPECS_PATH = path.join(__dirname, '..', 'data', 'formal-shoes-specs.json');
 
+const parseSpecs = (content) => {
+  const specs = {};
+  const productRegex = /"([^"]+)": {([^}]+)}/g;
+  let match;
+  while ((match = productRegex.exec(content)) !== null) {
+    const uuid = match[1];
+    const productContent = match[2];
+    const spec = {};
+    const propertyRegex = /"([^"]+)": "((?:.|\n|\r)*?)"/g;
+    let propMatch;
+    while ((propMatch = propertyRegex.exec(productContent)) !== null) {
+      const key = propMatch[1];
+      const value = propMatch[2];
+      spec[key] = value;
+    }
+    specs[uuid] = spec;
+  }
+  return specs;
+};
+
 const SPECS = fs.existsSync(SPECS_PATH)
-  ? JSON.parse(fs.readFileSync(SPECS_PATH, 'utf8'))
+  ? parseSpecs(fs.readFileSync(SPECS_PATH, 'utf8'))
   : {};
 
 const BATCH_UUIDS = new Set(Object.keys(SPECS));
@@ -105,8 +125,7 @@ const main = () => {
   }
 
   fs.writeFileSync(OUT_JSON, JSON.stringify(catalog, null, 2));
-  const boots = catalog.filter((c) => c.type === 'boot').length;
-  console.log(`Catalog: ${catalog.length} formal shoes (${boots} boots, ${catalog.length - boots} officials)`);
+  console.log(`Catalog: ${catalog.length} formal shoes`);
   console.log('Written:', OUT_JSON);
 };
 

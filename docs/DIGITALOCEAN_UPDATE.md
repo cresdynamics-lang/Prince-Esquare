@@ -59,22 +59,10 @@ The update script:
 
 Migrations are **additive** (new tables/columns/indexes). Existing products, orders, and stock rows stay.
 
-| Migration range | What it does |
-|-----------------|--------------|
-| 010 | `angle_images` on variants |
-| 011–012 | New POS tables + link columns on `products` / `pos_products` |
-| 013–015, 022 | Indexes only (no data loss) |
-| 016–021 | POS sales, SKUs, store stock, `website_details` JSONB |
-| 018 | Backfills `sku` on products/variants (updates empty SKUs only) |
-
 **Do not run on production:**
 
-- `npm run db:seed:pos`
 - `npm run seed:dummy-products`
-- `npm run import:stock` (unless you intend to overwrite stock sheet)
 - `npm run angles:apply` (unless you want to replace product images)
-
-**First deploy with POS on old DB:** `migrate.js` auto-marks older migrations as applied if `pos_products` already exists.
 
 ## 6. Production `.env` tips
 
@@ -82,8 +70,6 @@ In `backend/.env` on the server:
 
 ```env
 NODE_ENV=production
-TRUST_PROXY=true
-AUTO_BOOTSTRAP=true
 REQUIRE_CLOUDINARY=true
 STORAGE_ALLOW_LOCAL=false
 CLOUDINARY_URL=...

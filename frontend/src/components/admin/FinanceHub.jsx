@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
-import PosTerminalView from '../pos/PosTerminalView';
 import FinanceOverview from './FinanceOverview';
 import { canUsePosTerminal } from '../../utils/staffPermissions';
-import { AdminPosTerminalInfo, PosOverviewView, PosSalesView } from './pos/PosAdminViews';
 
 const MODULES = [
   { id: 'revenue', label: 'Revenue', description: 'Sales totals, profit, and opening/closing stock' },
-  { id: 'pos-overview', label: 'POS Overview', description: 'In-store KPIs and low-stock alerts' },
-  { id: 'pos-sales', label: 'POS Sales', description: 'Receipts, voids, and in-store transactions' },
-  { id: 'pos-terminal', label: 'POS Terminal', description: 'Checkout and shift management' },
 ];
 
 const FinanceHub = ({ forcedModule, readOnly = false }) => {
@@ -21,26 +16,12 @@ const FinanceHub = ({ forcedModule, readOnly = false }) => {
 
   const active = MODULES.find((m) => m.id === module) || MODULES[0];
   const canPos = isSeller || canUsePosTerminal(user, { isSeller });
-  const isPosTerminal = module === 'pos-terminal' && (isSeller || canPos || adminTestPos);
+  const isPosTerminal = false;
 
   const renderModule = () => {
     switch (module) {
       case 'revenue':
         return <FinanceOverview />;
-      case 'pos-overview':
-        return <PosOverviewView />;
-      case 'pos-sales':
-        return <PosSalesView channel="POS" readOnly={readOnly || isSeller} />;
-      case 'pos-terminal':
-        if (isSeller || canPos || adminTestPos) {
-          return <PosTerminalView embedded embeddedLayout="finance" />;
-        }
-        return (
-          <AdminPosTerminalInfo
-            onNavigateTab={(id) => setModule(id)}
-            onEnableTestPos={() => setAdminTestPos(true)}
-          />
-        );
       default:
         return <FinanceOverview />;
     }

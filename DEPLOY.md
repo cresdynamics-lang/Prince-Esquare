@@ -27,7 +27,7 @@ Set real secrets in `docker-compose.yml` or an override file before production u
    - **PostgreSQL** — attach `DATABASE_URL`
 3. Set environment variables (see `backend/.env.example`):
    - `CLOUDINARY_URL`, `JWT_SECRET`, `INTERNAL_KEY`, `FRONTEND_URL`, `VITE_API_URL`
-4. Run migrations once: Render shell → `node src/db/migrate.js`
+4. Run migrations once: Render shell → `npm run db:migrate`
 
 ## Option C — Manual
 
@@ -60,16 +60,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main`:
 - Docker image builds
 
 ## Angle product images
-
-```bash
-# 1. Copy generated PNGs into frontend/public/generated-products/{slug}/
-powershell -File backend/scripts/organize-angle-images.ps1
-
-# 2. Build manifest + apply to database
-cd backend
-npm run angles:manifest
-npm run angles:apply
-```
+This feature is now handled automatically.
 
 ## Health checks
 

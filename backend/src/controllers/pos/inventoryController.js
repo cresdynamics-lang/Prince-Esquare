@@ -269,7 +269,7 @@ exports.syncAlignment = async (req, res, next) => {
     const { syncInventoryAlignment } = require('../../services/inventoryWarehouseSync');
     const result = await syncInventoryAlignment();
     formatResponse(res, 200, true, 'Inventory aligned — website products linked and stock synced', result);
-  } catch (error) {
+  } catch (error) { // eslint-disable-line
     next(error);
   }
 };

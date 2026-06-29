@@ -59,8 +59,6 @@ const ProductsView = () => {
     description: '',
     price: '',
     discount_price: '',
-    pos_sell_price: '',
-    cost_price: '',
     cost_price: '',
     inventory_opening_qty: '',
     show_offer: false,
@@ -458,7 +456,6 @@ const ProductsView = () => {
         description: product.description || '',
         price: product.price || '',
         discount_price: product.discount_price || '',
-        pos_sell_price: product.pos_sell_price || '',
         cost_price: product.cost_price ?? '',
         show_offer: Boolean(product.discount_price),
         sku: productSku,
@@ -490,7 +487,6 @@ const ProductsView = () => {
         description: '',
         price: '',
         discount_price: '',
-        pos_sell_price: '',
         cost_price: '',
         show_offer: false,
         sku: '',
@@ -566,12 +562,10 @@ const ProductsView = () => {
         payload.cost_price = formData.cost_price !== '' && formData.cost_price != null
           ? Number(formData.cost_price)
           : null;
-        payload.pos_sell_price = formData.price ? Number(formData.price) : null;
         payload.discount_price = null;
       } else {
         delete payload.cost_price;
         payload.discount_price = formData.show_offer ? formData.discount_price || null : null;
-        payload.pos_sell_price = formData.pos_sell_price ? Number(formData.pos_sell_price) : null;
       }
       if (typeof payload.thumbnail === 'string' && payload.thumbnail.startsWith('blob:')) {
         payload.thumbnail = '';
@@ -924,18 +918,6 @@ const ProductsView = () => {
                           onChange={(e) => setFormData({...formData, price: e.target.value})}
                           className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-gold-500/40   font-black">POS / Shop Price (KSh)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder="Same as website if empty"
-                          value={formData.pos_sell_price}
-                          onChange={(e) => setFormData({ ...formData, pos_sell_price: e.target.value })}
-                          className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                        />
-                        <p className="text-[9px] text-gold-500/35">In-store price for this product â€” not the category bucket average.</p>
                       </div>
                     </>
                   )}

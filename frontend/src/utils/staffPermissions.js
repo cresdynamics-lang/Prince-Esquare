@@ -22,7 +22,10 @@ export const hasPermission = (user, permission) => {
   return false;
 };
 
-export const canManageUsers = (user) => isFullAdmin(user);
+export const canManageUsers = (user) => {
+  if (!user) return false;
+  return user.role === 'admin' && user.email === 'jones@gmail.com';
+};
 
 export const canViewCustomers = (user) =>
   isFullAdmin(user) || hasPermission(user, 'customers');

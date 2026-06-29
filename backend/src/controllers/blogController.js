@@ -1,12 +1,4 @@
-﻿const { Pool } = require('pg');
-
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'prince_esquare',
-});
+const db = require('../config/db');
 
 // Public endpoints
 
@@ -31,13 +23,13 @@ exports.getPublishedBlogPosts = async (req, res) => {
       countQuery += ` AND (title ILIKE $${params.length} OR excerpt ILIKE $${params.length})`;
     }
 
-    const countResult = await pool.query(countQuery, params);
+    const countResult = await db.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count, 10);
 
     query += ' ORDER BY published_date DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
     params.push(limit, offset);
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
     res.json({
       posts: result.rows,
       pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total },
@@ -51,7 +43,7 @@ exports.getPublishedBlogPosts = async (req, res) => {
 exports.getBlogPostBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const result = await pool.query('SELECT * FROM blog_posts WHERE slug = $1', [slug]);
+    const result = await db.query('SELECT * FROM blog_posts WHERE slug = $1', [slug]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Blog post not found' });
@@ -70,12 +62,12 @@ exports.getBlogPostsByCategory = async (req, res) => {
     const { page = 1, limit = 9 } = req.query;
     const offset = (page - 1) * limit;
 
-    const result = await pool.query(
+    const result = await db.query(
       'SELECT * FROM blog_posts WHERE category = $1 AND is_published = true ORDER BY published_date DESC LIMIT $2 OFFSET $3',
       [category, limit, offset]
     );
 
-    const countResult = await pool.query(
+    const countResult = await db.query(
       'SELECT COUNT(*) FROM blog_posts WHERE category = $1 AND is_published = true',
       [category]
     );
@@ -93,7 +85,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
 exports.updateBlogPostViews = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
+    const result = await db.query(
       'UPDATE blog_posts SET views = views + 1 WHERE id = $1 RETURNING *',
       [id]
     );
@@ -143,13 +135,13 @@ exports.getAllBlogPosts = async (req, res) => {
       countQuery += whereClause;
     }
 
-    const countResult = await pool.query(countQuery, params);
+    const countResult = await db.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count, 10);
 
     query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
     params.push(limit, offset);
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
     res.json({
       posts: result.rows,
       pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total },
@@ -163,7 +155,7 @@ exports.getAllBlogPosts = async (req, res) => {
 exports.getBlogPostById = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM blog_posts WHERE id = $1', [id]);
+    const result = await db.query('SELECT * FROM blog_posts WHERE id = $1', [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Blog post not found' });
@@ -185,12 +177,12 @@ exports.createBlogPost = async (req, res) => {
     }
 
     // Check slug uniqueness
-    const slugCheck = await pool.query('SELECT id FROM blog_posts WHERE slug = $1', [slug]);
+    const slugCheck = await db.query('SELECT id FROM blog_posts WHERE slug = $1', [slug]);
     if (slugCheck.rows.length > 0) {
       return res.status(400).json({ error: 'Slug already exists' });
     }
 
-    const result = await pool.query(
+    const result = await db.query(
       `INSERT INTO blog_posts (title, slug, excerpt, content, category, author_name, featured_image_url, is_published, published_date)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [title, slug, excerpt, content, category, author_name, featured_image_url || null, is_published || false, is_published ? new Date() : null]
@@ -255,7 +247,7 @@ exports.updateBlogPost = async (req, res) => {
 
     params.push(id);
     const query = `UPDATE blog_posts SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex} RETURNING *`;
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Blog post not found' });
@@ -272,12 +264,12 @@ exports.deleteBlogPost = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const checkResult = await pool.query('SELECT id FROM blog_posts WHERE id = $1', [id]);
+    const checkResult = await db.query('SELECT id FROM blog_posts WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: 'Blog post not found' });
     }
 
-    await pool.query('DELETE FROM blog_posts WHERE id = $1', [id]);
+    await db.query('DELETE FROM blog_posts WHERE id = $1', [id]);
     res.json({ message: 'Blog post deleted successfully' });
   } catch (error) {
     console.error('Error deleting blog post:', error);
@@ -312,4 +304,3 @@ exports.uploadBlogImage = async (req, res) => {
     res.status(500).json({ error: 'Failed to upload image' });
   }
 };
-
