@@ -22,31 +22,47 @@ exports.getCatalogue = async (req, res, next) => {
             return formatResponse(res, 200, true, 'Catalogue fetched from cache', catalogueCache);
         }
 
+        const categoryFilter = (req.query.category || '').trim();
+        const subFilter = (req.query.sub || '').trim();
+        const isFiltered = Boolean(categoryFilter && categoryFilter !== 'All');
+
+        let productsQuery = `
+            SELECT
+                p.id,
+                p.slug,
+                p.name,
+                p.price,
+                p.discount_price,
+                p.is_featured,
+                p.is_active,
+                p.stock_quantity,
+                p.thumbnail,
+                c.name AS category_name,
+                c.slug AS category_slug,
+                p_cat.name AS parent_category_name,
+                p_cat.slug AS parent_category_slug,
+                b.name AS brand_name,
+                b.slug AS brand_slug
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+            LEFT JOIN brands b ON p.brand_id = b.id
+            WHERE p.is_active = true
+        `;
+
+        const params = [];
+        if (isFiltered) {
+            params.push(categoryFilter);
+            productsQuery += ' AND (LOWER(c.slug) = LOWER($' + params.length + ') OR LOWER(p_cat.slug) = LOWER($' + params.length + ') OR LOWER(c.name) = LOWER($' + params.length + ') OR LOWER(p_cat.name) = LOWER($' + params.length + '))';
+            if (subFilter && subFilter !== 'All') {
+                params.push(subFilter);
+                productsQuery += ' AND (LOWER(c.name) = LOWER($' + params.length + ') OR LOWER(c.slug) = LOWER($' + params.length + '))';
+            }
+        }
+        productsQuery += ' ORDER BY p.created_at DESC';
+
         const [productsResult, categoriesResult, brandsResult] = await Promise.all([
-            db.query(`
-                SELECT
-                    p.id,
-                    p.slug,
-                    p.name,
-                    p.price,
-                    p.discount_price,
-                    p.is_featured,
-                    p.is_active,
-                    p.stock_quantity,
-                    p.thumbnail,
-                    c.name AS category_name,
-                    c.slug AS category_slug,
-                    p_cat.name AS parent_category_name,
-                    p_cat.slug AS parent_category_slug,
-                    b.name AS brand_name,
-                    b.slug AS brand_slug
-                FROM products p
-                LEFT JOIN categories c ON p.category_id = c.id
-                LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
-                LEFT JOIN brands b ON p.brand_id = b.id
-                WHERE p.is_active = true
-                ORDER BY p.created_at DESC
-            `),
+            db.query(productsQuery, params),
             db.query('SELECT id, name, slug, parent_id FROM categories ORDER BY name ASC'),
             db.query('SELECT id, name, slug FROM brands ORDER BY name ASC'),
         ]);

@@ -89,7 +89,7 @@ export const productAPI = {
 };
 
 export const catalogueAPI = {
-  get: () => API.get('/catalogue'),
+  get: (params) => API.get('/catalogue', { params }),
   ads: () => API.get('/catalogue/ads'),
 };
 

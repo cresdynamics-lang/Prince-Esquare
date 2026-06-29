@@ -141,7 +141,7 @@ const Products = ({ categoryOverride = null }) => {
       if (currentSub !== 'All') params.sub = currentSub;
 
       try {
-        const catalogueRes = await catalogueAPI.get();
+        const catalogueRes = await catalogueAPI.get(params);
         const catalogue = catalogueRes.data.data || {};
         const fetchedProducts = filterCatalogueProducts(catalogue.products || [], currentCategory, currentSub);
         const allCats = catalogue.categories || [];
