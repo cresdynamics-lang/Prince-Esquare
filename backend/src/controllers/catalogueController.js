@@ -16,15 +16,15 @@ const toImageUrl = (product) => product.thumbnail || product.image_url || null;
 
 exports.getCatalogue = async (req, res, next) => {
     try {
-        const now = Date.now();
-        if (catalogueCache && now - catalogueCacheTime < CACHE_TTL_MS) {
-            res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
-            return formatResponse(res, 200, true, 'Catalogue fetched from cache', catalogueCache);
-        }
-
         const categoryFilter = (req.query.category || '').trim();
         const subFilter = (req.query.sub || '').trim();
         const isFiltered = Boolean(categoryFilter && categoryFilter !== 'All');
+
+        const now = Date.now();
+        if (!isFiltered && catalogueCache && now - catalogueCacheTime < CACHE_TTL_MS) {
+            res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+            return formatResponse(res, 200, true, 'Catalogue fetched from cache', catalogueCache);
+        }
 
         let productsQuery = `
             SELECT
@@ -109,17 +109,25 @@ exports.getCatalogue = async (req, res, next) => {
                 category_name: product.category_name,
             }));
 
-        catalogueCache = {
+        if (!isFiltered) {
+            catalogueCache = {
+                generated_at: new Date().toISOString(),
+                products,
+                categories: categoriesResult.rows,
+                brands: brandsResult.rows,
+                ads,
+            };
+            catalogueCacheTime = now;
+        }
+
+        res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+        formatResponse(res, 200, true, 'Catalogue fetched successfully', {
             generated_at: new Date().toISOString(),
             products,
             categories: categoriesResult.rows,
             brands: brandsResult.rows,
             ads,
-        };
-        catalogueCacheTime = now;
-
-        res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
-        formatResponse(res, 200, true, 'Catalogue fetched successfully', catalogueCache);
+        });
     } catch (error) {
         next(error);
     }
