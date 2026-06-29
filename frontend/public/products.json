@@ -1,0 +1,392 @@
+[
+    {
+        "id": "PROD-001",
+        "fileName": "IMG_4056.HEIC",
+        "name": "The Kingsley Mahogany Derby",
+        "category": "Footwear",
+        "subcategory": "Derby",
+        "color": "Mahogany Brown",
+        "material": "Premium Calfskin Leather",
+        "description": "An exquisite smooth, rich deep-brown leather dress shoe featuring a classic closed lace system, structural silhouette, and refined finish. Tailored flawlessly for executive wardrobes."
+    },
+    {
+        "id": "PROD-002",
+        "fileName": "IMG_4057.HEIC",
+        "name": "The Heritage Oak Oxford",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Dark Oak Brown",
+        "material": "Polished Full-Grain Leather",
+        "description": "Elegant, highly polished dark oak brown dress shoe with precise stitching metrics. Showcases an upscale tone optimized for luxury tailoring and formal wear."
+    },
+    {
+        "id": "PROD-003",
+        "fileName": "IMG_4064.HEIC",
+        "name": "The Obsidian Nero Dress Shoe",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Obsidian Black",
+        "material": "Premium Smooth Leather",
+        "description": "Sleek, ultra-smooth jet black calfskin dress shoe with a brilliant premium sheen finish. Perfect choice for elite formal dressing and evening black-tie events."
+    },
+    {
+        "id": "PROD-004",
+        "fileName": "IMG_4065.HEIC",
+        "name": "The Sovereign Black Oxford",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Classic Black",
+        "material": "Full-Grain Calfskin Leather",
+        "description": "A minimalist, sharp black leather dress shoe styled elegantly with a sleek profile. Engineered to offer maximum comfort while projecting timeless luxury status."
+    },
+    {
+        "id": "PROD-005",
+        "fileName": "IMG_4066.HEIC",
+        "name": "The Monarch Nero Derby",
+        "category": "Footwear",
+        "subcategory": "Derby",
+        "color": "Nero Black",
+        "material": "Polished Smooth Leather",
+        "description": "Premium black dress shoe with a sophisticated matte-to-gloss sheen finish. Features clean curves and a modern structural build perfect for professional settings."
+    },
+    {
+        "id": "PROD-006",
+        "fileName": "IMG_4067.HEIC",
+        "name": "The Apex Pebble-Grain Espresso",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Espresso Brown",
+        "material": "Smooth & Pebbled Leather",
+        "description": "Distinctive split-texture dress shoe featuring a smooth leather cap-toe box combined beautifully with a rich, textured espresso brown pebbled leather quarter."
+    },
+    {
+        "id": "PROD-007",
+        "fileName": "IMG_4068.HEIC",
+        "name": "The Brunswick Textured Derby",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Derby",
+        "color": "Dark Brown",
+        "material": "Pebble-Grain & Smooth Leather",
+        "description": "A side-profile showcase of our textured deep-brown leather shoe. Highlights outstanding artisan craftsmanship and contrasting side panel textures."
+    },
+    {
+        "id": "PROD-008",
+        "fileName": "IMG_4069.HEIC",
+        "name": "The Legacy Espresso Cap-Toe",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Deep Espresso",
+        "material": "Premium Pebbled & Calfskin Leather",
+        "description": "High-end dark brown dress shoe emphasizing the elegant contrast of pebbled leather grain side panels against a highly polished smooth leather cap-toe box."
+    },
+    {
+        "id": "PROD-009",
+        "fileName": "IMG_4070.HEIC",
+        "name": "The Churchill Dual-Texture Oxford",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Rich Espresso Brown",
+        "material": "Premium Mixed Leather Blend",
+        "description": "A stunning pair presentation showcasing the balance of pebbled leather grain and smooth espresso surfaces. Ideal for adding rich texture to corporate ensembles."
+    },
+    {
+        "id": "PROD-010",
+        "fileName": "IMG_3707.HEIC",
+        "name": "The Onyx Avant-Garde Polo",
+        "category": "Apparel",
+        "subcategory": "Knit Polo",
+        "color": "Obsidian Navy",
+        "material": "Textured Pique Luxury Cotton Blend",
+        "description": "A sleek, deep obsidian navy knit polo shirt featuring a distinctive white-accented zipper placket and an architecturally structured textured collar."
+    },
+    {
+        "id": "PROD-011",
+        "fileName": "IMG_3710.HEIC",
+        "name": "The Alabaster Knit Polo",
+        "category": "Apparel",
+        "subcategory": "Knit Polo",
+        "color": "Pristine White",
+        "material": "Premium Textured Cotton",
+        "description": "A pristine, luxury white textured polo with minimal contrast black tipping details along a crisp, modern zipper collar system."
+    },
+    {
+        "id": "PROD-012",
+        "fileName": "IMG_3714.HEIC",
+        "name": "The Aero Zenith Zip Polo",
+        "category": "Apparel",
+        "subcategory": "Knit Polo",
+        "color": "Muted Ice Blue",
+        "material": "Luxury Lightweight Cotton Blend",
+        "description": "An elegant, muted ice-blue luxury polo balancing a refined micro-textured knit surface, modern structural collar, and minimal silver zip detailing."
+    },
+    {
+        "id": "PROD-013",
+        "fileName": "IMG_4049.HEIC",
+        "name": "The Sovereign Pebble Nero",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Obsidian Black",
+        "material": "Calfskin & Textured Grain Leather",
+        "description": "A magnificent dual-textured black calfskin oxford showcasing premium stitched lines and high-contrast smooth versus textured leather segments."
+    },
+    {
+        "id": "PROD-014",
+        "fileName": "IMG_4051.HEIC",
+        "name": "The Obsidian Pebble Derby",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Derby",
+        "color": "Nero Black",
+        "material": "Premium Mixed Leathers",
+        "description": "An elevated view of the dual-textured black calfskin derby shoe, emphasizing its clean executive aesthetic and superior craftsmanship layout."
+    },
+    {
+        "id": "PROD-0125",
+        "fileName": "IMG_4052.HEIC",
+        "name": "The Windsor Brunette Oxford",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Chocolate Brown",
+        "material": "Smooth Calfskin Leather",
+        "description": "A sleek, chocolate-brown leather dress shoe featuring an ultra-smooth pristine surface finish and formal closed lace structure."
+    },
+    {
+        "id": "PROD-016",
+        "fileName": "IMG_4053.HEIC",
+        "name": "The Regent Umber Dress Shoe",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Regent Umber Brown",
+        "material": "Polished Premium Leather",
+        "description": "A striking side-profile shot capturing the elegant silhouette of our premium deep-brown leather oxford dress shoe mounted on luxury gold hardware."
+    },
+    {
+        "id": "PROD-017",
+        "fileName": "IMG_4054.HEIC",
+        "name": "The Executive Mahogany Derby",
+        "category": "Footwear",
+        "subcategory": "Derby",
+        "color": "Dark Mahogany",
+        "material": "Smooth Full-Grain Leather",
+        "description": "A detailed, angled display layout showcasing the rich brown undertones and flawless master polish of our executive-class leather derby."
+    },
+    {
+        "id": "PROD-018",
+        "fileName": "IMG_4055.HEIC",
+        "name": "The Heritage Brunette Cap-Toe",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Dark Brunette Brown",
+        "material": "Polished Luxury Calfskin",
+        "description": "A beautifully balanced pair arrangement highlighting the rich tone, deep shadows, and sophisticated build of our signature brown dress shoes."
+    },
+    {
+        "id": "PROD-019",
+        "fileName": "IMG_4071.HEIC",
+        "name": "The Onyx Dual-Grain Oxford",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Midnight Black",
+        "material": "Pebbled & Smooth Calfskin",
+        "description": "A premium pair display of a sleek black oxford dress shoe combining rich pebbled side panels with highly polished smooth toe-cap segments."
+    },
+    {
+        "id": "PROD-020",
+        "fileName": "IMG_4072.HEIC",
+        "name": "The Sovereign Textured Cap-Toe",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Jet Black",
+        "material": "Premium Mixed Grains",
+        "description": "Striking side-profile shot of the luxury black dress shoe, emphasizing the exceptional texture transitions along the quarter paneling."
+    },
+    {
+        "id": "PROD-021",
+        "fileName": "IMG_4073.HEIC",
+        "name": "The Kensington Burnished Brogue",
+        "category": "Footwear",
+        "subcategory": "Brogue",
+        "color": "Burnished Espresso Brown",
+        "material": "Full-Grain Luxury Leather",
+        "description": "Elegant deep espresso brown leather dress shoe featuring delicate wingtip brogue perforations and a sophisticated dark burnished toe box finish."
+    },
+    {
+        "id": "PROD-022",
+        "fileName": "IMG_4076.HEIC",
+        "name": "The Obsidian Classic Derby",
+        "category": "Footwear",
+        "subcategory": "Derby",
+        "color": "Timeless Black",
+        "material": "Premium Smooth Leather",
+        "description": "Clean, timeless jet-black leather dress shoe with a flawless luxury polish. Built specifically to match with premium corporate evening suits."
+    },
+    {
+        "id": "PROD-023",
+        "fileName": "IMG_4077.HEIC",
+        "name": "The Apex Midnight Semi-Brogue",
+        "category": "Footwear",
+        "subcategory": "Semi-Brogue Oxford",
+        "color": "Midnight Black",
+        "material": "Calfskin Leather",
+        "description": "Sophisticated black leather dress shoe highlighting a subtle perforated design layout along the cap-toe borders and side panel joints."
+    },
+    {
+        "id": "PROD-024",
+        "fileName": "IMG_4080.HEIC",
+        "name": "The Heritage Walnut Derby",
+        "category": "Footwear",
+        "subcategory": "Derby",
+        "color": "Warm Walnut Brown",
+        "material": "Smooth Full-Grain Leather",
+        "description": "A smooth, warm walnut-brown leather dress shoe displaying a sleek minimalist profile and highly refined curves on an upscale presentation mount."
+    },
+    {
+        "id": "PROD-025",
+        "fileName": "IMG_4081.HEIC",
+        "name": "The Windsor Chestnut Oxford",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Chestnut Brown",
+        "material": "Polished Smooth Leather",
+        "description": "High-end chestnut brown dress shoe emphasizing a flawless premium sheen finish, deep color gradients, and elegant formal closed lacing."
+    },
+    {
+        "id": "PROD-026",
+        "fileName": "IMG_4082.HEIC",
+        "name": "The Nero Croc-Embossed Chelsea",
+        "category": "Footwear",
+        "subcategory": "Chelsea Boot",
+        "color": "Obsidian Black",
+        "material": "Crocodile-Embossed Leather",
+        "description": "A bold, luxury mid-top boot wrapped completely in deep black crocodile-embossed leather texture with a streamlined side metallic zipper design."
+    },
+    {
+        "id": "PROD-027",
+        "fileName": "IMG_4085.HEIC",
+        "name": "The Espresso Croc-Embossed Chelsea",
+        "category": "Footwear",
+        "subcategory": "Chelsea Boot",
+        "color": "Rich Espresso Brown",
+        "material": "Crocodile-Embossed Leather",
+        "description": "An upscale, dramatic fashion boot styled in rich espresso dark brown crocodile-embossed leather. Engineered for an elite casual or formal statement wardrobe."
+    },
+    {
+        "id": "PROD-028",
+        "fileName": "IMG_4086.HEIC",
+        "name": "The Kingsley Nero Chukka",
+        "category": "Footwear",
+        "subcategory": "Chukka Boot",
+        "color": "Nero Black",
+        "material": "Smooth Luxury Calfskin",
+        "description": "An exquisite mid-top chukka dress boot crafted from smooth, premium black calfskin leather with a minimal three-eyelet lace-up structure."
+    },
+    {
+        "id": "PROD-029",
+        "fileName": "IMG_4089.HEIC",
+        "name": "The Sovereign Black Chelsea",
+        "category": "Footwear",
+        "subcategory": "Chelsea Boot",
+        "color": "Classic Black",
+        "material": "Premium Smooth Leather",
+        "description": "A sleek, timeless black leather Chelsea boot featuring flexible side gussets, dual pull tabs, a flawless polish, and a streamlined premium toe profile."
+    },
+    {
+        "id": "PROD-030",
+        "fileName": "IMG_4090.HEIC",
+        "name": "The Regent Nero Ankle Boot",
+        "category": "Footwear",
+        "subcategory": "Chelsea Boot",
+        "color": "Deep Black",
+        "material": "Polished Full-Grain Leather",
+        "description": "A sharp side-profile presentation of our formal black leather Chelsea boot resting elegantly on minimalist gold display stands."
+    },
+    {
+        "id": "PROD-031",
+        "fileName": "IMG_4091.HEIC",
+        "name": "The Cognac Heritage Chelsea",
+        "category": "Footwear",
+        "subcategory": "Chelsea Boot",
+        "color": "Warm Cognac Tan",
+        "material": "Hand-Finished Burnished Leather",
+        "description": "A magnificent luxury boot finished in a rich, warm cognac brown hue, offering exceptional depth, dark wood-grain shaded accents, and premium elasticity."
+    },
+    {
+        "id": "PROD-032",
+        "fileName": "IMG_4094.HEIC",
+        "name": "The Vanguard Wingtip Chelsea",
+        "category": "Footwear",
+        "subcategory": "Chelsea Boot",
+        "color": "Obsidian Black",
+        "material": "Calfskin Leather with Brogueing",
+        "description": "A striking black leather Chelsea boot upgraded beautifully with traditional wingtip perforation details and brogue patterns for an elite visual presence."
+    },
+    {
+        "id": "PROD-033",
+        "fileName": "IMG_4099.HEIC",
+        "name": "The Churchill Textured Espresso",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Espresso Dark Brown",
+        "material": "Premium Pebbled & Smooth Grain Blend",
+        "description": "A superb dress shoe presentation showcasing a rich dark brown color palette across high-contrast grain panels and structural lining metrics."
+    },
+    {
+        "id": "PROD-034",
+        "fileName": "IMG_4102.HEIC",
+        "name": "The Monarch Dual-Grain Nero",
+        "category": "Footwear",
+        "subcategory": "Dual-Texture Oxford",
+        "color": "Matte Jet Black",
+        "material": "Smooth & Grained Calfskin Blend",
+        "description": "An exceptional formal dress shoe combining smooth black leather base structures with finely micro-textured side quarters for a premium artistic contrast."
+    },
+    {
+        "id": "PROD-035",
+        "fileName": "IMG_4103.HEIC",
+        "name": "The Executive Burnished Amber",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Burnished Amber Tan",
+        "material": "Hand-Burnished Luxury Leather",
+        "description": "A gorgeous amber tan dress shoe featuring an artisan high-shine finish and exquisite dark-burnished shading details concentrated at the toe box and seams."
+    },
+    {
+        "id": "PROD-036",
+        "fileName": "IMG_4106.HEIC",
+        "name": "The Obsidian Cap-Toe Oxford",
+        "category": "Footwear",
+        "subcategory": "Oxford",
+        "color": "Jet Black",
+        "material": "Premium Calfskin Leather",
+        "description": "A pristine, highly formal jet-black leather oxford with minimal stitching lines and a sleek modern profile, designed perfectly for premium bespoke tailoring."
+    },
+    {
+        "id": "PROD-037",
+        "fileName": "IMG_4265.HEIC",
+        "name": "The Vanguard Technical Bomber",
+        "category": "Apparel",
+        "subcategory": "Outerwear / Jacket",
+        "color": "Obsidian Midnight Blue",
+        "material": "Premium High-Density Technical Matte Nylon Blend",
+        "description": "A high-end, structured technical bomber jacket in deep obsidian midnight blue. Features architectural shoulder seam paneling, a subtle silver-grey contrast double-stripe tipping along the ribbed stand collar and hemline, full-zip front hardware, and streamlined zippered utility pockets. Styled beautifully on a mannequin over a luxury shirt and tie arrangement."
+    },
+    {
+        "id": "PROD-038",
+        "fileName": "IMG_4282.HEIC",
+        "name": "The Stealth Aviator Bomber",
+        "category": "Apparel",
+        "subcategory": "Outerwear / Jacket",
+        "color": "Matte Obsidian Black",
+        "material": "High-Performance Weatherproof Matte Fabric Blend",
+        "description": "An ultra-premium outerwear piece showcasing a crisp matte obsidian black colorway. Features a minimalist ribbed knit stand collar, comfortable elasticized cuffs, matching front-zip hardware closures, and a sophisticated low-profile utility flap-pocket accent seamlessly built onto the left sleeve upper arm."
+    },
+    {
+        "id": "PROD-039",
+        "fileName": "IMG_4283.HEIC",
+        "name": "The Sentinel Luxury Field Jacket",
+        "category": "Apparel",
+        "subcategory": "Outerwear / Jacket",
+        "color": "Classic Onyx Black",
+        "material": "Sleek Water-Resistant Structured Shell",
+        "description": "An elegant, side-angled showcase of our signature onyx black smart-casual jacket. Engineered with clean minimal lines, a premium ribbed collar trim, and an architectural sleeve pocket profile that perfectly bridges high-performance utility with sharp luxury fashion styling."
+    }
+]

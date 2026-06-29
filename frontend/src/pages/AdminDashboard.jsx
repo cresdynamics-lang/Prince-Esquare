@@ -7,14 +7,9 @@ import {
   ArrowUpRight, ArrowDownRight, MoreVertical, Plus, 
   Download, Filter, CheckCircle2, AlertCircle, Clock, 
   UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight, ChevronDown,
-  Phone, Globe, Truck, CreditCard, CreditCard as CardIcon,
-  Warehouse,
+  Phone, Globe, Truck, CreditCard,
   Store, BookOpen
 } from 'lucide-react';
-import { AdminPosTerminalInfo, PosSalesView } from '../components/admin/pos/PosAdminViews';
-import PosTerminalView from '../components/pos/PosTerminalView';
-import ShiftSummaryView from '../components/pos/ShiftSummaryView';
-import { posAdminAPI } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore, isStaffSession } from '../store/useAuthStore';
 import { userInitials } from '../lib/format';
@@ -39,13 +34,9 @@ import {
 import { ensureSocket, disconnectSocket } from '../lib/socket';
 import { ConfirmProvider, useConfirm } from '../components/admin/ConfirmDialog';
 import {
-  canViewInventory,
-  canManageInventory,
   canAccessProducts,
-  canUsePosTerminal,
   canViewCustomers,
   canManageUsers,
-  canAccessFinance,
   hasPermission,
   parsePermissions,
   STAFF_ACCESS_PRESETS,
@@ -55,8 +46,6 @@ import {
   normalizeStaffPermissions,
 } from '../utils/staffPermissions';
 
-const FinanceHub = lazy(() => import('../components/admin/FinanceHub'));
-const PosInventoryHub = lazy(() => import('../components/admin/pos/PosInventoryHub'));
 const ProductsView = lazy(() => import('../components/admin/ProductsView'));
 const BlogsView = lazy(() => import('../components/admin/BlogsView'));
 
@@ -73,12 +62,9 @@ const AdminTable = ({ children }) => (
 
 const AdminDashboard = () => {
   const location = useLocation();
-  const [activeSection, setActiveSection] = useState(() =>
-    useAuthStore.getState().isSeller ? 'pos-terminal' : 'dashboard'
-  );
+  const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [shiftSummary, setShiftSummary] = useState(null);
   const navigate = useNavigate();
   const logout = useAuthStore(state => state.logout);
   const authState = useAuthStore();
@@ -106,57 +92,28 @@ const AdminDashboard = () => {
     }
   }, [authReady, staffSession, navigate]);
 
-  useEffect(() => {
-    if (location.state?.shiftSummary) {
-      setShiftSummary(location.state.shiftSummary);
-      setActiveSection('pos-terminal');
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
   const allSidebarItems = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
-    { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
+    { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Catalogue' },
     { id: 'blogs', label: 'Blog', icon: BookOpen, section: 'Store' },
     { id: 'users', label: 'Users', icon: Users, section: 'People' },
-    { id: 'inventory', label: 'Inventory', icon: Warehouse, section: 'Operations' },
-    { id: 'finance', label: 'Finance', icon: CreditCard, section: 'Operations' },
     { id: 'reviews', label: 'Reviews', icon: Star, section: 'Marketing', badge: '5' },
     { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
   ], []);
 
-  const posOnlySidebarItems = useMemo(() => [
-    { id: 'pos-terminal', label: 'POS Terminal', icon: Store, section: 'POS' },
-    { id: 'finance', label: 'Finance', icon: CreditCard, section: 'POS' },
-    { id: 'orders', label: 'Online Orders', icon: ShoppingBag, section: 'POS' },
-  ], []);
-
   const sidebarItems = useMemo(() => {
-    const posOnly =
-      isSeller ||
-      (user?.role === 'staff' &&
-        canUsePosTerminal(user, { isSeller }) &&
-        !canViewInventory(user) &&
-        !canAccessProducts(user) &&
-        !canViewCustomers(user) &&
-        !hasPermission(user, 'dashboard') &&
-        !hasPermission(user, 'orders'));
-
-    const items = posOnly ? posOnlySidebarItems : allSidebarItems;
+    const items = allSidebarItems;
     return items.filter((item) => {
-      if (posOnly) return item.id !== 'finance' || canAccessFinance(user);
       if (user?.role === 'admin') return true;
       if (user?.role === 'staff') {
-        if (item.id === 'inventory') return canViewInventory(user);
-        if (item.id === 'finance') return canAccessFinance(user);
         if (item.id === 'users') return canViewCustomers(user);
         if (item.id === 'products') return canAccessProducts(user);
         return hasPermission(user, item.id) || (item.id === 'users' && hasPermission(user, 'customers'));
       }
       return false;
     });
-  }, [isSeller, user, allSidebarItems, posOnlySidebarItems]);
+  }, [isSeller, user, allSidebarItems]);
 
   useEffect(() => {
     if (!authReady || !staffSession) return undefined;
@@ -184,11 +141,6 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
-  const staffHasPosAccess = (perms) =>
-    perms.includes('pos-terminal') ||
-    perms.includes('inventory-view') ||
-    perms.includes('inventory-manage');
-
   const navSections = [...new Set(sidebarItems.map((item) => item.section))];
 
   const renderContent = () => {
@@ -197,16 +149,11 @@ const AdminDashboard = () => {
         hasPermission(user, activeSection) ||
         (activeSection === 'users' && canViewCustomers(user)) ||
         (activeSection === 'products' && canAccessProducts(user)) ||
-        (activeSection === 'inventory' && canViewInventory(user)) ||
-        (activeSection === 'finance' && canAccessFinance(user)) ||
-        (activeSection === 'blogs' && hasPermission(user, 'blogs')) ||
-        (activeSection === 'pos-terminal' && canUsePosTerminal(user, { isSeller }));
+        (activeSection === 'blogs' && hasPermission(user, 'blogs'));
       if (!allowed) {
         return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
       }
     }
-
-    const inventoryReadOnly = user?.role === 'staff' && !canManageInventory(user);
 
     const heavySection = (
       <Suspense fallback={<SectionLoader />}>
@@ -214,10 +161,6 @@ const AdminDashboard = () => {
           switch (activeSection) {
             case 'products':
               return <ProductsView />;
-            case 'finance':
-              return <FinanceHub readOnly={isSeller} />;
-            case 'inventory':
-              return <PosInventoryHub readOnlyInventory={inventoryReadOnly} />;
             default:
               return null;
           }
@@ -228,38 +171,14 @@ const AdminDashboard = () => {
     switch (activeSection) {
       case 'dashboard':
         if (isSeller) return null;
-        return <DashboardView onOpenPos={() => setActiveSection('inventory')} />;
+        return <DashboardView />;
       case 'orders': return <OrdersView readOnly={isSeller} />;
       case 'products':
-      case 'finance':
-      case 'inventory':
         return heavySection;
       case 'blogs': return <BlogsView />;
       case 'users': return <UsersView />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
-      case 'pos-terminal':
-        if (shiftSummary) {
-          return (
-            <ShiftSummaryView
-              embedded
-              summary={shiftSummary}
-              onDone={() => {
-                setShiftSummary(null);
-                logout();
-                navigate('/admin/login');
-              }}
-            />
-          );
-        }
-        if (isSeller || canUsePosTerminal(user, { isSeller })) {
-          return <PosTerminalView embedded onClockOut={(summary) => setShiftSummary(summary)} />;
-        }
-        return (
-          <AdminPosTerminalInfo
-            onOpenInventory={() => setActiveSection('finance')}
-          />
-        );
       default: return <DashboardView />;
     }
   };
@@ -401,7 +320,7 @@ const AdminDashboard = () => {
               </button>
               <div
                 className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform text-sm"
-                title={[user?.fullName, user?.name, user?.full_name, user?.email].filter(Boolean).join(' Â· ')}
+                title={[user?.fullName, user?.name, user?.full_name, user?.email].filter(Boolean).join(' · ')}
               >
                 {userInitials(user)}
               </div>
@@ -432,24 +351,11 @@ const AdminDashboard = () => {
 
 // --- Sub-views ---
 
-const DashboardView = ({ onOpenPos }) => {
+const DashboardView = () => {
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
   const [stats, setStats] = useState(null);
   const [salesData, setSalesData] = useState([]);
-  const [posOverview, setPosOverview] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [posLoading, setPosLoading] = useState(true);
-  const [closingShiftId, setClosingShiftId] = useState(null);
-
-  const loadPosOverview = async () => {
-    setPosLoading(true);
-    try {
-      const posRes = await posAdminAPI.getOverview().catch(() => null);
-      if (posRes?.data?.data) setPosOverview(posRes.data.data);
-    } finally {
-      setPosLoading(false);
-    }
-  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -469,21 +375,7 @@ const DashboardView = ({ onOpenPos }) => {
     };
 
     fetchDashboardData();
-    loadPosOverview();
   }, []);
-
-  const handleForceCloseShift = async (shiftId) => {
-    setClosingShiftId(shiftId);
-    try {
-      await posAdminAPI.forceCloseShift(shiftId);
-      await loadPosOverview();
-      adminToast.success('Open shift closed');
-    } catch (error) {
-      adminToast.error(apiErrorMessage(error, 'Could not close shift'));
-    } finally {
-      setClosingShiftId(null);
-    }
-  };
 
   if (loading) {
     return (
@@ -494,9 +386,9 @@ const DashboardView = ({ onOpenPos }) => {
   }
 
   const statCards = [
-    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard, detail: stats?.posRevenue != null ? `POS KSh ${Math.round(stats.posRevenue).toLocaleString()} + online` : null },
+    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard },
     { label: 'Total Profit', value: `KSh ${stats?.profit?.toLocaleString()}`, icon: Tag },
-    { label: 'Total Sales', value: stats?.orders || 0, icon: Package, detail: stats?.posSales != null ? `${stats.posSales} POS Â· ${stats.onlineOrders} online` : null },
+    { label: 'Total Sales', value: stats?.orders || 0, icon: Package },
     { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock },
   ];
 
@@ -525,87 +417,6 @@ const DashboardView = ({ onOpenPos }) => {
           </div>
         ))}
       </div>
-
-      {(posLoading || posOverview) && (
-        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-6 backdrop-blur-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h3 className="font-serif font-bold text-lg text-gold-100">Shop POS & Inventory</h3>
-            {onOpenPos && (
-              <button type="button" onClick={onOpenPos} className="text-[10px] font-black   bg-gold-600 text-navy-950 px-4 py-2 rounded-lg">
-                Open POS & Inventory
-              </button>
-            )}
-          </div>
-          {posLoading ? (
-            <div className="flex items-center justify-center h-24">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500" />
-            </div>
-          ) : posOverview ? (
-          <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              ['Today (shop)', `KSh ${Number(posOverview.kpis?.todayRevenue || 0).toLocaleString()}`],
-              ['This week', `KSh ${Number(posOverview.kpis?.weekRevenue || 0).toLocaleString()}`],
-              ['Open shifts', posOverview.kpis?.activeSellers ?? 0],
-              ['Low stock items', posOverview.lowStockItems?.length ?? 0],
-            ].map(([label, value]) => (
-              <div key={label} className="bg-navy-950/50 border border-gold-500/10 rounded-xl p-4">
-                <p className="text-[10px] text-gold-500/40  ">{label}</p>
-                <p className="text-xl font-bold text-gold-300 mt-1">{value}</p>
-              </div>
-            ))}
-          </div>
-          {posOverview.kpis?.openShifts?.length > 0 && (
-            <div className="mt-4 rounded-xl border border-gold-500/10 bg-navy-950/40 p-4">
-              <p className="text-[10px] font-bold   text-gold-500/50 mb-3">
-                Clocked in now (POS shifts not yet closed)
-              </p>
-              <div className="space-y-2">
-                {posOverview.kpis.openShifts.map((shift) => (
-                  <div
-                    key={shift.shiftId}
-                    className="flex flex-wrap items-center justify-between gap-3 text-sm text-gold-100/90"
-                  >
-                    <div>
-                      <span className="font-semibold">{shift.sellerName}</span>
-                      {shift.sellerEmail && (
-                        <span className="text-gold-500/50 text-xs ml-2">{shift.sellerEmail}</span>
-                      )}
-                      {shift.userRole && (
-                        <span className="text-[9px]   text-gold-500/40 ml-2">
-                          {shift.userRole}
-                        </span>
-                      )}
-                      {!shift.userRole && (
-                        <span className="text-[9px]   text-amber-400/70 ml-2">
-                          legacy POS profile
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] text-gold-500/40">
-                        since {new Date(shift.clockIn).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}
-                      </span>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleForceCloseShift(shift.shiftId)}
-                          disabled={closingShiftId === shift.shiftId}
-                          className="text-[10px] font-bold   text-red-300/80 hover:text-red-300 disabled:opacity-50"
-                        >
-                          {closingShiftId === shift.shiftId ? 'Closingâ€¦' : 'Close shift'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          </>
-          ) : null}
-        </div>
-      )}
 
       <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
         <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
@@ -655,7 +466,7 @@ const parseOrderAddress = (value) => {
 const formatPaymentLabel = (method) => {
   if (method === 'whatsapp_mpesa') return 'WhatsApp + M-Pesa';
   if (method === 'mpesa') return 'M-Pesa';
-  return method || 'â€”';
+  return method || '—';
 };
 
 const OrdersView = ({ readOnly = false }) => {
@@ -975,7 +786,7 @@ const OrdersView = ({ readOnly = false }) => {
                   <div>
                     <p className="text-[10px]   text-gold-500/40 mb-1">Payment</p>
                     <p className="text-gold-100 text-xs">
-                      {formatPaymentLabel(detailOrder.payment_method)} Â· {detailOrder.payment_status}
+                      {formatPaymentLabel(detailOrder.payment_method)} · {detailOrder.payment_status}
                     </p>
                   </div>
                 </div>
@@ -1000,8 +811,11 @@ const OrdersView = ({ readOnly = false }) => {
                           <p className="text-gold-100">{item.name}</p>
                           <p className="text-gold-500/50 text-xs">
                             Qty {item.quantity}
-                            {item.size_label ? ` Â· Size ${item.size_label}` : ''}
-                            {(item.variant_sku || item.product_sku) ? ` Â· SKU ${item.variant_sku || item.product_sku}` : ''}
+                            {item.size_label ? ` · Size ${item.size_label}` : ''}
+                            {(item.variant_sku || item.product_sku) ? ` · SKU ${item.variant_sku || item.product_sku}` : ''}
+                          </p>
+                          <p className="text-gold-500/60 text-xs">
+                            Online price: KSh {parseFloat(item.price).toLocaleString()}
                           </p>
                         </div>
                         <p className="text-gold-400 shrink-0">
@@ -1042,7 +856,7 @@ const OrdersView = ({ readOnly = false }) => {
               <div>
                 <h3 className="text-xl font-serif text-gold-100">Edit Order</h3>
                 <p className="text-gold-500/50 text-xs mt-1  ">
-                  #{editOrder.id.substring(0, 8).toUpperCase()} Â· {editOrder.customer_name}
+                  #{editOrder.id.substring(0, 8).toUpperCase()} · {editOrder.customer_name}
                 </p>
               </div>
               <button type="button" onClick={closeEdit} className="text-gold-500/40 hover:text-gold-500">
@@ -1118,7 +932,7 @@ const OrdersView = ({ readOnly = false }) => {
                   disabled={saving}
                   className="flex-1 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 disabled:opacity-50"
                 >
-                  {saving ? 'Savingâ€¦' : 'Save Changes'}
+                  {saving ? 'Saving…' : 'Save Changes'}
                 </button>
               )}
             </div>
@@ -1211,7 +1025,7 @@ const CategoriesView = () => {
     });
     if (!ok) return;
     try {
-      await adminCategoryAPI.remove(id);
+      await adminCategoryAPI.remove(d);
       fetchCategories();
     } catch (error) {
       alert('Error deleting category');
@@ -1713,7 +1527,7 @@ const UsersView = () => {
           </div>
           <div>
             <p className="text-sm font-bold text-gold-100">{currentUser.fullName || currentUser.name}</p>
-            <p className="text-xs text-gold-500/50">{currentUser.email} Â· Staff</p>
+            <p className="text-xs text-gold-500/50">{currentUser.email} · Staff</p>
           </div>
         </div>
       )}
@@ -2010,6 +1824,7 @@ const CustomersView = ({ embedded = false }) => {
   );
 };
 const AdminsView = ({ roleFilter = null }) => {
+  const currentUser = useAuthStore((s) => s.user);
   const confirm = useConfirm();
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2023,6 +1838,7 @@ const AdminsView = ({ roleFilter = null }) => {
     accessPreset: 'pos-only',
     permissions: ['pos-terminal'],
   });
+  const [users, setUsers] = useState([]);
 
   const fetchAdmins = async () => {
     setLoading(true);
@@ -2031,8 +1847,8 @@ const AdminsView = ({ roleFilter = null }) => {
         adminCustomerAPI.getStaff(),
         adminCustomerAPI.getAdmins(),
       ]);
-      const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])];
-      setAdmins(combined);
+      const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])].filter(u => u.email !== 'jones@gmail.com');
+      setUsers(combined);
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
@@ -2101,281 +1917,219 @@ const AdminsView = ({ roleFilter = null }) => {
           name: formData.name,
           permissions: normalizeStaffPermissions(formData.permissions),
         });
-        adminToast.success('Staff duties updated');
       } else {
-        await adminCustomerAPI.createStaff({
-          ...formData,
-          permissions: normalizeStaffPermissions(formData.permissions),
-        });
-        adminToast.success('Staff account created');
+        await adminCustomerAPI.createStaff({ ...formData, permissions: normalizeStaffPermissions(formData.permissions) });
       }
-      setIsModalOpen(false);
-      setEditingStaff(null);
-      fetchAdmins();
+      handleCloseModal();
+      await fetchAdmins();
+      adminToast.success(`Staff ${editingStaff ? 'updated' : 'created'}`);
     } catch (error) {
-      adminToast.error(apiErrorMessage(error, editingStaff ? 'Could not update staff' : 'Could not create staff'));
+      adminToast.error(apiErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (id, currentStatus) => {
-    try {
-      await adminCustomerAPI.updateStatus(id, !currentStatus);
-      fetchAdmins();
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
-
-  const handleDeleteStaff = async (id) => {
-    const ok = await confirm({
-      title: 'Remove staff member',
-      message: 'This staff member will lose access to the admin dashboard immediately.',
-      confirmLabel: 'Remove staff',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    try {
-      await adminCustomerAPI.deleteStaff(id);
-      adminToast.success('Staff removed');
-      fetchAdmins();
-    } catch (error) {
-      adminToast.error(apiErrorMessage(error, 'Could not remove staff'));
-    }
-  };
-
-  const visibleAdmins = roleFilter
-    ? admins.filter((a) => a.role === roleFilter)
-    : admins;
+  const filteredAdmins = roleFilter ? users.filter(a => a.role === roleFilter) : users;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <p className="text-xs text-gold-500/40">{visibleAdmins.length} {roleFilter || 'dashboard'} user(s)</p>
-        {roleFilter === 'staff' && (
-        <button 
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gold-500/40">{filteredAdmins.length} {roleFilter || 'admin'} users</p>
+        <button
           type="button"
           onClick={handleOpenModal}
-          className="px-4 sm:px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20 text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all"
         >
-          <UserPlus size={20} /> Add staff
+          <UserPlus size={16} /> Invite Staff
         </button>
-        )}
       </div>
-      
-      {loading ? (
-        <div className="py-24 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {visibleAdmins.length > 0 ? visibleAdmins.map((admin, i) => (
-            <div key={i} className={`bg-navy-900/40 border-l-4 border-gold-500 p-6 rounded-r-2xl border-y border-r border-gold-500/10 backdrop-blur-sm group`}>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <div className="text-sm font-bold text-gold-100 flex items-center gap-2">
-                    {admin.name}
-                    {admin.is_active === false && <span className="w-2 h-2 rounded-full bg-red-500"></span>}
-                  </div>
-                  <div className="text-xs text-gold-500/40">{admin.email}</div>
-                  {admin.role === 'staff' && (
-                    <span className={`inline-block mt-2 text-[9px] font-bold   px-2 py-0.5 rounded ${
-                      admin.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
-                    }`}>
-                      {admin.is_active !== false ? 'Active' : 'Suspended'}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-[9px] font-bold  px-2 py-1 rounded bg-navy-800 border border-gold-500/10 ${admin.role === 'admin' ? 'text-gold-400' : 'text-blue-400'}`}>
-                  {admin.role}
-                </span>
-              </div>
-              <div className="pt-4 border-t border-gold-500/5 flex justify-between items-center text-[10px]">
-                <span className="text-gold-500/30 ">ID: {admin.id.substring(0, 8)}</span>
-                <div className="flex gap-2">
-                  {admin.role === 'staff' && (
-                    <>
+
+      <div className="overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-900/40 backdrop-blur-sm">
+        {loading ? (
+          <div className="py-24 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gold-500" />
+          </div>
+        ) : filteredAdmins.length > 0 ? (
+          <AdminTable>
+          <table className="w-full min-w-[640px] text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold tracking-[0.2em] text-gold-500/40">
+              <tr>
+                <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Access Level</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gold-500/5">
+              {filteredAdmins.map((admin) => (
+                <tr key={admin.id} className="transition-colors hover:bg-navy-800/30">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-navy-800 bg-gold-600 font-bold text-navy-950">
+                        {userInitials(admin)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-gold-100">{admin.name || admin.fullName}</div>
+                        <div className="text-xs text-gold-500/50">{admin.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-bold capitalize text-gold-100">{admin.role}</td>
+                  <td className="px-6 py-4 text-xs capitalize text-gold-300">
+                    {detectStaffPreset(parsePermissions(admin.permissions))}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      {currentUser?.email === 'jones@gmail.com' && (
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(admin)}
-                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold  tracking-wider text-gold-500/70 hover:text-gold-400 hover:bg-navy-800 transition-all flex items-center gap-1"
+                        className="rounded-lg p-2 text-gold-500/60 transition-all hover:bg-navy-800 hover:text-gold-500"
+                        title="Edit permissions"
                       >
-                        <Eye size={14} /> View staff
+                        <Edit size={16} />
                       </button>
-                      <button 
-                        type="button"
-                        onClick={() => handleDeleteStaff(admin.id)}
-                        className="p-1.5 rounded-lg text-red-400/40 hover:text-red-400 hover:bg-red-400/5 transition-all"
-                        title="Remove Staff"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </>
-                  )}
-                  <button 
-                    onClick={() => handleToggleStatus(admin.id, admin.is_active !== false)}
-                    className="p-1.5 rounded-lg text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 transition-all"
-                    title={admin.is_active !== false ? "Suspend Access" : "Restore Access"}
-                  >
-                    {admin.is_active !== false ? <UserMinus size={14} /> : <CheckCircle2 size={14} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )) : (
-            <div className="col-span-full py-12 text-center text-gold-500/40 text-sm">No admin accounts found.</div>
-          )}
-        </div>
-      )}
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </AdminTable>
+        ) : (
+          <div className="py-24 text-center text-sm text-gold-500/40">No {roleFilter} users found.</div>
+        )}
+      </div>
 
-      {/* Admin/Staff Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <button
             type="button"
-            aria-label="Close"
+            aria-label="Close modal"
             className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm"
             onClick={handleCloseModal}
           />
-          <div className="relative flex min-h-full items-center justify-center p-4 py-8">
-            <motion.div
+          <div className="relative z-10 mx-auto mt-12 flex max-w-2xl flex-col">
+            <motion.form
+              onSubmit={handleSubmit}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="relative bg-navy-900 border border-gold-500/20 rounded-2xl w-full max-w-md max-h-[min(90dvh,720px)] flex flex-col shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
+              className="relative flex flex-col rounded-2xl border border-gold-500/20 bg-navy-900 shadow-2xl"
             >
-              <div className="flex shrink-0 justify-between items-center p-6 border-b border-gold-500/10 bg-navy-900/50">
-                <h3 className="font-serif font-bold text-gold-100 text-xl">
-                  {editingStaff ? 'View staff & re-assign duties' : 'Add staff'}
+              <div className="flex items-center justify-between border-b border-gold-500/10 p-6">
+                <h3 className="font-serif text-xl font-bold text-gold-100">
+                  {editingStaff ? 'Edit Staff Permissions' : 'Invite New Staff'}
                 </h3>
-                <button type="button" onClick={handleCloseModal} className="text-gold-500/40 hover:text-gold-500 transition-colors">
+                <button type="button" onClick={handleCloseModal} className="rounded-lg p-2 text-gold-500/40 transition-colors hover:text-gold-500">
                   <X size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                  <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Full Name</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
-                    placeholder="E.g. James Arthur"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Email Address</label>
-                  <input 
-                    type="email" 
-                    required
-                    readOnly={Boolean(editingStaff)}
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className={`w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20 ${editingStaff ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    placeholder="staff@prince-esquare.com"
-                  />
+              <div className="p-6">
+                <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-gold-500/60">Full Name</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      className="w-full rounded-lg border border-gold-500/20 bg-navy-950/50 px-4 py-2 text-gold-100 outline-none transition-colors focus:border-gold-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-gold-500/60">Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      disabled={!!editingStaff}
+                      className="w-full rounded-lg border border-gold-500/20 bg-navy-950/50 px-4 py-2 text-gold-100 outline-none transition-colors focus:border-gold-500/50 disabled:opacity-50"
+                    />
+                  </div>
                 </div>
 
                 {!editingStaff && (
-                <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Temporary Password</label>
-                  <input 
-                    type="password" 
-                    required
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    className="w-full bg-navy-950/50 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 focus:outline-none focus:border-gold-500/50 transition-colors placeholder:text-gold-500/20"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                  />
-                </div>
+                  <div className="mb-6">
+                    <label className="mb-2 block text-xs font-bold text-gold-500/60">Password</label>
+                    <input
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required={!editingStaff}
+                      className="w-full rounded-lg border border-gold-500/20 bg-navy-950/50 px-4 py-2 text-gold-100 outline-none transition-colors focus:border-gold-500/50"
+                    />
+                  </div>
                 )}
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">Access role</label>
-                  <div className="space-y-2">
+                
+                <div className="mb-6">
+                  <label className="mb-3 block text-xs font-bold text-gold-500/60">Access Level</label>
+                  <div className="flex flex-wrap gap-3">
                     {STAFF_ACCESS_PRESETS.map((preset) => (
-                      <label
+                      <button
                         key={preset.id}
-                        className={`block p-3 rounded-xl border cursor-pointer transition-all ${
+                        type="button"
+                        onClick={() => handlePresetChange(preset.id)}
+                        className={`rounded-lg border px-4 py-2 text-sm font-bold transition-colors ${
                           formData.accessPreset === preset.id
-                            ? 'border-gold-500/50 bg-gold-500/10'
-                            : 'border-gold-500/15 bg-navy-950/40 hover:border-gold-500/30'
+                            ? 'border-gold-600 bg-gold-600 text-navy-950'
+                            : 'border-gold-500/20 bg-navy-800/50 text-gold-100/70 hover:border-gold-500/50'
                         }`}
                       >
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="radio"
-                            name="accessPreset"
-                            checked={formData.accessPreset === preset.id}
-                            onChange={() => handlePresetChange(preset.id)}
-                            className="mt-1"
-                          />
-                          <div>
-                            <p className="text-sm font-bold text-gold-100">{preset.label}</p>
-                            <p className="text-[11px] text-gold-500/50 mt-0.5">{preset.description}</p>
-                          </div>
-                        </div>
-                      </label>
+                        {preset.name}
+                      </button>
                     ))}
                   </div>
-                </div>
-
-                {(formData.accessPreset === 'custom' || editingStaff) && (
-                <div>
-                  <label className="block text-[10px] font-bold text-gold-500/60   mb-2">
-                    {editingStaff ? 'Assigned duties' : 'Custom duties'}
-                  </label>
-                  <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar p-3 bg-navy-950/50 border border-gold-500/20 rounded-xl">
-                    {STAFF_PERMISSION_GROUPS.map((group) => (
-                      <div key={group.label}>
-                        <p className="text-[9px] font-bold   text-gold-500/40 mb-1">{group.label}</p>
-                        {group.hint && (
-                          <p className="text-[10px] text-gold-500/30 mb-2">{group.hint}</p>
-                        )}
-                        <div className="grid grid-cols-1 gap-2">
-                          {group.permissions.map((perm) => (
-                            <label key={perm} className="flex items-center gap-2 cursor-pointer group">
-                              <input
-                                type="checkbox"
-                                checked={formData.permissions.includes(perm)}
-                                onChange={(e) => handlePermissionToggle(perm, e.target.checked)}
-                                disabled={perm === 'inventory-manage' && !formData.permissions.includes('inventory-view')}
-                                className="w-3.5 h-3.5 rounded border-gold-500/20 bg-navy-900 text-gold-600 focus:ring-0 focus:ring-offset-0"
-                              />
-                              <span className="text-[10px]  font-bold text-gold-100 group-hover:text-gold-500 transition-colors">
-                                {perm.replace(/-/g, ' ')}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gold-500/40 mt-2">
-                    POS only: checkout without inventory. Inventory view: add products and browse stock read-only. Inventory manage: update stock (admin grants only).
+                  <p className="mt-2 text-[11px] text-gold-500/40">
+                    {STAFF_ACCESS_PRESETS.find(p => p.id === formData.accessPreset)?.description}
                   </p>
                 </div>
-                )}
-                </div>
+                
+                   <div className="rounded-lg border border-gold-500/10 bg-navy-950/30 p-4">
+                    <label className="mb-3 block text-xs font-bold text-gold-500/60">{formData.accessPreset === 'custom' ? 'Custom Permissions' : 'Included Permissions'}</label>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      {STAFF_PERMISSION_GROUPS.map(group => (
+                        <div key={group.name}>
+                           <h4 className="mb-2 text-sm font-bold text-gold-300">{group.name}</h4>
+                           <div className="space-y-3">
+                            {group.permissions.map(p => (
+                               <label key={p.id} className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.permissions.includes(p.id)}
+                                  onChange={(e) => handlePermissionToggle(p.id, e.target.checked)}
+                                  className="h-4 w-4 rounded border-gold-500/40 bg-navy-800 text-gold-600 focus:ring-gold-500"
+                                />
+                                <span className="text-sm text-gold-100/80">{p.name}</span>
+                              </label>
+                            ))}
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="shrink-0 p-6 pt-4 border-t border-gold-500/10 bg-navy-900 rounded-b-2xl">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
-                  >
-                    {submitting ? (editingStaff ? 'SAVING...' : 'CREATING...') : (editingStaff ? 'SAVE CHANGES' : 'CREATE STAFF ACCOUNT')}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+              <div className="flex justify-end gap-4 border-t border-gold-500/10 p-6">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="rounded-lg border border-gold-500/20 px-6 py-2 text-sm font-bold text-gold-100/70 transition-colors hover:border-gold-500/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-gold-600 px-6 py-2 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-500 disabled:opacity-50"
+                >
+                  {submitting ? (editingStaff ? 'Updating...' : 'Inviting...') : (editingStaff ? 'Update Staff' : 'Invite Staff')}
+                </button>
+              </div>
+            </motion.form>
           </div>
         </div>
       )}
@@ -2384,7 +2138,6 @@ const AdminsView = ({ roleFilter = null }) => {
 };
 
 const ReviewsView = () => {
-  const confirm = useConfirm();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -2394,7 +2147,7 @@ const ReviewsView = () => {
         const res = await adminReviewAPI.getAll();
         setReviews(res.data.data);
       } catch (error) {
-        console.error('Error fetching reviews:', error);
+        console.error("Error fetching reviews:", error);
       } finally {
         setLoading(false);
       }
@@ -2402,120 +2155,74 @@ const ReviewsView = () => {
     fetchReviews();
   }, []);
 
-  const handleApprove = async (id) => {
+  const handleToggle = async (id, currentStatus) => {
     try {
-      await adminReviewAPI.approve(id);
-      setReviews(reviews.map(r => r.id === id ? { ...r, is_approved: true } : r));
+      await adminReviewAPI.toggle(id);
+      setReviews(
+        reviews.map((r) =>
+          r.id === id ? { ...r, is_approved: !currentStatus } : r
+        )
+      );
     } catch (error) {
-      console.error('Error approving review:', error);
+      console.error("Error toggling review status:", error);
     }
   };
-
-  const handleDelete = async (id) => {
-    const ok = await confirm({
-      title: 'Delete review',
-      message: 'This customer review will be permanently removed from your store.',
-      confirmLabel: 'Delete review',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    try {
-      await adminReviewAPI.remove(id);
-      setReviews(reviews.filter(r => r.id !== id));
-    } catch (error) {
-      console.error('Error deleting review:', error);
-    }
-  };
-
-  const pendingCount = reviews.filter(r => !r.is_approved).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-serif font-bold text-gold-100">Customer Feedback</h3>
-          {pendingCount > 0 && (
-            <span className="bg-gold-600 text-navy-950 px-2 py-0.5 rounded-full text-[10px] font-black  ">
-              {pendingCount} Pending
-            </span>
-          )}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="py-24 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-        </div>
-      ) : reviews.length > 0 ? (
-        <div className="space-y-4">
-          {reviews.map((r) => (
-            <div key={r.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl backdrop-blur-sm relative group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-navy-800 rounded-full flex items-center justify-center text-gold-500 font-bold border border-gold-500/10">
-                    {userInitials({ name: r.user_name, email: r.user_email })}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-gold-100">{r.user_name || 'Anonymous'}</div>
-                    <div className="text-xs text-gold-500/40">{r.product_name}</div>
-                  </div>
-                </div>
-                <div className="flex gap-0.5">
-                  {[1,2,3,4,5].map(star => (
-                    <Star key={star} size={14} className={star <= r.rating ? 'fill-gold-500 text-gold-500' : 'text-gold-500/10'} />
-                  ))}
-                </div>
-              </div>
-              <p className="text-sm text-gold-200/80 leading-relaxed mb-6 italic">"{r.comment}"</p>
-              <div className="flex items-center justify-between border-t border-gold-500/5 pt-4">
-                <span className="text-[10px] text-gold-500/30  ">{new Date(r.created_at).toLocaleDateString()}</span>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!r.is_approved && (
+      <h3 className="text-xl font-serif font-bold text-gold-100">Product Reviews</h3>
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+        {loading ? (
+          <div className="py-24 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto" /></div>
+        ) : (
+          <AdminTable>
+          <table className="w-full min-w-[700px] text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
+              <tr>
+                <th className="px-6 py-4">Product</th>
+                <th className="px-6 py-4">Customer</th>
+                <th className="px-6 py-4">Rating</th>
+                <th className="px-6 py-4">Review</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gold-500/5 text-sm">
+              {reviews.map(review => (
+                <tr key={review.id} className="hover:bg-navy-800/30">
+                  <td className="px-6 py-4 text-gold-100">{review.product?.name || 'N/A'}</td>
+                  <td className="px-6 py-4 text-gold-100">{review.customer_name}</td>
+                  <td className="px-6 py-4 text-gold-100">{review.rating}/5</td>
+                  <td className="px-6 py-4 text-gold-500/60 max-w-sm truncate">{review.comment}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${review.is_approved ? 'bg-green-400/10 text-green-400' : 'bg-gold-500/10 text-gold-500'}`}>
+                      {review.is_approved ? 'Approved' : 'Pending'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
                     <button 
-                      onClick={() => handleApprove(r.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-green-400 text-navy-950 rounded-lg text-[10px] font-black  "
+                      onClick={() => handleToggle(review.id, review.is_approved)}
+                      className="text-xs font-bold  px-3 py-1.5 rounded-lg border border-gold-500/20 text-gold-100 hover:bg-gold-600 hover:text-navy-950 transition-all"
                     >
-                      <CheckCircle2 size={12} /> Approve
+                      {review.is_approved ? 'Unapprove' : 'Approve'}
                     </button>
-                  )}
-                  <button 
-                    onClick={() => handleDelete(r.id)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-400/10 text-red-400 rounded-lg text-[10px] font-black   border border-red-400/20"
-                  >
-                     <Trash2 size={12} /> Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="py-24 text-center text-gold-500/40 text-sm bg-navy-900/40 border border-gold-500/10 rounded-2xl border-dashed">
-          No reviews yet.
-        </div>
-      )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </AdminTable>
+        )}
+      </div>
     </div>
   );
 };
 
+
 const SettingsView = () => {
-  const [settings, setSettings] = useState({
-    store_name: '',
-    support_email: '',
-    phone_number: '',
-    store_currency: '',
-  });
+  const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [adminsLoading, setAdminsLoading] = useState(true);
-  const [creatingAdmin, setCreatingAdmin] = useState(false);
-  const [admins, setAdmins] = useState([]);
-  const [editingAdminId, setEditingAdminId] = useState(null);
-  const [adminForm, setAdminForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-  });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -2523,7 +2230,7 @@ const SettingsView = () => {
         const res = await adminSettingsAPI.get();
         setSettings(res.data.data);
       } catch (error) {
-        console.error('Error fetching settings:', error);
+        console.error("Error fetching settings:", error);
       } finally {
         setLoading(false);
       }
@@ -2531,242 +2238,111 @@ const SettingsView = () => {
     fetchSettings();
   }, []);
 
-  useEffect(() => {
-    const fetchAdmins = async () => {
-      try {
-        const res = await adminCustomerAPI.getAdmins();
-        setAdmins(res.data?.data || []);
-      } catch (error) {
-        console.error('Error fetching admins:', error);
-      } finally {
-        setAdminsLoading(false);
-      }
-    };
-    fetchAdmins();
-  }, []);
-
   const handleSave = async () => {
     setSaving(true);
     try {
       await adminSettingsAPI.update(settings);
-      alert('Settings updated successfully');
+      adminToast.success('Settings updated');
     } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Error saving settings');
+      adminToast.error(apiErrorMessage(error, 'Could not save settings'));
     } finally {
       setSaving(false);
     }
   };
 
-  const resetAdminForm = () => {
-    setEditingAdminId(null);
-    setAdminForm({ name: '', email: '', password: '' });
-  };
-
-  const handleEditAdmin = (admin) => {
-    setEditingAdminId(admin.id);
-    setAdminForm({
-      name: admin.name || '',
-      email: admin.email || '',
-      password: '',
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setSettings({
+      ...settings,
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
-  const refreshAdmins = async () => {
-    try {
-      const res = await adminCustomerAPI.getAdmins();
-      setAdmins(res.data?.data || []);
-    } catch (error) {
-      console.error('Error refreshing admins:', error);
-    }
-  };
-
-  const handleCreateAdmin = async (e) => {
-    e.preventDefault();
-    setCreatingAdmin(true);
-    try {
-      if (editingAdminId) {
-        const payload = {
-          name: adminForm.name,
-          email: adminForm.email,
-        };
-        if (adminForm.password) payload.password = adminForm.password;
-        await adminCustomerAPI.updateAdmin(editingAdminId, payload);
-        adminToast.success('Admin account updated');
-      } else {
-        await adminCustomerAPI.createAdmin(adminForm);
-        adminToast.success('Admin account created');
-      }
-      await refreshAdmins();
-      resetAdminForm();
-    } catch (error) {
-      adminToast.error(apiErrorMessage(error, editingAdminId ? 'Could not update admin account' : 'Could not create admin account'));
-    } finally {
-      setCreatingAdmin(false);
-    }
-  };
+  if(loading) return <SectionLoader />;
 
   return (
-    <div className="space-y-8 pb-12">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="space-y-8 lg:col-span-2">
-          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
-            <h4 className="mb-6 flex items-center gap-3 font-serif text-xl font-bold text-gold-100">
-              <Settings size={20} className="text-gold-500" /> Store Information
-            </h4>
-            {loading ? (
-              <div className="py-12 text-center text-xs text-gold-500/40">Retrieving configurations...</div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {[
-                  { label: 'Store Name', key: 'store_name' },
-                  { label: 'Support Email', key: 'support_email' },
-                  { label: 'Phone Number', key: 'phone_number' },
-                  { label: 'Store Currency', key: 'store_currency' },
-                ].map((f, i) => (
-                  <div key={i} className="space-y-2">
-                    <label className="text-[10px] font-black text-gold-500/40">{f.label}</label>
-                    <input 
-                      type="text" 
-                      value={settings[f.key] || ''} 
-                      onChange={(e) => {
-                        let val = e.target.value;
-                        if (!f.key.includes('email') && !f.key.includes('phone')) {
-                          val = val.toUpperCase();
-                        }
-                        setSettings({ ...settings, [f.key]: val });
-                      }}
-                      className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 font-bold text-gold-100 outline-none transition-all focus:border-gold-500/40"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-serif font-bold text-gold-100">Store Configurations</h3>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
+        >
+          {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
+        </button>
+      </div>
 
-          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
-            <h4 className="mb-6 flex items-center gap-3 font-serif text-xl font-bold text-gold-100">
-              <Mail size={20} className="text-gold-500" /> Notification Preferences
-            </h4>
-            <div className="space-y-4">
-              {[
-                'Order Confirmation Emails',
-                'Low Stock Alerts',
-                'New Customer Registrations',
-                'Daily Sales Summaries',
-              ].map((pref, i) => (
-                <label key={i} className="flex items-center justify-between rounded-xl border border-gold-500/5 bg-navy-950/50 p-4">
-                  <span className="text-xs font-bold text-gold-100 transition-colors">{pref}</span>
-                  <div className="relative h-6 w-12 rounded-full border border-gold-500/20 bg-navy-800">
-                    <div className="absolute right-1 top-1 h-4 w-4 rounded-full bg-gold-600" />
-                  </div>
-                </label>
-              ))}
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
+        <div className="max-w-2xl mx-auto space-y-8">
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gold-100">Store Name</label>
+              <input 
+                type="text" 
+                name="store_name"
+                value={settings.store_name || ''}
+                onChange={handleInputChange}
+                className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gold-100">Contact Email</label>
+              <input 
+                type="email" 
+                name="support_email"
+                value={settings.support_email || ''}
+                onChange={handleInputChange}
+                className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gold-100">Contact Phone</label>
+              <input 
+                type="tel" 
+                name="phone_number"
+                value={settings.phone_number || ''}
+                onChange={handleInputChange}
+                className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+              />
             </div>
           </div>
-        </div>
+          
+          <div className="border-t border-gold-500/10" />
 
-        <div className="space-y-8">
-          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <ShieldCheck size={20} className="text-gold-500" />
-              <div>
-                <h5 className="font-serif text-lg font-bold text-gold-100">Admin accounts</h5>
-                <p className="text-xs text-gold-500/40">Edit existing admin access or select one to update.</p>
-              </div>
-            </div>
-            {adminsLoading ? (
-              <div className="py-10 text-center text-xs text-gold-500/40">Loading admins...</div>
-            ) : admins.length ? (
-              <div className="space-y-3 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
-                {admins.map((admin) => (
-                  <div key={admin.id} className="rounded-xl border border-gold-500/10 bg-navy-950/50 p-4 flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-gold-100">{admin.name}</p>
-                        {admin.is_active === false && <span className="h-2 w-2 rounded-full bg-red-500" />}
-                      </div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-500/35">{admin.email}</p>
-                      <p className="mt-1 text-[10px] text-gold-500/30">ID: {String(admin.id).substring(0, 8)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleEditAdmin(admin)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-gold-500/15 px-3 py-2 text-[10px] font-bold text-gold-100 hover:border-gold-500/40"
-                    >
-                      <Edit size={12} /> Edit
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-10 text-center text-xs text-gold-500/40">No admin accounts found.</div>
-            )}
+          <div className="space-y-4">
+            <label className="flex items-center gap-4 cursor-pointer">
+              <input 
+                type="checkbox" 
+                name="enable_reviews"
+                checked={settings.enable_reviews || false}
+                onChange={handleInputChange}
+                className="w-5 h-5 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+              />
+              <span className="text-sm text-gold-100">Enable Product Reviews</span>
+            </label>
+            <p className="text-xs text-gold-500/40  pl-9">Allow customers to submit reviews on product pages.</p>
           </div>
+          
+          <div className="border-t border-gold-500/10" />
 
-          <div className="rounded-2xl border border-gold-500/10 bg-navy-900/40 p-8 backdrop-blur-sm">
-            <div className="mb-5 flex items-center gap-3">
-              <ShieldCheck size={20} className="text-gold-500" />
-              <div>
-                <h5 className="font-serif text-lg font-bold text-gold-100">{editingAdminId ? 'Edit admin account' : 'Add another admin'}</h5>
-                <p className="text-xs text-gold-500/40">{editingAdminId ? 'Update the selected admin details below.' : 'Create a full admin account from the settings page.'}</p>
-              </div>
-            </div>
-            <form onSubmit={handleCreateAdmin} className="space-y-4">
-              <input
-                type="text"
-                required
-                value={adminForm.name}
-                onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
-                placeholder="Full name"
-                className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
-              />
-              <input
-                type="email"
-                required
-                value={adminForm.email}
-                onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                placeholder="Email address"
-                className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
-              />
-              <input
-                type="password"
-                required={!editingAdminId}
-                value={adminForm.password}
-                onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                placeholder={editingAdminId ? 'New password (optional)' : 'Temporary password'}
-                className="w-full rounded-xl border border-gold-500/10 bg-navy-950 px-4 py-3 text-sm text-gold-100 outline-none placeholder:text-gold-500/25 focus:border-gold-500/40"
-              />
-              <button 
-                type="submit"
-                disabled={creatingAdmin}
-                className="w-full rounded-2xl bg-gold-600 py-4 font-black tracking-[0.2em] text-navy-950 shadow-xl shadow-gold-600/10 transition-all hover:bg-gold-500 disabled:opacity-50"
-              >
-                {creatingAdmin ? 'SAVING...' : editingAdminId ? 'UPDATE ADMIN' : 'CREATE ADMIN'}
-              </button>
-              {editingAdminId && (
-                <button
-                  type="button"
-                  onClick={resetAdminForm}
-                  className="w-full rounded-2xl border border-gold-500/15 py-4 font-black tracking-[0.2em] text-gold-100 transition-all hover:border-gold-500/40"
-                >
-                  CANCEL EDIT
-                </button>
-              )}
-            </form>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gold-100">New Order Notifications Email</label>
+            <input 
+              type="email" 
+              name="new_order_email_recipient"
+              value={settings.new_order_email_recipient || ''}
+              onChange={handleInputChange}
+              className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+            />
+            <p className="text-xs text-gold-500/40">Send an email to this address for every new order.</p>
           </div>
-
-          <button 
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full rounded-2xl bg-gold-600 py-5 font-black tracking-[0.2em] text-navy-950 shadow-xl shadow-gold-600/10 transition-all hover:bg-gold-500 disabled:opacity-50"
-          >
-            {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
-          </button>
         </div>
       </div>
     </div>
   );
 };
 export default AdminDashboard;
-
