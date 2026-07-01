@@ -6,6 +6,27 @@ const slugify = (value) => String(value || '')
   .replace(/^-|-$/g, '');
 
 const NEW_PRODUCTS = [
+  // Moncler Tracksuits
+  {
+    name: 'Moncler Tricolor Zip-Up Sportswear Tracksuit - Alpine White',
+    slug: 'moncler-tricolor-zip-up-tracksuit-alpine-white',
+    category: 'Tracksuits',
+    subcategory: 'Sportswear',
+    price: 8000,
+    color: 'Alpine White',
+    thumbnail: '/images/products/WhatsApp Image 2026-07-01 at 17.48.56.jpg',
+    description: 'A premium luxury two-piece sportswear set featuring a sleek zip-up mock neck jacket and matching tailored joggers. Designed with Moncler\'s iconic tricolor ribbon accents along the main zipper and pocket borders, finished with signature chest and thigh logo embroidery. Key features: Iconic red, white, and navy tricolor zipper detailing, Embroidered Moncler signature logo on the chest and thigh, Premium heavyweight, breathable cotton-blend stretch fabric, Mock neck collar jacket with ribbed cuffs and hem, Adjustable drawstring elastic waistband with tricolor zippered side pockets on joggers.'
+  },
+  {
+    name: 'Moncler Tricolor Zip-Up Sportswear Tracksuit - Onyx Black',
+    slug: 'moncler-tricolor-zip-up-tracksuit-onyx-black',
+    category: 'Tracksuits',
+    subcategory: 'Sportswear',
+    price: 8000,
+    color: 'Onyx Black',
+    thumbnail: '/images/products/WhatsApp Image 2026-07-01 at 17.48.57.jpg',
+    description: 'An ultra-sharp, high-end two-piece luxury tracksuit combination crafted for a clean, athletic silhouette. Highlights a deep onyx black palette contrasted sharply against the signature heritage tricolor trim along the main zip enclosures and utility pockets. Key features: Deep fade-resistant matte black utility textile base, High-contrast red, white, and navy tricolor pocket and front zip borders, Embroidered signature Moncler brand insignias, Secure zippered side utility pockets on both jacket and trousers, Ribbed elastic trim and cuffs for a streamlined, tailored fit.'
+  },
   // Knit Polos
   {
     name: 'The Onyx Avant-Garde Polo',
@@ -410,6 +431,7 @@ const sizesForCategory = (categoryName) => {
   if (name.includes('shoe') || name.includes('loafer')) return ['39', '40', '41', '42', '43', '44', '45', '46'];
   if (name.includes('trouser') || name.includes('pant')) return ['30', '32', '34', '36', '38'];
   if (name.includes('shirt') || name.includes('polo')) return ['M', 'L', 'XL', 'XXL', '3XL'];
+  if (name.includes('tracksuit')) return ['M', 'L', 'XL', 'XXL', '3XL'];
   return ['M', 'L', 'XL', 'XXL'];
 };
 
@@ -459,6 +481,10 @@ async function seed() {
   categoryIds.set('jackets', jacketsParentId);
   categoryIds.set(slugify('Jackets'), jacketsParentId);
 
+  const tracksuitsParentId = await ensureCategory('Tracksuits');
+  categoryIds.set('tracksuits', tracksuitsParentId);
+  categoryIds.set(slugify('Tracksuits'), tracksuitsParentId);
+
   // Ensure subcategories
   const formalShoesId = await ensureCategory('Formal shoes', shoesParentId);
   categoryIds.set('formal shoes', formalShoesId);
@@ -475,6 +501,10 @@ async function seed() {
   const jacketsSubId = await ensureCategory('Jackets', jacketsParentId);
   categoryIds.set('jackets-sub', jacketsSubId);
   categoryIds.set(slugify('Jackets'), jacketsSubId);
+
+  const sportswearId = await ensureCategory('Sportswear', tracksuitsParentId);
+  categoryIds.set('sportswear', sportswearId);
+  categoryIds.set(slugify('Sportswear'), sportswearId);
 
   const brandId = await ensureBrand('Prince Esquire');
 
