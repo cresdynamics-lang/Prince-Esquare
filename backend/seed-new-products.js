@@ -10,8 +10,8 @@ const NEW_PRODUCTS = [
   {
     name: 'Moncler Tricolor Zip-Up Sportswear Tracksuit - Alpine White',
     slug: 'moncler-tricolor-zip-up-tracksuit-alpine-white',
-    category: 'Tracksuits',
-    subcategory: 'Sportswear',
+    category: 'Track Suits',
+    subcategory: 'All',
     price: 8000,
     color: 'Alpine White',
     thumbnail: '/images/products/WhatsApp Image 2026-07-01 at 17.48.56.jpg',
@@ -20,8 +20,8 @@ const NEW_PRODUCTS = [
   {
     name: 'Moncler Tricolor Zip-Up Sportswear Tracksuit - Onyx Black',
     slug: 'moncler-tricolor-zip-up-tracksuit-onyx-black',
-    category: 'Tracksuits',
-    subcategory: 'Sportswear',
+    category: 'Track Suits',
+    subcategory: 'All',
     price: 8000,
     color: 'Onyx Black',
     thumbnail: '/images/products/WhatsApp Image 2026-07-01 at 17.48.57.jpg',

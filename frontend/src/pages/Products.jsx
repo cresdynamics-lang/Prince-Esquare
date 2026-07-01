@@ -30,7 +30,7 @@ const CATEGORY_DATA = [
   { id: 'shirts', name: 'Shirts', sub: ['Formal shirts', 'Casual', 'Presidential'] },
   { id: 'suits', name: 'Suits', sub: ['Two piece', 'Three piece'] },
   { id: 'blazers', name: 'Blazers', sub: ['Modern', 'Casual', 'Classic'] },
-  { id: 'tracksuits', name: 'Tracksuits', sub: ['Sportswear'] },
+  { id: 'track-suits', name: 'Track Suits', sub: [] },
   { id: 'jackets', name: 'Jackets', sub: ['Jackets', 'Half jackets'] },
   { id: 'linen', name: 'Linen', sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'] },
   { id: 'caps-hats', name: 'Caps & Hats', sub: [] },
