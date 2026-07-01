@@ -481,7 +481,9 @@ async function seed() {
   categoryIds.set('jackets', jacketsParentId);
   categoryIds.set(slugify('Jackets'), jacketsParentId);
 
-  const tracksuitsParentId = await ensureCategory('Tracksuits');
+  const tracksuitsParentId = await ensureCategory('Track Suits');
+  categoryIds.set('track suits', tracksuitsParentId);
+  categoryIds.set(slugify('Track Suits'), tracksuitsParentId);
   categoryIds.set('tracksuits', tracksuitsParentId);
   categoryIds.set(slugify('Tracksuits'), tracksuitsParentId);
 
@@ -509,7 +511,10 @@ async function seed() {
   const brandId = await ensureBrand('Prince Esquire');
 
   for (const product of NEW_PRODUCTS) {
-    const categoryId = categoryIds.get(slugify(product.subcategory)) || categoryIds.get(slugify(product.category));
+    let categoryId = categoryIds.get(slugify(product.subcategory));
+    if (!categoryId || product.subcategory === 'All') {
+      categoryId = categoryIds.get(slugify(product.category));
+    }
     const images = JSON.stringify([product.thumbnail].filter(Boolean));
 
     const productResult = await db.query(
