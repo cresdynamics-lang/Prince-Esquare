@@ -124,7 +124,15 @@ const Products = ({ categoryOverride = null }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchParam = searchParams.get('search');
   const [stockFilter, setStockFilter] = useState('all');
+
+  // Initialize search query from URL parameter
+  useEffect(() => {
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [searchParam]);
   const [addedProductId, setAddedProductId] = useState(null);
   const [fetchError, setFetchError] = useState('');
   const [visibleCount, setVisibleCount] = useState(12);
@@ -140,6 +148,7 @@ const Products = ({ categoryOverride = null }) => {
       const params = {};
       if (currentCategory !== 'All') params.category = currentCategory;
       if (currentSub !== 'All') params.sub = currentSub;
+      if (searchParam) params.search = searchParam;
 
       try {
         const catalogueRes = await catalogueAPI.get(params);
@@ -238,9 +247,10 @@ const Products = ({ categoryOverride = null }) => {
   };
 
   const filteredProducts = products.filter((product) => {
-    const matchesSearch =
+    const matchesSearch = !searchQuery || (
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (product.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     if (!matchesSearch) return false;
     if (stockFilter === 'in_stock' && product.out_of_stock) return false;
@@ -294,8 +304,8 @@ const Products = ({ categoryOverride = null }) => {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-8 md:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
-            <div className="w-full space-y-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-8 lg:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
+            <div className="w-full lg:w-auto space-y-8">
               {!isDedicatedCategoryPage && (
               <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2">
                 {allCategoryData.map((cat) => (
@@ -347,17 +357,17 @@ const Products = ({ categoryOverride = null }) => {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0">
               <select
                 value={stockFilter}
                 onChange={(e) => setStockFilter(e.target.value)}
-                className="bg-navy-950 border border-gold-600/10 text-[10px]   text-white px-4 py-4 outline-none focus:border-gold-600"
+                className="bg-navy-950 border border-gold-600/10 text-[10px]   text-white px-4 py-4 outline-none focus:border-gold-600 min-w-[160px]"
               >
                 <option value="all">All availability</option>
                 <option value="in_stock">In stock only</option>
                 <option value="out_of_stock">Out of stock</option>
               </select>
-              <div className="relative w-full md:w-80 group">
+              <div className="relative w-full sm:w-80 group">
                 <Search
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-600/30 group-focus-within:text-gold-500 transition-colors"
                   size={16}

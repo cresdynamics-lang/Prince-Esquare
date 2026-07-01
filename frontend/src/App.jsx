@@ -13,6 +13,11 @@ import Payment from './pages/Payment';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
+import ContactUs from './pages/ContactUs';
+import BespokeServices from './pages/BespokeServices';
+import ShippingReturns from './pages/ShippingReturns';
+import SizeGuide from './pages/SizeGuide';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import SEO from './components/SEO';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
@@ -95,6 +100,11 @@ function App() {
         <Route path="/admin/login" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
         <Route path="/admin/dashboard" element={<NoIndexPage title="Admin Dashboard"><AdminDashboard /></NoIndexPage>} />
         <Route path="/admin" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
+        <Route path="/contact-us" element={<ContactUs />} />
+        <Route path="/bespoke-services" element={<BespokeServices />} />
+        <Route path="/shipping-returns" element={<ShippingReturns />} />
+        <Route path="/size-guide" element={<SizeGuide />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       </Routes>
     </Router>
   );

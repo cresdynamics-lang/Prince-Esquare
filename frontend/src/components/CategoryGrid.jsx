@@ -31,7 +31,7 @@ const CategoryGrid = () => {
           </motion.button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 auto-rows-[360px] md:auto-rows-[260px] gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 auto-rows-[260px] gap-6 md:gap-8">
           {CATEGORY_TILES.map((cat, index) => (
             <motion.div
               key={cat.title}
@@ -39,7 +39,7 @@ const CategoryGrid = () => {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1, duration: 0.8 }}
-              className={`relative min-h-[360px] md:min-h-0 overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
+              className={`relative min-h-[260px] overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
               onClick={() => navigate(cat.path || `/products?category=${cat.category}`)}
             >
               <img

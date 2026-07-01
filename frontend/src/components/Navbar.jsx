@@ -10,6 +10,8 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [openMobileCategory, setOpenMobileCategory] = useState('polo-t-shirts');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
   
   const getItemCount = useCartStore((state) => state.getItemCount);
@@ -125,6 +127,15 @@ const Navbar = () => {
     setOpenMobileCategory((current) => (current === category ? '' : category));
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchOpen(false);
+      setSearchQuery('');
+    }
+  };
+
   return (
     <nav className={`fixed w-full z-[80] transition-all duration-500 ${scrolled ? 'py-4 glass shadow-2xl' : 'py-8 bg-transparent'}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
@@ -200,7 +211,35 @@ const Navbar = () => {
           <Link to="/blog" className="text-[9px] 2xl:text-[10px] font-bold tracking-[0.18em] 2xl:tracking-[0.24em] text-white hover:text-gold-400 transition-colors duration-300">
             BLOG
           </Link>
-          <Search size={18} className="cursor-pointer hover:text-gold-200 transition-colors" />
+          <Link to="/products" className="text-[9px] 2xl:text-[10px] font-bold tracking-[0.18em] 2xl:tracking-[0.24em] text-white hover:text-gold-400 transition-colors duration-300">
+            SHOP ALL
+          </Link>
+          <div className="relative">
+            <button onClick={() => setSearchOpen(!searchOpen)} className="hover:text-gold-200 transition-colors">
+              <Search size={18} />
+            </button>
+            {searchOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute right-0 top-12 w-80 bg-navy-950/95 border border-gold-600/20 backdrop-blur-xl p-4 shadow-2xl z-50"
+              >
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search products..."
+                    className="flex-1 bg-navy-900 border border-gold-600/20 text-white px-3 py-2 text-sm outline-none focus:border-gold-600"
+                    autoFocus
+                  />
+                  <button type="submit" className="bg-gold-600 text-navy-950 px-4 py-2 text-sm font-bold hover:bg-gold-500 transition-colors">
+                    Search
+                  </button>
+                </form>
+              </motion.div>
+            )}
+          </div>
           
           <div className="relative group">
             <Link to={isAuthenticated ? "/profile" : "/login"} className="relative block">

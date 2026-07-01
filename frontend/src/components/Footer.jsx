@@ -55,7 +55,7 @@ const Footer = () => {
             </div>
           </div>
 
-          <div>
+          <div className="hidden md:block">
             <h3 className="text-gold-400 font-serif text-xl mb-8">Collections</h3>
             <ul className="space-y-4">
               {['Formal Wear', 'Casual Collection', 'The Shoe Atelier', 'Linen Basics', 'Accessories'].map((link) => (
@@ -68,51 +68,169 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div>
+          <div className="hidden md:block">
             <h3 className="text-gold-400 font-serif text-xl mb-8">Support</h3>
             <ul className="space-y-4">
-              {['Contact Us', 'Bespoke Services', 'Shipping & Returns', 'Size Guide', 'Privacy Policy', 'Staff'].map((link) => (
+              <li>
+                <a href="/contact-us" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Contact Us
+                </a>
+              </li>
+              <li>
+                <a href="/bespoke-services" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Bespoke Services
+                </a>
+              </li>
+              <li>
+                <a href="/shipping-returns" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Shipping & Returns
+                </a>
+              </li>
+              <li>
+                <a href="/size-guide" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Size Guide
+                </a>
+              </li>
+              <li>
+                <a href="/privacy-policy" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a href="/admin" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Staff
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Mobile layout - Collections left, Support right */}
+        <div className="md:hidden grid grid-cols-2 gap-8 mb-12">
+          <div>
+            <h3 className="text-gold-400 font-serif text-xl mb-6">Collections</h3>
+            <ul className="space-y-3">
+              {['Formal Wear', 'Casual Collection', 'The Shoe Atelier', 'Linen Basics', 'Accessories'].map((link) => (
                 <li key={link}>
-                  <a href={link === 'Staff' ? '/admin' : '#'} className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  <a href="#" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
                     {link}
                   </a>
                 </li>
               ))}
             </ul>
           </div>
+
+          <div>
+            <h3 className="text-gold-400 font-serif text-xl mb-6">Support</h3>
+            <ul className="space-y-3">
+              <li>
+                <a href="/contact-us" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Contact Us
+                </a>
+              </li>
+              <li>
+                <a href="/bespoke-services" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Bespoke Services
+                </a>
+              </li>
+              <li>
+                <a href="/shipping-returns" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Shipping & Returns
+                </a>
+              </li>
+              <li>
+                <a href="/size-guide" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Size Guide
+                </a>
+              </li>
+              <li>
+                <a href="/privacy-policy" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a href="/admin" className="text-navy-400 hover:text-gold-400 transition-colors font-light text-sm tracking-wide">
+                  Staff
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center py-12 border-y border-gold-500/10 gap-8">
-          <div className="flex items-center space-x-4 text-navy-400">
-            <MapPin size={18} className="text-gold-600" />
-            <span className="text-xs">Prince Esquire Boutique, Nairobi</span>
+          {/* Desktop layout */}
+          <div className="hidden md:flex flex-wrap justify-center items-center gap-6">
+            <div className="flex items-center space-x-4 text-navy-400">
+              <MapPin size={18} className="text-gold-600" />
+              <span className="text-xs">Prince Esquire Boutique, Nairobi</span>
+            </div>
+            <div className="flex items-center space-x-4 text-navy-400">
+              <Phone size={18} className="text-gold-600" />
+              <span className="text-xs">0724-494089</span>
+            </div>
+            <div className="flex items-center space-x-4 text-navy-400">
+              <Mail size={18} className="text-gold-600" />
+              <span className="text-xs">prince.esquire.staff@gmail.com</span>
+            </div>
+            <a href={SITE_URL} className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors">
+              <Globe size={18} className="text-gold-600" />
+              <span className="text-xs">prince-esquire.co.ke</span>
+            </a>
+            <a href={SOCIAL_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
+              <span className="text-xs">@prince_esquire.1</span>
+            </a>
+            <a href={SOCIAL_FACEBOOK} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600" aria-hidden="true">
+                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+              </svg>
+              <span className="text-xs">prince.esquire254</span>
+            </a>
           </div>
-          <div className="flex items-center space-x-4 text-navy-400">
-            <Phone size={18} className="text-gold-600" />
-            <span className="text-xs">0724-494089</span>
+
+          {/* Mobile layout - two straight lines */}
+          <div className="md:hidden flex flex-col gap-4 w-full">
+            <div className="flex flex-wrap justify-center gap-4">
+              <div className="flex items-center space-x-2 text-navy-400">
+                <MapPin size={16} className="text-gold-600" />
+                <span className="text-xs">Prince Esquire Boutique, Nairobi</span>
+              </div>
+              <div className="flex items-center space-x-2 text-navy-400">
+                <Phone size={16} className="text-gold-600" />
+                <span className="text-xs">0724-494089</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-center gap-4">
+              <div className="flex items-center space-x-2 text-navy-400">
+                <Mail size={16} className="text-gold-600" />
+                <span className="text-xs">prince.esquire.staff@gmail.com</span>
+              </div>
+              <a href={SITE_URL} className="flex items-center space-x-2 text-navy-400 hover:text-gold-400 transition-colors">
+                <Globe size={16} className="text-gold-600" />
+                <span className="text-xs">prince-esquire.co.ke</span>
+              </a>
+            </div>
+            <div className="flex flex-wrap justify-center gap-4">
+              <a href={SOCIAL_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-navy-400 hover:text-gold-400 transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600" aria-hidden="true">
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                </svg>
+                <span className="text-xs">@prince_esquire.1</span>
+              </a>
+              <a href={SOCIAL_FACEBOOK} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-navy-400 hover:text-gold-400 transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600" aria-hidden="true">
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                </svg>
+                <span className="text-xs">prince.esquire254</span>
+              </a>
+            </div>
           </div>
-          <div className="flex items-center space-x-4 text-navy-400">
-            <Mail size={18} className="text-gold-600" />
-            <span className="text-xs">prince.esquire.staff@gmail.com</span>
-          </div>
-          <a href={SITE_URL} className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors">
-            <Globe size={18} className="text-gold-600" />
-            <span className="text-xs">prince-esquire.co.ke</span>
-          </a>
-          <a href={SOCIAL_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600" aria-hidden="true">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-            </svg>
-            <span className="text-xs">@prince_esquire.1</span>
-          </a>
-          <a href={SOCIAL_FACEBOOK} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-4 text-navy-400 hover:text-gold-400 transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gold-600" aria-hidden="true">
-              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-            </svg>
-            <span className="text-xs">prince.esquire254</span>
-          </a>
         </div>
 
         <div className="text-center pt-12">
