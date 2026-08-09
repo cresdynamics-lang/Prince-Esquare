@@ -6,7 +6,7 @@ const runMigrations = async () => {
     try {
         console.log('Starting migrations...');
         const dir = path.join(__dirname, 'migrations');
-        const files = ['schema.sql', '002_cart_order_size_label.sql'].filter((f) =>
+        const files = ['schema.sql', '002_cart_order_size_label.sql', '003_product_analytics.sql'].filter((f) =>
             fs.existsSync(path.join(dir, f))
         );
         for (const file of files) {

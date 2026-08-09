@@ -2,10 +2,31 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { cartAPI } from '../services/api';
 import { useAuthStore } from './useAuthStore';
+import { toCartVariantId } from '../utils/ids';
+import { trackAddToCart } from '../lib/metaPixel';
+
+const isCustomerSession = () => {
+  const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
+  return isAuthenticated && token && !isSeller && user?.accountType !== 'pos';
+};
 
 function lineKey(item) {
   if (item.cartItemId) return `s:${item.cartItemId}`;
   return `g:${item.productId}:${item.variantId}:${item.sizeLabel || ''}`;
+}
+
+function mergeKey(item) {
+  return `${item.productId}:${item.variantId || ''}:${item.sizeLabel || ''}`;
+}
+
+const isRealProductId = (id) => typeof id === 'string' && id.length >= 32;
+
+function mergeServerAndLocal(serverItems, localItems) {
+  const serverKeys = new Set(serverItems.map(mergeKey));
+  const unsyncedLocal = localItems.filter(
+    (it) => !it.cartItemId && isRealProductId(it.productId) && !serverKeys.has(mergeKey(it))
+  );
+  return [...serverItems, ...unsyncedLocal];
 }
 
 export function mapCartRow(row) {
@@ -37,35 +58,35 @@ export const useCartStore = create(
 
       getCheckoutTotals: () => {
         const subtotal = get().getTotal();
-        const tax = Math.round(subtotal * 0.16);
-        const shipping = 250;
+        const tax = 0;
+        const shipping = 0;
         const total = subtotal + tax + shipping;
         return { subtotal, tax, shipping, total };
       },
 
       loadCart: async () => {
-        const { isAuthenticated, token } = useAuthStore.getState();
-        if (!isAuthenticated || !token) return;
+        if (!isCustomerSession()) return;
         try {
           const res = await cartAPI.get();
           if (!res.data?.success) return;
           const rows = Array.isArray(res.data.data) ? res.data.data : [];
-          set({ items: rows.map(mapCartRow) });
+          const serverItems = rows.map(mapCartRow);
+          set({ items: mergeServerAndLocal(serverItems, get().items) });
         } catch (e) {
           console.error('loadCart', e);
         }
       },
 
       mergeGuestCartToServer: async () => {
-        const { isAuthenticated, token } = useAuthStore.getState();
-        if (!isAuthenticated || !token) return;
+        if (!isCustomerSession()) return;
         const items = get().items;
         for (const it of items) {
-          if (!it.productId || it.cartItemId) continue;
+          const isDummy = !isRealProductId(it.productId);
+          if (!it.productId || it.cartItemId || isDummy) continue;
           try {
             await cartAPI.addItem({
               product_id: it.productId,
-              variant_id: it.variantId,
+              variant_id: toCartVariantId(it.variantId),
               quantity: it.quantity,
               size_label: it.sizeLabel || null,
             });
@@ -76,27 +97,28 @@ export const useCartStore = create(
         await get().loadCart();
       },
 
+      prepareForCheckout: async () => {
+        if (isCustomerSession()) {
+          await get().mergeGuestCartToServer();
+        }
+        return get().items;
+      },
+
       addToCart: async (payload) => {
-        const { isAuthenticated, token } = useAuthStore.getState();
         const qty = Math.max(1, payload.quantity || 1);
-        if (isAuthenticated && token) {
-          await cartAPI.addItem({
-            product_id: payload.productId,
-            variant_id: payload.variantId,
-            quantity: qty,
-            size_label: payload.sizeLabel || null,
-          });
-          await get().loadCart();
-          return;
+        const isDummy = !isRealProductId(payload.productId);
+        if (isDummy) {
+          throw new Error('This item is not available for checkout. Please browse the shop catalogue.');
         }
         const items = get().items;
         const idx = items.findIndex(
           (i) =>
-            !i.cartItemId &&
             i.productId === payload.productId &&
             i.variantId === payload.variantId &&
             (i.sizeLabel || '') === (payload.sizeLabel || '')
         );
+        const snapshot = items;
+
         if (idx !== -1) {
           const next = [...items];
           next[idx] = { ...next[idx], quantity: next[idx].quantity + qty };
@@ -119,31 +141,67 @@ export const useCartStore = create(
             ],
           });
         }
+
+        if (isCustomerSession()) {
+          try {
+            // Keep UI optimistic — sync server in background after local cart updates
+            void cartAPI
+              .addItem({
+                product_id: payload.productId,
+                variant_id: toCartVariantId(payload.variantId),
+                quantity: qty,
+                size_label: payload.sizeLabel || null,
+              })
+              .then(() => get().loadCart())
+              .catch((e) => {
+                console.error('addToCart', e);
+                set({ items: snapshot });
+              });
+          } catch (e) {
+            console.error('addToCart', e);
+            set({ items: snapshot });
+            throw e;
+          }
+        }
+
+        trackAddToCart({ ...payload, quantity: qty });
       },
 
       updateQuantity: async (item, newQty) => {
         const q = Math.max(1, newQty);
-        const { isAuthenticated, token } = useAuthStore.getState();
-        if (isAuthenticated && token && item.cartItemId) {
-          await cartAPI.updateItem(item.cartItemId, { quantity: q });
-          await get().loadCart();
-          return;
-        }
         const k = lineKey(item);
+        const snapshot = get().items;
+        // Optimistic quantity for instant badge / bag totals
         set({
           items: get().items.map((i) => (lineKey(i) === k ? { ...i, quantity: q } : i)),
         });
+        if (isCustomerSession() && item.cartItemId) {
+          try {
+            await cartAPI.updateItem(item.cartItemId, { quantity: q });
+            void get().loadCart();
+          } catch (e) {
+            console.error('updateQuantity', e);
+            set({ items: snapshot });
+            throw e;
+          }
+          return;
+        }
       },
 
       removeFromCart: async (item) => {
-        const { isAuthenticated, token } = useAuthStore.getState();
-        if (isAuthenticated && token && item.cartItemId) {
-          await cartAPI.removeItem(item.cartItemId);
-          await get().loadCart();
-          return;
-        }
         const k = lineKey(item);
+        const snapshot = get().items;
         set({ items: get().items.filter((i) => lineKey(i) !== k) });
+        if (isCustomerSession() && item.cartItemId) {
+          try {
+            await cartAPI.removeItem(item.cartItemId);
+            void get().loadCart();
+          } catch (e) {
+            console.error('removeFromCart', e);
+            set({ items: snapshot });
+            throw e;
+          }
+        }
       },
 
       clearLocalItems: () => set({ items: [] }),

@@ -1,17 +1,73 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../store/useCartStore';
-import { Trash2, ShoppingBag, ArrowRight, Minus, Plus } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, Phone } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { orderAPI } from '../services/api';
+import { toCartVariantId } from '../utils/ids';
+
+const DRAFT_KEY = 'prince-esquire-draft-order-id';
 
 const Cart = () => {
   const { items, removeFromCart, updateQuantity, getTotal } = useCartStore();
   const navigate = useNavigate();
+  const [cartPhone, setCartPhone] = useState(() => sessionStorage.getItem('prince-esquire-cart-phone') || '');
+  const [cartName, setCartName] = useState('');
+  const [savingLead, setSavingLead] = useState(false);
+  const [leadSaved, setLeadSaved] = useState(false);
+  const [leadError, setLeadError] = useState('');
 
   const lineKey = (item) =>
     item.cartItemId ? `c-${item.cartItemId}` : `g-${item.productId}-${item.variantId}-${item.sizeLabel || ''}`;
 
+  const saveCartLead = async () => {
+    setLeadError('');
+    const digits = String(cartPhone).replace(/\D/g, '');
+    if (digits.length < 9) {
+      setLeadError('Enter a valid Kenyan phone number (e.g. 0712 345 678).');
+      return;
+    }
+    if (!items.length) {
+      setLeadError('Your bag is empty.');
+      return;
+    }
+    setSavingLead(true);
+    try {
+      const names = cartName.trim().split(/\s+/);
+      const shipping_address = {
+        first_name: names[0] || '',
+        last_name: names.slice(1).join(' ') || '',
+        phone: cartPhone.trim(),
+        email: '',
+        line1: 'Details pending at checkout',
+        city: 'Nairobi',
+        country: 'Kenya',
+        stage: 'cart_capture',
+      };
+      const res = await orderAPI.saveDraft({
+        draft_id: sessionStorage.getItem(DRAFT_KEY) || undefined,
+        shipping_address,
+        items: items
+          .filter((it) => String(it.productId).length >= 32)
+          .map((it) => ({
+            product_id: it.productId,
+            variant_id: toCartVariantId(it.variantId),
+            quantity: it.quantity,
+            size_label: it.sizeLabel || null,
+          })),
+      });
+      if (!res.data?.success) throw new Error(res.data?.message || 'Could not save');
+      if (res.data?.data?.id) sessionStorage.setItem(DRAFT_KEY, res.data.data.id);
+      sessionStorage.setItem('prince-esquire-cart-phone', cartPhone.trim());
+      setLeadSaved(true);
+    } catch (err) {
+      setLeadError(err.response?.data?.message || err.message || 'Could not save phone');
+    } finally {
+      setSavingLead(false);
+    }
+  };
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
       <Navbar />
@@ -35,7 +91,7 @@ const Cart = () => {
                   <p className="text-gold-500 mb-8 font-light italic">Your bag is currently empty.</p>
                   <Link
                     to="/products"
-                    className="inline-block bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all"
+                    className="inline-block bg-gold-600 text-navy-950 px-12 py-5 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all rounded-full"
                   >
                     Start Shopping
                   </Link>
@@ -62,6 +118,16 @@ const Cart = () => {
                                 {item.brandName || 'Bespoke'}
                               </p>
                               <h3 className="text-xl font-serif text-white">{item.name}</h3>
+                              {item.slug && (
+                                <a
+                                  href={`https://prince-esquire.co.ke/product/${item.slug}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-1 inline-block text-[10px] font-bold uppercase tracking-widest text-green-400 hover:text-green-300"
+                                >
+                                  {item.name} — KSh {item.price.toLocaleString()} · View product
+                                </a>
+                              )}
                               <div className="flex flex-wrap gap-4 pt-3">
                                 <div className="text-[10px] font-bold uppercase tracking-widest text-gold-400 bg-navy-950 px-4 py-1.5 border border-gold-600/20">
                                   Size: {item.sizeLabel || '—'}
@@ -129,11 +195,51 @@ const Cart = () => {
                 </div>
 
                 <div className="space-y-4 pt-6">
+                  {items.length > 0 && (
+                    <div className="space-y-3 border border-gold-600/15 bg-navy-950/80 p-5">
+                      <div className="flex items-center gap-2 text-gold-500">
+                        <Phone size={14} />
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Hold this order</p>
+                      </div>
+                      <p className="text-[11px] text-navy-300 font-sans font-light leading-relaxed">
+                        Drop your phone (and name if you like). We save your bag now so staff can follow up even if you don&apos;t finish checkout.
+                      </p>
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={cartPhone}
+                        onChange={(e) => { setCartPhone(e.target.value); setLeadSaved(false); }}
+                        placeholder="0712 345 678"
+                        className="w-full bg-navy-900 border border-gold-500/15 py-3 px-4 text-sm text-white outline-none focus:border-gold-500 font-sans"
+                      />
+                      <input
+                        type="text"
+                        value={cartName}
+                        onChange={(e) => setCartName(e.target.value)}
+                        placeholder="Your name (optional)"
+                        className="w-full bg-navy-900 border border-gold-500/15 py-3 px-4 text-sm text-white outline-none focus:border-gold-500 font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={saveCartLead}
+                        disabled={savingLead}
+                        className="w-full border border-gold-500/40 text-gold-400 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 hover:text-navy-950 transition-all disabled:opacity-40 font-sans"
+                      >
+                        {savingLead ? 'Saving…' : leadSaved ? 'Saved — continue to checkout' : 'Save phone & bag'}
+                      </button>
+                      {leadSaved && (
+                        <p className="text-[10px] text-green-400 font-sans">Details saved. You can finish checkout anytime.</p>
+                      )}
+                      {leadError && (
+                        <p className="text-[10px] text-red-400 font-sans">{leadError}</p>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     disabled={items.length === 0}
                     onClick={() => navigate('/checkout')}
-                    className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group"
+                    className="w-full bg-gold-600 text-navy-950 py-5 px-6 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center justify-center space-x-4 disabled:opacity-30 disabled:cursor-not-allowed group rounded-full"
                   >
                     <span>Begin Checkout</span>
                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />

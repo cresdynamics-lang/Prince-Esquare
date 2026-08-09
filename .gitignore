@@ -1,6 +1,10 @@
 # Agent Skills
 .agent/skills/
 
+# Cursor agent SSH keys (never commit private keys)
+.cursor/ssh/
+!.cursor/ssh/*.pub
+
 # Dependencies
 node_modules/
 .pnp
@@ -25,3 +29,8 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.tmp-prod/
+
+# local backups
+backups/
+.tmp-prod/

@@ -1,96 +1,248 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Package, ShoppingBag, Tag, Award, Users, 
-  ShieldCheck, Ticket, Image as ImageIcon, Mail, CreditCard, 
-  Star, Settings, LogOut, Bell, Search, Menu, X, 
+  ShieldCheck, Image as ImageIcon, Mail,
+  Star, Settings, LogOut, Bell, Search, Menu, X,
   ArrowUpRight, ArrowDownRight, MoreVertical, Plus, 
   Download, Filter, CheckCircle2, AlertCircle, Clock, 
-  UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight,
-  Phone, Globe, Truck, CreditCard as CardIcon, Laptop
+  UserPlus, UserMinus, Trash2, Edit, Eye, ChevronRight, ChevronDown,
+  Phone, Globe, Truck, CreditCard,
+  Store, BookOpen
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthStore, isStaffSession } from '../store/useAuthStore';
+import { userInitials } from '../lib/format';
+import { adminToast, apiErrorMessage } from '../lib/adminToast';
 import { 
   adminAnalyticsAPI, 
   adminOrderAPI, 
-  adminProductAPI, 
   adminCategoryAPI, 
   adminBrandAPI, 
   adminCustomerAPI,
-  adminCouponAPI,
-  adminBannerAPI,
-  adminNewsletterAPI,
-  adminReviewAPI
+  adminReviewAPI,
+  adminSettingsAPI,
+  adminUploadAPI,
 } from '../services/api';
 import { useEffect } from 'react';
+import AdminDashboardCharts from '../components/admin/AdminDashboardCharts';
+import {
+  formatPaymentLabel,
+  parseOrderAddress,
+  formatOrderContact,
+  orderCustomerPhone,
+  orderCustomerEmail,
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+} from '../lib/adminOrderHelpers';
+import {
+  getUploadUrl,
+  getPersistImageUrl,
+  getImageSrc,
+  resolveDisplayImageUrl,
+} from '../utils/cloudinary';
+import { ensureSocket, disconnectSocket } from '../lib/socket';
+import SaleCatalogView, { LiveVisitorsView } from '../components/admin/StoreAnalyticsViews';
+import { ConfirmProvider, useConfirm } from '../components/admin/ConfirmDialog';
+import AdminSectionErrorBoundary from '../components/admin/AdminSectionErrorBoundary';
+import {
+  canAccessProducts,
+  canViewCustomers,
+  canManageUsers,
+  hasPermission,
+  parsePermissions,
+  STAFF_ACCESS_PRESETS,
+  STAFF_PERMISSION_GROUPS,
+  detectStaffPreset,
+  applyPermissionToggle,
+  normalizeStaffPermissions,
+} from '../utils/staffPermissions';
+
+const ProductsView = lazy(() => import('../components/admin/ProductsView'));
+const BlogsView = lazy(() => import('../components/admin/BlogsView'));
+
+const SectionLoader = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500" />
+  </div>
+);
+
+/** Scrollable table wrapper for mobile */
+const AdminTable = ({ children }) => (
+  <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">{children}</div>
+);
 
 const AdminDashboard = () => {
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const navigate = useNavigate();
   const logout = useAuthStore(state => state.logout);
-  const { isAuthenticated, isAdmin } = useAuthStore();
+  const authState = useAuthStore();
+  const { user, isAuthenticated, isAdmin, isSeller } = authState;
+  const staffSession = isStaffSession(authState);
+  const [authReady, setAuthReady] = useState(
+    () => useAuthStore.persist?.hasHydrated?.() ?? true
+  );
 
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin) {
-      navigate('/admin/login');
+    const done = () => setAuthReady(true);
+    if (useAuthStore.persist?.hasHydrated?.()) {
+      setAuthReady(true);
+      return undefined;
     }
-  }, [isAuthenticated, isAdmin, navigate]);
+    const unsub = useAuthStore.persist?.onFinishHydration?.(done);
+    useAuthStore.persist?.rehydrate?.();
+    return unsub;
+  }, []);
 
-  if (!isAuthenticated || !isAdmin) return null;
+  useEffect(() => {
+    if (!authReady) return;
+    if (!staffSession) {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [authReady, staffSession, navigate]);
+
+  const allSidebarItems = useMemo(() => [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
+    { id: 'live-visitors', label: 'Live Visitors', icon: Eye, section: 'Overview' },
+    { id: 'blogs', label: 'Blogs', icon: BookOpen, section: 'Content' },
+    { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
+    { id: 'sale-catalog', label: 'Sale Catalog', icon: ShoppingBag, section: 'Store' },
+    { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Catalogue' },
+    { id: 'users', label: 'Users', icon: Users, section: 'People' },
+    { id: 'reviews', label: 'Reviews', icon: Star, section: 'Marketing', badge: '5' },
+    { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
+  ], []);
+
+  const sidebarItems = useMemo(() => {
+    const items = allSidebarItems;
+    return items.filter((item) => {
+      if (user?.role === 'admin') return true;
+      if (user?.role === 'staff') {
+        if (item.id === 'sale-catalog' || item.id === 'live-visitors') return true;
+        if (item.id === 'users') return canViewCustomers(user);
+        if (item.id === 'products') return canAccessProducts(user);
+        return hasPermission(user, item.id) || (item.id === 'users' && hasPermission(user, 'customers'));
+      }
+      return false;
+    });
+  }, [isSeller, user, allSidebarItems]);
+
+  useEffect(() => {
+    if (!authReady || !staffSession) return undefined;
+    ensureSocket();
+    return undefined;
+  }, [authReady, staffSession]);
+
+  useEffect(() => {
+    if (user?.role === 'staff' && sidebarItems.length > 0) {
+      if (!sidebarItems.find((i) => i.id === activeSection)) {
+        setActiveSection(sidebarItems[0].id);
+      }
+    }
+  }, [user, sidebarItems, activeSection]);
+
+  if (!authReady || !staffSession) return null;
 
   const handleLogout = async () => {
     try {
       // Optional: call backend logout
       // await adminAuthAPI.logout(); 
     } catch (e) {}
+    disconnectSocket();
     logout();
     navigate('/admin/login');
   };
 
-  const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
-    { id: 'orders', label: 'Orders', icon: Package, section: 'Store', badge: '12' },
-    { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Store' },
-    { id: 'categories', label: 'Categories', icon: Tag, section: 'Store' },
-    { id: 'brands', label: 'Brands', icon: Award, section: 'Store' },
-    { id: 'customers', label: 'Customers', icon: Users, section: 'People' },
-    { id: 'admins', label: 'Admins', icon: ShieldCheck, section: 'People' },
-    { id: 'coupons', label: 'Coupons', icon: Ticket, section: 'Marketing' },
-    { id: 'banners', label: 'Banners', icon: ImageIcon, section: 'Marketing' },
-    { id: 'newsletter', label: 'Newsletter', icon: Mail, section: 'Marketing' },
-    { id: 'payments', label: 'Payments', icon: CreditCard, section: 'Finance' },
-    { id: 'reviews', label: 'Reviews', icon: Star, section: 'Finance', badge: '5' },
-    { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
-  ];
+  const navSections = [...new Set(sidebarItems.map((item) => item.section))];
 
   const renderContent = () => {
+    if (user?.role === 'staff') {
+      const allowed =
+        hasPermission(user, activeSection) ||
+        (activeSection === 'users' && canViewCustomers(user)) ||
+        (activeSection === 'products' && canAccessProducts(user)) ||
+        (activeSection === 'blogs' && hasPermission(user, 'blogs')) ||
+        activeSection === 'sale-catalog' ||
+        activeSection === 'live-visitors';
+      if (!allowed) {
+        return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
+      }
+    }
+
+    const heavySection = (
+      <AdminSectionErrorBoundary label="Products">
+        <Suspense fallback={<SectionLoader />}>
+          {(() => {
+            switch (activeSection) {
+              case 'products':
+                return <ProductsView />;
+              default:
+                return null;
+            }
+          })()}
+        </Suspense>
+      </AdminSectionErrorBoundary>
+    );
+
     switch (activeSection) {
-      case 'dashboard': return <DashboardView />;
-      case 'orders': return <OrdersView />;
-      case 'products': return <ProductsView />;
-      case 'categories': return <CategoriesView />;
-      case 'brands': return <BrandsView />;
-      case 'customers': return <CustomersView />;
-      case 'admins': return <AdminsView />;
-      case 'coupons': return <CouponsView />;
-      case 'banners': return <BannersView />;
-      case 'newsletter': return <NewsletterView />;
-      case 'payments': return <PaymentsView />;
+      case 'dashboard':
+        if (isSeller) return null;
+        return <DashboardView />;
+      case 'sale-catalog': return <SaleCatalogView />;
+      case 'live-visitors': return <LiveVisitorsView />;
+      case 'orders': return <OrdersView readOnly={isSeller} />;
+      case 'products':
+        return heavySection;
+      case 'blogs':
+        return (
+          <Suspense fallback={<SectionLoader />}>
+            <BlogsView />
+          </Suspense>
+        );
+      case 'users': return <UsersView />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
       default: return <DashboardView />;
     }
   };
 
+  const handleNavClick = (sectionId) => {
+    setActiveSection(sectionId);
+    setIsMobileNavOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileNavOpen((open) => !open);
+    } else {
+      setIsSidebarOpen((open) => !open);
+    }
+  };
+
+  const isMobileMenuVisible = isMobileNavOpen;
+
   return (
-    <div className="flex h-screen bg-navy-950 text-gold-50 font-sans overflow-hidden">
+    <ConfirmProvider>
+    <div className="flex h-dvh bg-navy-950 text-gold-50 font-sans overflow-hidden">
+      {isMobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 bg-navy-950/80 z-30 lg:hidden"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside 
         className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-navy-900/50 border-r border-gold-500/10 transition-all duration-300 flex flex-col z-20 backdrop-blur-xl`}
+          isSidebarOpen ? 'w-72 lg:w-64' : 'w-72 lg:w-20'
+        } fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 bg-navy-900/95 lg:bg-navy-900/50 border-r border-gold-500/10 transition-all duration-300 flex flex-col backdrop-blur-xl ${
+          isMobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
         <div className="p-6 border-b border-gold-500/10 flex items-center gap-3">
           <div className="w-10 h-10 bg-gold-600 rounded-lg flex items-center justify-center text-navy-950 font-bold text-xl">
@@ -108,10 +260,10 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
-          {['Overview', 'Store', 'People', 'Marketing', 'Finance', 'System'].map((section) => (
+          {navSections.map((section) => (
             <div key={section} className="mb-6">
               {isSidebarOpen && (
-                <h3 className="px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-500/40 mb-2">
+                <h3 className="px-4 text-[10px] font-bold  tracking-[0.2em] text-gold-500/40 mb-2">
                   {section}
                 </h3>
               )}
@@ -120,10 +272,10 @@ const AdminDashboard = () => {
                 .map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => setActiveSection(item.id)}
+                    onClick={() => handleNavClick(item.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                      activeSection === item.id 
-                        ? 'bg-gold-600 text-navy-950 shadow-lg shadow-gold-600/20' 
+                      activeSection === item.id
+                        ? 'bg-gold-600 text-navy-950 shadow-lg shadow-gold-600/20'
                         : 'text-gold-500/60 hover:bg-navy-800/50 hover:text-gold-400'
                     }`}
                   >
@@ -156,29 +308,32 @@ const AdminDashboard = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0 w-full lg:ml-0">
         {/* Topbar */}
-        <header className="h-20 bg-navy-900/30 border-b border-gold-500/10 flex items-center justify-between px-8 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="h-16 sm:h-20 bg-navy-900/30 border-b border-gold-500/10 flex items-center justify-between px-4 sm:px-6 lg:px-8 backdrop-blur-md shrink-0 gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-gold-500/60 hover:text-gold-500 transition-colors bg-navy-800/50 rounded-lg border border-gold-500/10"
+              type="button"
+              onClick={toggleSidebar}
+              className="p-2 text-gold-500/60 hover:text-gold-500 transition-colors bg-navy-800/50 rounded-lg border border-gold-500/10 shrink-0"
             >
-              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+              {(isMobileMenuVisible || (isSidebarOpen && typeof window !== 'undefined' && window.innerWidth >= 1024)) ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="h-8 w-[1px] bg-gold-500/10 mx-2" />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Admin / Overview</span>
-              <h2 className="text-xl font-serif font-bold text-gold-100 capitalize">
-                {activeSection.replace('-', ' ')}
+            <div className="hidden sm:block h-8 w-[1px] bg-gold-500/10 mx-1 sm:mx-2" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-gold-500/40   truncate">
+                {isSeller ? 'Seller Portal' : 'Admin / Overview'}
+              </span>
+              <h2 className="text-base sm:text-xl font-serif font-bold text-gold-100 capitalize truncate">
+                {sidebarItems.find((i) => i.id === activeSection)?.label || activeSection.replace(/-/g, ' ')}
               </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             <div className="hidden md:flex items-center gap-2 bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl focus-within:border-gold-500/30 transition-all">
               <Search size={18} className="text-gold-500/40" />
-              <input 
+              <input
                 type="text" 
                 placeholder="Search anything..." 
                 className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/30 w-64"
@@ -189,15 +344,18 @@ const AdminDashboard = () => {
                 <Bell size={20} />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-gold-600 rounded-full border-2 border-navy-900 group-hover:scale-125 transition-transform"></span>
               </button>
-              <div className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform">
-                AD
+              <div
+                className="h-10 w-10 bg-gradient-to-br from-gold-400 to-gold-700 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 cursor-pointer hover:scale-105 transition-transform text-sm"
+                title={[user?.fullName, user?.name, user?.full_name, user?.email].filter(Boolean).join(' · ')}
+              >
+                {userInitials(user)}
               </div>
             </div>
           </div>
         </header>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gradient-to-b from-navy-950 to-navy-900/50">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 custom-scrollbar bg-gradient-to-b from-navy-950 to-navy-900/50">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}
@@ -205,6 +363,7 @@ const AdminDashboard = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
+              className="min-w-0"
             >
               {renderContent()}
             </motion.div>
@@ -212,214 +371,206 @@ const AdminDashboard = () => {
         </div>
       </main>
     </div>
+    </ConfirmProvider>
   );
 };
 
 // --- Sub-views ---
 
 const DashboardView = () => {
-  const [stats, setStats] = useState(null);
-  const [topProducts, setTopProducts] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
+  const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        const [statsRes, topRes, lowStockRes] = await Promise.all([
-          adminAnalyticsAPI.getStats(),
-          adminAnalyticsAPI.getTopProducts(),
-          adminAnalyticsAPI.getLowStock()
-        ]);
-        
-        setStats(statsRes.data.data);
-        setTopProducts(topRes.data.data);
-        setLowStock(lowStockRes.data.data);
+        const res = await adminAnalyticsAPI.getInsights();
+        if (!cancelled && res.data?.success) setInsights(res.data.data);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-
-    fetchDashboardData();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500"></div>
-      </div>
-    );
-  }
-
-  const statCards = [
-    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard, up: true, change: '+12%' },
-    { label: 'Total Orders', value: stats?.orders || 0, icon: Package, up: true, change: '+5%' },
-    { label: 'Customers', value: stats?.customers || 0, icon: Users, up: true, change: '+8%' },
-    { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock, up: stats?.pendingOrders < 5, change: stats?.pendingOrders > 10 ? 'Action required' : 'Manageable' },
-  ];
-
-  return (
-    <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, i) => (
-          <div key={i} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl hover:border-gold-500/20 transition-all group backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-navy-800/50 rounded-xl group-hover:bg-gold-600 group-hover:text-navy-950 transition-all">
-                <stat.icon size={22} className="text-gold-500 group-hover:text-navy-950" />
-              </div>
-              {stat.up ? (
-                <span className="flex items-center text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">
-                  <ArrowUpRight size={14} className="mr-1" /> {stat.change}
-                </span>
-              ) : (
-                <span className="flex items-center text-xs font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg">
-                  <ArrowDownRight size={14} className="mr-1" /> {stat.change}
-                </span>
-              )}
-            </div>
-            <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest mb-1">{stat.label}</div>
-            <div className="text-2xl font-serif font-bold text-gold-100">{stat.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Sales Chart Placeholder */}
-        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-           <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-            <h3 className="font-serif font-bold text-lg text-gold-100">Monthly Sales</h3>
-            <div className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">Current Year</div>
-          </div>
-          <div className="p-8 h-64 flex items-end justify-between gap-2">
-             {[40, 65, 45, 80, 55, 90, 75, 60, 85, 70, 95, 80].map((h, i) => (
-               <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                 <div className="relative w-full">
-                    <motion.div 
-                      initial={{ height: 0 }}
-                      animate={{ height: `${h}%` }}
-                      className="w-full bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-lg opacity-40 group-hover:opacity-100 transition-all duration-500"
-                    />
-                 </div>
-                 <span className="text-[9px] font-bold text-gold-500/30 uppercase tracking-tighter">
-                   {['J','F','M','A','M','J','J','A','S','O','N','D'][i]}
-                 </span>
-               </div>
-             ))}
-          </div>
-        </div>
-
-        {/* Top Products */}
-        <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-          <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-            <h3 className="font-serif font-bold text-lg text-gold-100">Top Products</h3>
-            <button className="text-xs font-bold text-gold-500 hover:text-gold-400 transition-colors uppercase tracking-widest">Analytics</button>
-          </div>
-          <div className="p-6 space-y-6">
-            {topProducts.length > 0 ? topProducts.map((product, i) => (
-              <div key={i} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gold-200">{product.name}</span>
-                  <span className="text-gold-500/60 font-bold">{product.sales} units sold</span>
-                </div>
-                <div className="h-2 bg-navy-800 rounded-full overflow-hidden border border-gold-500/5">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(product.sales / (topProducts[0]?.sales || 1)) * 100}%` }}
-                    className="h-full bg-gradient-to-r from-gold-600 to-gold-400 rounded-full"
-                  />
-                </div>
-              </div>
-            )) : (
-              <div className="text-center py-12 text-gold-500/40 text-sm">No sales data yet</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Low Stock Alerts */}
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertCircle size={20} className="text-red-400" />
-            <h3 className="font-serif font-bold text-lg text-gold-100">Low Stock Alerts</h3>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em] border-b border-gold-500/10">
-                <th className="px-6 py-4">Product</th>
-                <th className="px-6 py-4">Stock</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {lowStock.length > 0 ? lowStock.map((item, i) => (
-                <tr key={i} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-gold-100">{item.name}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs font-bold ${item.stock === 0 ? 'text-red-500 bg-red-500/10' : 'text-red-400 bg-red-400/10'} px-2 py-1 rounded-lg`}>
-                      {item.stock} units left
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-gold-500 hover:text-gold-400 p-2 bg-navy-800/50 rounded-lg border border-gold-500/10 transition-all">
-                      <Plus size={16} />
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="3" className="px-6 py-12 text-center text-gold-500/40 text-sm">All products are well-stocked</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+  return <AdminDashboardCharts data={insights} loading={loading} />;
 };
 
-
-const OrdersView = () => {
+const OrdersView = ({ readOnly = false }) => {
+  const confirm = useConfirm();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filter, setFilter] = useState('All');
+  const [detailOrder, setDetailOrder] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [editOrder, setEditOrder] = useState(null);
+  const [editStatus, setEditStatus] = useState('pending');
+  const [editPaymentStatus, setEditPaymentStatus] = useState('pending');
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await adminOrderAPI.getAll();
+      const rows = res.data?.data ?? res.data?.orders ?? [];
+      setOrders(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError(err.response?.data?.message || 'Could not load orders. Try again.');
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      try {
-        const res = await adminOrderAPI.getAll();
-        setOrders(res.data.data);
-      } catch (error) {
-        console.error('Error fetching orders:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchOrders();
   }, []);
 
-  const filteredOrders = filter === 'All' 
-    ? orders 
-    : orders.filter(o => o.status.toLowerCase() === filter.toLowerCase());
+  const filteredOrders = filter === 'All'
+    ? orders
+    : orders.filter((o) => (o.status || '').toLowerCase() === filter.toLowerCase());
+
+  const openOrderDetail = async (orderId) => {
+    setDetailOrder(null);
+    setDetailLoading(true);
+    setActionError('');
+    try {
+      const res = await adminOrderAPI.getOne(orderId);
+      setDetailOrder(res.data?.data || null);
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not load order details.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const openOrderEdit = (order) => {
+    setEditOrder(order);
+    setEditStatus(order.status || 'pending');
+    setEditPaymentStatus(order.payment_status || 'pending');
+    setActionError('');
+  };
+
+  const handleSaveOrder = async () => {
+    if (!editOrder) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      const statusChanged = editStatus !== editOrder.status;
+      const paymentChanged = editPaymentStatus !== editOrder.payment_status;
+
+      if (statusChanged) {
+        await adminOrderAPI.updateStatus(editOrder.id, editStatus);
+      }
+      if (paymentChanged) {
+        await adminOrderAPI.updatePayment(editOrder.id, editPaymentStatus);
+      }
+
+      setEditOrder(null);
+      await fetchOrders();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not update order.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExportOrders = async () => {
+    try {
+      const res = await adminOrderAPI.exportCsv();
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Export failed');
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!editOrder) return;
+    const ok = await confirm({
+      title: 'Cancel order',
+      message: 'Cancel this order? Stock will be restored if already paid.',
+      confirmLabel: 'Cancel order',
+      variant: 'warning',
+    });
+    if (!ok) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      await adminOrderAPI.cancel(editOrder.id);
+      setEditOrder(null);
+      await fetchOrders();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not cancel order.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRefundOrder = async () => {
+    if (!editOrder) return;
+    const ok = await confirm({
+      title: 'Refund order',
+      message: 'Refund this paid order and restore stock to inventory?',
+      confirmLabel: 'Refund order',
+      variant: 'warning',
+    });
+    if (!ok) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      await adminOrderAPI.refund(editOrder.id);
+      setEditOrder(null);
+      await fetchOrders();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Could not refund order.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setDetailOrder(null);
+    setDetailLoading(false);
+    setActionError('');
+  };
+
+  const closeEdit = () => {
+    setEditOrder(null);
+    setActionError('');
+  };
+
+  const detailAddress = parseOrderAddress(detailOrder?.shipping_address);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex gap-2">
-          {['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'].map((f) => (
-            <button 
-              key={f} 
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm py-3 px-4 rounded-xl">
+          {error}
+        </div>
+      )}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          {['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].map((f) => (
+            <button
+              key={f}
+              type="button"
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                filter === f 
-                  ? 'bg-gold-600 text-navy-950 border-gold-600' 
+              className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                filter === f
+                  ? 'bg-gold-600 text-navy-950 border-gold-600'
                   : 'bg-navy-900/50 text-gold-500/60 border-gold-500/10 hover:border-gold-500/30'
               }`}
             >
@@ -428,9 +579,22 @@ const OrdersView = () => {
           ))}
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all">
-            <Download size={16} /> Export
+          <button
+            type="button"
+            onClick={handleExportOrders}
+            className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all"
+          >
+            <Download size={16} /> Export CSV
           </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => fetchOrders()}
+              className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all"
+            >
+              Refresh
+            </button>
+          )}
         </div>
       </div>
 
@@ -440,9 +604,10 @@ const OrdersView = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
           </div>
         ) : filteredOrders.length > 0 ? (
-          <table className="w-full text-left">
+          <AdminTable>
+          <table className="w-full min-w-[900px] text-left">
             <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+              <tr className="text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
                 <th className="px-6 py-4">Order ID</th>
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Total</th>
@@ -456,21 +621,33 @@ const OrdersView = () => {
               {filteredOrders.map((o) => (
                 <tr key={o.id} className="hover:bg-navy-800/30 transition-colors">
                   <td className="px-6 py-4 font-bold text-gold-500">#{o.id.substring(0, 8).toUpperCase()}</td>
-                  <td className="px-6 py-4 text-sm text-gold-100">{o.customer_name}</td>
+                  <td className="px-6 py-4 text-sm text-gold-100">
+                    <div className="font-medium">{o.customer_name || 'Guest'}</div>
+                    {formatOrderContact(o) ? (
+                      <div className="text-[11px] text-gold-500/65 mt-0.5 leading-snug">
+                        {formatOrderContact(o)}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-gold-500/35 mt-0.5">No phone or email</div>
+                    )}
+                    {o.is_draft && (
+                      <div className="text-[9px] text-amber-400/80 mt-0.5">Open lead · not submitted</div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(o.total_amount).toLocaleString()}</td>
                   <td className="px-6 py-4 text-xs">
                     <span className={`px-2 py-1 rounded border border-gold-500/10 ${o.payment_status === 'paid' ? 'text-green-400 bg-green-400/5' : 'text-gold-500/60 bg-navy-800'}`}>
-                      {o.payment_method} ({o.payment_status})
+                      {formatPaymentLabel(o.payment_method)} ({o.payment_status})
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
-                      o.status === 'pending' ? 'bg-gold-500/10 text-gold-500' : 
-                      o.status === 'delivered' ? 'bg-green-400/10 text-green-400' : 
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${
+                      o.status === 'pending' ? 'bg-gold-500/10 text-gold-500' :
+                      o.status === 'delivered' ? 'bg-green-400/10 text-green-400' :
                       o.status === 'cancelled' ? 'bg-red-400/10 text-red-400' :
                       'bg-blue-400/10 text-blue-400'
                     }`}>
-                      {o.status}
+                      {o.is_draft ? 'open lead' : o.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-xs text-gold-500/40">
@@ -478,612 +655,258 @@ const OrdersView = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="View Details"><Eye size={16} /></button>
-                      <button className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="Edit Order"><Edit size={16} /></button>
+                      <button
+                        type="button"
+                        onClick={() => openOrderDetail(o.id)}
+                        className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => openOrderEdit(o)}
+                          className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"
+                          title="Edit Order"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </AdminTable>
         ) : (
           <div className="py-24 text-center text-gold-500/40 text-sm">
             No orders found matching this criteria.
           </div>
         )}
       </div>
-    </div>
-  );
-};
 
-
-const ProductsView = () => {
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    description: '',
-    price: '',
-    discount_price: '',
-    category_id: '',
-    brand_id: '',
-    stock_quantity: 0,
-    is_featured: false,
-    is_active: true,
-    thumbnail: '',
-    images: [],
-    variants: [],
-    thumbnailFile: null,
-    thumbnailPreview: '',
-    galleryFiles: [],
-    galleryPreviews: []
-  });
-
-  const handleInputChange = (e, field) => {
-    let value = e.target.value;
-    if (typeof value === 'string' && field !== 'thumbnail' && field !== 'slug' && !field.includes('image')) {
-      value = value.toUpperCase();
-    }
-    setFormData({ ...formData, [field]: value });
-  };
-
-  const handleThumbnailChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFormData({
-        ...formData,
-        thumbnailFile: file,
-        thumbnailPreview: URL.createObjectURL(file)
-      });
-    }
-  };
-
-  const handleGalleryChange = (e) => {
-    const files = Array.from(e.target.files);
-    const previews = files.map(file => URL.createObjectURL(file));
-    setFormData({
-      ...formData,
-      galleryFiles: [...formData.galleryFiles, ...files],
-      galleryPreviews: [...formData.galleryPreviews, ...previews]
-    });
-  };
-
-  const removeGalleryFile = (index) => {
-    const newFiles = [...formData.galleryFiles];
-    const newPreviews = [...formData.galleryPreviews];
-    URL.revokeObjectURL(newPreviews[index]);
-    newFiles.splice(index, 1);
-    newPreviews.splice(index, 1);
-    setFormData({
-      ...formData,
-      galleryFiles: newFiles,
-      galleryPreviews: newPreviews
-    });
-  };
-
-  const handleAddVariant = () => {
-    setFormData({ 
-      ...formData, 
-      variants: [...formData.variants, { color: '', size: '', stock: 0, price_override: '' }] 
-    });
-  };
-
-  const handleVariantChange = (index, field, value) => {
-    const newVariants = [...formData.variants];
-    let finalValue = value;
-    if (typeof finalValue === 'string' && (field === 'color' || field === 'size')) {
-      finalValue = finalValue.toUpperCase();
-    }
-    newVariants[index][field] = finalValue;
-    setFormData({ ...formData, variants: newVariants });
-  };
-
-  const handleRemoveVariant = (index) => {
-    setFormData({ ...formData, variants: formData.variants.filter((_, i) => i !== index) });
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [prodRes, catRes, brandRes] = await Promise.all([
-        adminProductAPI.getAll(),
-        adminCategoryAPI.getAll(),
-        adminBrandAPI.getAll()
-      ]);
-      setProducts(prodRes.data.data);
-      setCategories(catRes.data.data);
-      setBrands(brandRes.data.data);
-    } catch (error) {
-      console.error('Error fetching product data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const handleOpenModal = (product = null) => {
-    if (product) {
-      setCurrentProduct(product);
-      setFormData({
-        name: product.name || '',
-        slug: product.slug || '',
-        description: product.description || '',
-        price: product.price || '',
-        discount_price: product.discount_price || '',
-        category_id: product.category_id || '',
-        brand_id: product.brand_id || '',
-        stock_quantity: product.stock_quantity || 0,
-        is_featured: product.is_featured || false,
-        is_active: product.is_active ?? true,
-        thumbnail: product.thumbnail || '',
-        images: Array.isArray(product.images) ? product.images : [],
-        variants: Array.isArray(product.variants) ? product.variants : [],
-        thumbnailFile: null,
-        thumbnailPreview: product.thumbnail || '',
-        galleryFiles: [],
-        galleryPreviews: Array.isArray(product.images) ? product.images : []
-      });
-    } else {
-      setCurrentProduct(null);
-      setFormData({
-        name: '',
-        slug: '',
-        description: '',
-        price: '',
-        discount_price: '',
-        category_id: '',
-        brand_id: '',
-        stock_quantity: 0,
-        is_featured: false,
-        is_active: true,
-        thumbnail: '',
-        images: [],
-        variants: [],
-        thumbnailFile: null,
-        thumbnailPreview: '',
-        galleryFiles: [],
-        galleryPreviews: []
-      });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        await adminProductAPI.remove(id);
-        fetchData();
-      } catch (error) {
-        alert('Error deleting product');
-      }
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const data = new FormData();
-      Object.keys(formData).forEach(key => {
-        if (key === 'variants') {
-          data.append(key, JSON.stringify(formData[key]));
-        } else if (key === 'galleryFiles') {
-          formData[key].forEach(file => data.append('images', file));
-        } else if (key === 'thumbnailFile' && formData[key]) {
-          data.append('thumbnail', formData[key]);
-        } else if (['thumbnailPreview', 'galleryPreviews', 'thumbnail', 'images'].includes(key)) {
-           // Skip internal state previews and old URL fields if they are strings
-        } else {
-          data.append(key, formData[key]);
-        }
-      });
-
-      if (currentProduct) {
-        await adminProductAPI.update(currentProduct.id, data);
-      } else {
-        await adminProductAPI.create(data);
-      }
-      setIsModalOpen(false);
-      fetchData();
-    } catch (error) {
-      console.error('Error saving product:', error);
-      alert('Error saving product');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6 relative">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100 uppercase tracking-widest">Inventory Management ({products.length})</h3>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20"
-        >
-          <Plus size={20} /> Add Product
-        </button>
-      </div>
-
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm text-gold-100">
-        {loading ? (
-          <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-          </div>
-        ) : products.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50">
-              <tr className="text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-                <th className="px-6 py-4">Product Details</th>
-                <th className="px-6 py-4">Category</th>
-                <th className="px-6 py-4">Price</th>
-                <th className="px-6 py-4">Stock</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-navy-800 rounded-xl border border-gold-500/10 overflow-hidden flex items-center justify-center">
-                        {p.thumbnail ? (
-                          <img src={p.thumbnail} alt={p.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <ShoppingBag size={24} className="text-gold-500/40" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-gold-100 uppercase">{p.name}</div>
-                        <div className="text-[10px] font-mono text-gold-500/40 uppercase mt-1">{p.slug}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[10px] font-bold text-gold-500/60 uppercase">{p.category_name || 'Uncategorized'}</td>
-                  <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(p.price).toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <div className={`text-[10px] font-black uppercase ${p.stock_quantity === 0 ? 'text-red-400' : p.stock_quantity < 10 ? 'text-gold-500' : 'text-green-400'}`}>
-                      {p.stock_quantity === 0 ? 'Out of Stock' : `${p.stock_quantity} units`}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${p.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'}`}>
-                      {p.is_active ? 'Active' : 'Hidden'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button 
-                        onClick={() => handleOpenModal(p)}
-                        className="p-2 text-gold-500/60 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(p.id)}
-                        className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm uppercase tracking-widest">
-            No products found in inventory.
-          </div>
-        )}
-      </div>
-
-      {/* Product Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-navy-900 border border-gold-500/20 rounded-3xl p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl custom-scrollbar"
-          >
-            <div className="flex items-center justify-between mb-8">
-              <h4 className="text-2xl font-serif font-bold text-gold-100 uppercase tracking-widest">
-                {currentProduct ? 'Edit Product' : 'Add New Product'}
-              </h4>
-              <button onClick={() => setIsModalOpen(false)} className="text-gold-500/40 hover:text-gold-500">
-                <X size={24} />
+      {(detailLoading || detailOrder || actionError) && !editOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <button type="button" aria-label="Close order details" className="absolute inset-0 bg-navy-950/85 backdrop-blur-sm" onClick={closeDetail} />
+          <div className="relative bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-serif text-gold-100">Order Details</h3>
+                {detailOrder && (
+                  <p className="text-gold-500/50 text-xs mt-1  ">
+                    #{detailOrder.id.substring(0, 8).toUpperCase()}
+                  </p>
+                )}
+              </div>
+              <button type="button" onClick={closeDetail} className="text-gold-500/40 hover:text-gold-500">
+                <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-10">
-              {/* Basic Info */}
-              <div className="space-y-6">
-                <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">General Information</h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Product Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={formData.name}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
-                      }}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={formData.slug}
-                      onChange={(e) => setFormData({...formData, slug: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Price (KSh)</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={formData.price}
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Discount Price</label>
-                    <input 
-                      type="number" 
-                      value={formData.discount_price}
-                      onChange={(e) => setFormData({...formData, discount_price: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Total Stock</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={formData.stock_quantity}
-                      onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Category</label>
-                    <select 
-                      required
-                      value={formData.category_id}
-                      onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Brand</label>
-                    <select 
-                      value={formData.brand_id}
-                      onChange={(e) => setFormData({...formData, brand_id: e.target.value})}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
-                    >
-                      <option value="">Select Brand</option>
-                      {brands.map(brand => (
-                        <option key={brand.id} value={brand.id}>{brand.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
-                  <textarea 
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
-                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
-                  />
-                </div>
+            {detailLoading ? (
+              <div className="py-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto" />
               </div>
-
-              {/* Media Section */}
+            ) : actionError && !detailOrder ? (
+              <p className="text-red-400 text-sm">{actionError}</p>
+            ) : detailOrder ? (
               <div className="space-y-6">
-                <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em] border-b border-gold-500/10 pb-2">Product Media</h5>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Main Thumbnail</label>
-                    <div className="flex items-center gap-6 p-6 bg-navy-950 border-2 border-dashed border-gold-500/10 rounded-2xl group hover:border-gold-500/30 transition-all">
-                      <div className="w-24 h-24 rounded-xl border border-gold-500/20 overflow-hidden bg-navy-900 flex items-center justify-center relative">
-                        {formData.thumbnailPreview ? (
-                          <img src={formData.thumbnailPreview} className="w-full h-full object-cover" />
-                        ) : (
-                          <ImageIcon className="text-gold-500/20" size={32} />
-                        )}
-                        <input 
-                          type="file" 
-                          accept="image/*"
-                          onChange={handleThumbnailChange}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-[10px] font-black text-gold-100 uppercase tracking-widest">Select Thumbnail</p>
-                        <p className="text-[9px] text-gold-500/40 uppercase tracking-wider">Drag and drop or click to upload</p>
-                      </div>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-[10px] text-gold-500/40 mb-1">Customer</p>
+                    <p className="text-gold-100">{detailOrder.customer_name || 'Guest'}</p>
+                    {orderCustomerPhone(detailOrder) && (
+                      <p className="text-gold-300/90 text-xs mt-1">
+                        Phone: {orderCustomerPhone(detailOrder)}
+                      </p>
+                    )}
+                    {orderCustomerEmail(detailOrder) && (
+                      <p className="text-gold-500/70 text-xs mt-0.5">
+                        Email: {orderCustomerEmail(detailOrder)}
+                      </p>
+                    )}
+                    {!orderCustomerPhone(detailOrder) && !orderCustomerEmail(detailOrder) && (
+                      <p className="text-gold-500/40 text-xs mt-0.5">No phone or email on file</p>
+                    )}
                   </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Additional Gallery Images</label>
-                      <div className="relative">
-                        <button type="button" className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
-                          <Plus size={14} /> Attach Photos
-                        </button>
-                        <input 
-                          type="file" 
-                          multiple 
-                          accept="image/*"
-                          onChange={handleGalleryChange}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {formData.galleryPreviews.map((preview, idx) => (
-                        <div key={idx} className="aspect-square rounded-xl border border-gold-500/10 overflow-hidden relative group">
-                          <img src={preview} className="w-full h-full object-cover" />
-                          <button 
-                            type="button" 
-                            onClick={() => removeGalleryFile(idx)} 
-                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-lg"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                  <div>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Placed</p>
+                    <p className="text-gold-100">{new Date(detailOrder.created_at).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Status</p>
+                    <p className="text-gold-100  text-xs font-bold">{detailOrder.status}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px]   text-gold-500/40 mb-1">Payment</p>
+                    <p className="text-gold-100 text-xs">
+                      {formatPaymentLabel(detailOrder.payment_method)} · {detailOrder.payment_status}
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Variants Section */}
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-gold-500/10 pb-2">
-                  <h5 className="text-xs font-black text-gold-500 uppercase tracking-[0.3em]">Product Variants (COLOUR, SIZE, ETC.)</h5>
-                  <button type="button" onClick={handleAddVariant} className="text-[10px] text-gold-500 hover:text-gold-300 font-black uppercase flex items-center gap-2 transition-colors">
-                    <Plus size={14} /> Add Variant Option
-                  </button>
-                </div>
-                
-                <div className="space-y-4">
-                  {formData.variants.length > 0 ? formData.variants.map((variant, idx) => (
-                    <div key={idx} className="bg-navy-950/50 border border-gold-500/10 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-5 gap-4 items-end relative group">
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Colour</label>
-                        <input 
-                          type="text" 
-                          placeholder="E.G. MIDNIGHT BLUE"
-                          value={variant.color}
-                          onChange={(e) => handleVariantChange(idx, 'color', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Size</label>
-                        <input 
-                          type="text" 
-                          placeholder="E.G. XL / 42"
-                          value={variant.size}
-                          onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold uppercase"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Stock</label>
-                        <input 
-                          type="number" 
-                          value={variant.stock}
-                          onChange={(e) => handleVariantChange(idx, 'stock', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[8px] text-gold-500/40 uppercase tracking-widest font-black">Price Override</label>
-                        <input 
-                          type="number" 
-                          placeholder="IF DIFFERENT"
-                          value={variant.price_override}
-                          onChange={(e) => handleVariantChange(idx, 'price_override', e.target.value)}
-                          className="w-full bg-navy-900 border border-gold-500/5 rounded-lg py-2 px-3 text-gold-100 text-[10px] outline-none focus:border-gold-500/20 font-bold"
-                        />
-                      </div>
-                      <div className="pb-1 text-right">
-                        <button type="button" onClick={() => handleRemoveVariant(idx)} className="p-2 text-red-400/40 hover:text-red-400 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="py-8 text-center border-2 border-dashed border-gold-500/5 rounded-2xl text-[10px] text-gold-500/20 uppercase font-black tracking-widest">
-                      No variants added. Click above to add sizes or colours.
-                    </div>
+                <div className="bg-navy-950/60 border border-gold-500/10 rounded-xl p-4 text-sm">
+                  <p className="text-[10px]   text-gold-500/40 mb-2">Shipping</p>
+                  {detailAddress ? (
+                    <>
+                      <p className="text-gold-100">{[detailAddress.first_name, detailAddress.last_name].filter(Boolean).join(' ')}</p>
+                      <p className="text-gold-500/70 text-xs mt-1">{detailAddress.line1 || '—'}</p>
+                      <p className="text-gold-500/70 text-xs">{detailAddress.city || '—'}, {detailAddress.country || 'Kenya'}</p>
+                      <p className="text-gold-500/70 text-xs mt-1">{detailAddress.phone || '—'}</p>
+                      <p className="text-gold-500/70 text-xs">{detailAddress.email || '—'}</p>
+                    </>
+                  ) : (
+                    <p className="text-gold-500/50 text-xs">No shipping address on file.</p>
                   )}
                 </div>
-              </div>
 
-              {/* Status & Submit */}
-              <div className="pt-10 border-t border-gold-500/10 flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="flex gap-8">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      checked={formData.is_featured}
-                      onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
-                      className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
-                    />
-                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Featured</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                      className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
-                    />
-                    <span className="text-[10px] font-black uppercase text-gold-100 tracking-widest group-hover:text-gold-500 transition-colors">Active / Published</span>
-                  </label>
+                <div>
+                  <p className="text-[10px]   text-gold-500/40 mb-3">Items</p>
+                  <div className="space-y-2">
+                    {(detailOrder.items || []).map((item) => (
+                      <div key={item.id} className="flex justify-between gap-4 bg-navy-950/60 border border-gold-500/5 rounded-xl px-4 py-3 text-sm">
+                        <div>
+                          <p className="text-gold-100">{item.name}</p>
+                          <p className="text-gold-500/50 text-xs">
+                            Qty {item.quantity}
+                            {item.size_label ? ` · Size ${item.size_label}` : ''}
+                            {(item.variant_sku || item.product_sku) ? ` · SKU ${item.variant_sku || item.product_sku}` : ''}
+                          </p>
+                          <p className="text-gold-500/60 text-xs">
+                            Online price: KSh {parseFloat(item.price).toLocaleString()}
+                          </p>
+                        </div>
+                        <p className="text-gold-400 shrink-0">
+                          KSh {(parseFloat(item.price) * item.quantity).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex gap-4 w-full md:w-auto">
-                  <button 
+                <div className="flex justify-between border-t border-gold-500/10 pt-4 text-sm font-bold">
+                  <span className="text-gold-500/60">Total</span>
+                  <span className="text-gold-400">KSh {parseFloat(detailOrder.total_amount).toLocaleString()}</span>
+                </div>
+
+                {!readOnly && (
+                  <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-8 py-4 bg-navy-800 text-gold-500/60 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-navy-700 hover:text-gold-500 transition-all border border-gold-500/10"
+                    onClick={() => {
+                      closeDetail();
+                      openOrderEdit(detailOrder);
+                    }}
+                    className="w-full py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500"
                   >
-                    Discard
+                    Edit Order
                   </button>
-                  <button 
-                    type="submit" 
-                    disabled={submitting}
-                    className="px-12 py-4 bg-gold-600 text-navy-950 rounded-xl font-black uppercase tracking-[0.2em] hover:bg-gold-500 transition-all disabled:opacity-50 shadow-xl shadow-gold-600/20"
-                  >
-                    {submitting ? 'AUTHENTICATING...' : 'COMMIT PRODUCT'}
-                  </button>
-                </div>
+                )}
               </div>
-            </form>
-          </motion.div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {editOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <button type="button" aria-label="Close edit order" className="absolute inset-0 bg-navy-950/85 backdrop-blur-sm" onClick={closeEdit} />
+          <div className="relative bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-xl font-serif text-gold-100">Edit Order</h3>
+                <p className="text-gold-500/50 text-xs mt-1  ">
+                  #{editOrder.id.substring(0, 8).toUpperCase()} · {editOrder.customer_name}
+                  {formatOrderContact(editOrder) ? ` · ${formatOrderContact(editOrder)}` : ''}
+                </p>
+              </div>
+              <button type="button" onClick={closeEdit} className="text-gold-500/40 hover:text-gold-500">
+                <X size={20} />
+              </button>
+            </div>
+
+            {actionError && (
+              <p className="text-red-400 text-sm mb-4">{actionError}</p>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px]   text-gold-500/40 font-bold">Order Status</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 text-sm outline-none focus:border-gold-500"
+                >
+                  {ORDER_STATUSES.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px]   text-gold-500/40 font-bold">Payment Status</label>
+                <select
+                  value={editPaymentStatus}
+                  onChange={(e) => setEditPaymentStatus(e.target.value)}
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-4 py-3 text-gold-100 text-sm outline-none focus:border-gold-500"
+                >
+                  {PAYMENT_STATUSES.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!readOnly && editOrder.status !== 'cancelled' && editOrder.status !== 'delivered' && (
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                disabled={saving}
+                className="w-full mt-4 py-3 rounded-xl border border-red-500/30 text-red-400 text-[10px] font-bold   hover:bg-red-500/10 disabled:opacity-50"
+              >
+                Cancel Order
+              </button>
+            )}
+
+            {!readOnly && editOrder.payment_status === 'paid' && (
+              <button
+                type="button"
+                onClick={handleRefundOrder}
+                disabled={saving}
+                className="w-full mt-2 py-3 rounded-xl border border-amber-500/30 text-amber-400 text-[10px] font-bold   hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                Refund Order
+              </button>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="flex-1 py-3 rounded-xl border border-gold-500/20 text-gold-500/60 text-[10px] font-bold  "
+              >
+                Close
+              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={handleSaveOrder}
+                  disabled={saving}
+                  className="flex-1 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-
 const CategoriesView = () => {
+  const confirm = useConfirm();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1093,6 +916,7 @@ const CategoriesView = () => {
     name: '',
     slug: '',
     description: '',
+    image: '',
     is_featured: false,
     is_active: true
   });
@@ -1113,6 +937,22 @@ const CategoriesView = () => {
     fetchCategories();
   }, []);
 
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const uploadData = new FormData();
+      uploadData.append('images', file);
+      try {
+        const res = await adminUploadAPI.upload(uploadData);
+        if (res.data.success) {
+          setFormData({ ...formData, image: res.data.data[0] });
+        }
+      } catch (error) {
+        console.error('Category image upload failed:', error);
+      }
+    }
+  };
+
   const handleOpenModal = (category = null) => {
     if (category) {
       setCurrentCategory(category);
@@ -1120,6 +960,7 @@ const CategoriesView = () => {
         name: category.name || '',
         slug: category.slug || '',
         description: category.description || '',
+        image: category.image || '',
         is_featured: category.is_featured || false,
         is_active: category.is_active ?? true
       });
@@ -1129,6 +970,7 @@ const CategoriesView = () => {
         name: '',
         slug: '',
         description: '',
+        image: '',
         is_featured: false,
         is_active: true
       });
@@ -1137,13 +979,18 @@ const CategoriesView = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
-      try {
-        await adminCategoryAPI.remove(id);
-        fetchCategories();
-      } catch (error) {
-        alert('Error deleting category');
-      }
+    const ok = await confirm({
+      title: 'Delete category',
+      message: 'Products in this category may be affected. Are you sure you want to delete it?',
+      confirmLabel: 'Delete category',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCategoryAPI.remove(d);
+      fetchCategories();
+    } catch (error) {
+      alert('Error deleting category');
     }
   };
 
@@ -1184,7 +1031,7 @@ const CategoriesView = () => {
           </div>
         ) : categories.length > 0 ? (
           <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
               <tr>
                 <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Slug</th>
@@ -1203,7 +1050,7 @@ const CategoriesView = () => {
                   <td className="px-6 py-4 font-mono text-gold-500/60 text-xs">{c.slug}</td>
                   <td className="px-6 py-4 text-gold-200">{c.is_featured ? 'Yes' : 'No'}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${
                       c.is_active ? 'bg-green-400/10 text-green-400' : 'bg-navy-800 text-gold-500/30'
                     }`}>
                       {c.is_active ? 'Active' : 'Inactive'}
@@ -1254,7 +1101,7 @@ const CategoriesView = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Name</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Name</label>
                     <input 
                       type="text" 
                       required
@@ -1263,11 +1110,11 @@ const CategoriesView = () => {
                         const val = e.target.value.toUpperCase();
                         setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
                       }}
-                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold uppercase"
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Slug</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Slug</label>
                     <input 
                       type="text" 
                       required
@@ -1279,11 +1126,22 @@ const CategoriesView = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gold-500/40 uppercase tracking-widest font-black">Description</label>
+                    <label className="text-[10px] text-gold-500/40   font-black">Image</label>
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center relative">
+                            {formData.image ? <img src={formData.image} className="w-full h-full object-cover" /> : <ImageIcon size={20} className="text-gold-500/20" />}
+                            <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                        <p className="text-[9px] text-gold-500/40  ">Click to upload cover image</p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gold-500/40   font-black">Description</label>
                   <textarea 
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
-                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold uppercase"
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold "
                   />
                 </div>
 
@@ -1311,7 +1169,7 @@ const CategoriesView = () => {
               <button 
                 type="submit" 
                 disabled={submitting}
-                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-500 transition-all disabled:opacity-50"
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
               >
                 {submitting ? 'AUTHENTICATING...' : 'COMMIT CATEGORY'}
               </button>
@@ -1325,53 +1183,156 @@ const CategoriesView = () => {
 
 
 const BrandsView = () => {
+  const confirm = useConfirm();
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentBrand, setCurrentBrand] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    logo: '',
+    is_featured: false,
+    is_active: true
+  });
+
+  const fetchBrands = async () => {
+    setLoading(true);
+    try {
+      const res = await adminBrandAPI.getAll();
+      setBrands(res.data.data);
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        const res = await adminBrandAPI.getAll();
-        setBrands(res.data.data);
-      } catch (error) {
-        console.error('Error fetching brands:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchBrands();
   }, []);
 
+  const handleLogoChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const uploadData = new FormData();
+      uploadData.append('images', file);
+      try {
+        const res = await adminUploadAPI.upload(uploadData);
+        if (res.data.success) {
+          setFormData({ ...formData, logo: getUploadUrl(res.data.data[0]) });
+        }
+      } catch (error) {
+        console.error('Brand logo upload failed:', error);
+      }
+    }
+  };
+
+  const handleOpenModal = (brand = null) => {
+    if (brand) {
+      setCurrentBrand(brand);
+      setFormData({
+        name: brand.name || '',
+        slug: brand.slug || '',
+        description: brand.description || '',
+        logo: brand.logo || '',
+        is_featured: brand.is_featured || false,
+        is_active: brand.is_active ?? true
+      });
+    } else {
+      setCurrentBrand(null);
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        logo: '',
+        is_featured: false,
+        is_active: true
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    const ok = await confirm({
+      title: 'Delete brand',
+      message: 'This brand will be removed from your store. Products linked to it will remain but lose the brand label.',
+      confirmLabel: 'Delete brand',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminBrandAPI.remove(id);
+      fetchBrands();
+    } catch (error) {
+      alert('Error deleting brand');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (currentBrand) {
+        await adminBrandAPI.update(currentBrand.id, formData);
+      } else {
+        await adminBrandAPI.create(formData);
+      }
+      setIsModalOpen(false);
+      fetchBrands();
+    } catch (error) {
+      alert('Error saving brand');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
        <div className="flex items-center justify-between mb-8">
         <h3 className="text-xl font-serif font-bold text-gold-100">Brand Partners ({brands.length})</h3>
-        <button className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20">
-          Add Brand
+        <button 
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 px-6 py-3 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl font-bold hover:bg-navy-800 transition-all"
+        >
+          <Plus size={20} /> Add Brand
         </button>
       </div>
 
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
       {loading ? (
         <div className="py-24 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
         </div>
       ) : brands.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
           {brands.map((brand) => (
-            <div key={brand.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl flex items-center justify-between group backdrop-blur-sm">
-              <div>
-                <div className="text-lg font-bold text-gold-100 mb-1">{brand.name}</div>
-                <div className="text-xs text-gold-500/40 mb-3">{brand.product_count || 0} products live</div>
-                <div className="flex gap-2">
-                   {brand.is_featured && <span className="bg-gold-600/10 text-gold-500 text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border border-gold-500/10">Featured</span>}
-                   <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded tracking-widest border ${brand.is_active ? 'border-green-400/20 text-green-400' : 'border-gold-500/5 text-gold-500/20'}`}>
-                     {brand.is_active ? 'Active' : 'Inactive'}
-                   </span>
+            <div key={brand.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl flex items-center justify-between group backdrop-blur-sm transition-all hover:bg-navy-800/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center">
+                    {brand.logo ? <img src={brand.logo} className="w-full h-full object-contain" /> : <Award size={20} className="text-gold-500/20" />}
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-gold-100 mb-1">{brand.name}</div>
+                  <div className="text-xs text-gold-500/40 mb-3">{brand.product_count || 0} products live</div>
+                  <div className="flex gap-2">
+                    {brand.is_featured && <span className="bg-gold-600/10 text-gold-500 text-[9px] font-bold  px-2 py-0.5 rounded  border border-gold-500/10">Featured</span>}
+                    <span className={`text-[9px] font-bold  px-2 py-0.5 rounded  border ${brand.is_active ? 'border-green-400/20 text-green-400' : 'border-gold-500/5 text-gold-500/20'}`}>
+                      {brand.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <button className="w-10 h-10 bg-navy-800 rounded-xl border border-gold-500/10 flex items-center justify-center text-gold-500/40 group-hover:border-gold-500/40 transition-all">
-                <Settings size={18} />
-              </button>
+              <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleOpenModal(brand)} className="w-10 h-10 bg-navy-800 rounded-xl border border-gold-500/10 flex items-center justify-center text-gold-500/60 hover:text-gold-500 hover:border-gold-500/40 transition-all">
+                  <Edit size={18} />
+                </button>
+                <button onClick={() => handleDelete(brand.id)} className="w-10 h-10 bg-red-400/10 rounded-xl border border-red-400/20 flex items-center justify-center text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition-all">
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -1380,21 +1341,180 @@ const BrandsView = () => {
           No brand partners found.
         </div>
       )}
+      </div>
+
+      {/* Brand Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-navy-950/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-navy-900 border border-gold-500/20 rounded-3xl p-8 w-full max-w-lg shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h4 className="text-2xl font-serif font-bold text-gold-100">
+                {currentBrand ? 'Edit Brand' : 'Create New Brand'}
+              </h4>
+              <button onClick={() => setIsModalOpen(false)} className="text-gold-500/40 hover:text-gold-500"><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40   font-black">Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, '-')});
+                      }}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40   font-black">Slug</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.slug}
+                      onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                      className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-[10px] text-gold-500/40   font-black">Logo</label>
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl border border-gold-500/10 overflow-hidden bg-navy-950 flex items-center justify-center relative">
+                            {formData.logo ? <img src={formData.logo} className="w-full h-full object-contain" /> : <Award size={20} className="text-gold-500/20" />}
+                            <input type="file" accept="image/*" onChange={handleLogoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                        <p className="text-[9px] text-gold-500/40  ">Click to upload brand logo</p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gold-500/40   font-black">Description</label>
+                  <textarea 
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value.toUpperCase()})}
+                    className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all h-24 font-bold "
+                  />
+                </div>
+
+              <div className="flex gap-8">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.is_featured}
+                    onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
+                    className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gold-100">Featured Brand</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                    className="w-4 h-4 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span className="text-xs text-gold-100">Active</span>
+                </label>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={submitting}
+                className="w-full bg-gold-600 text-navy-950 py-4 rounded-xl font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
+              >
+                {submitting ? 'SAVING...' : 'SAVE BRAND'}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
 
 
-const CustomersView = () => {
+const UsersView = () => {
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = canManageUsers(currentUser);
+  const [tab, setTab] = useState('customers');
+
+  const tabs = isAdmin
+    ? [
+        { id: 'customers', label: 'Customers' },
+        { id: 'staff', label: 'Staff' },
+        { id: 'admins', label: 'Admins' },
+      ]
+    : [{ id: 'customers', label: 'Customers' }];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h3 className="text-xl sm:text-2xl font-serif font-bold text-gold-100">Users</h3>
+          <p className="text-xs text-gold-500/40 mt-1">
+            {isAdmin ? 'Website accounts, staff, and administrators' : 'Customer accounts only'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold   border transition-all ${
+                tab === t.id
+                  ? 'bg-gold-600 text-navy-950 border-gold-600'
+                  : 'bg-navy-900/50 text-gold-500/70 border-gold-500/15 hover:border-gold-500/40'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!isAdmin && currentUser && (
+        <div className="bg-navy-900/40 border border-gold-500/15 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-gold-600 text-navy-950 font-bold flex items-center justify-center">
+            {userInitials(currentUser)}
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gold-100">{currentUser.fullName || currentUser.name}</p>
+            <p className="text-xs text-gold-500/50">{currentUser.email} · Staff</p>
+          </div>
+        </div>
+      )}
+
+      {tab === 'customers' && <CustomersView embedded />}
+      {tab === 'staff' && isAdmin && <AdminsView roleFilter="staff" />}
+      {tab === 'admins' && isAdmin && <AdminsView roleFilter="admin" />}
+    </div>
+  );
+};
+
+
+const CustomersView = ({ embedded = false }) => {
+  const confirm = useConfirm();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await adminCustomerAPI.getAll();
-        setCustomers(res.data.data);
+        const res = await adminCustomerAPI.getAll({ role: 'customer' });
+        setCustomers(res.data.data || []);
       } catch (error) {
         console.error('Error fetching customers:', error);
       } finally {
@@ -1404,43 +1524,104 @@ const CustomersView = () => {
     fetchCustomers();
   }, []);
 
-  const filteredCustomers = customers.filter(c => 
-    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredCustomers = customers.filter((c) =>
+    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleToggleStatus = async (id, currentStatus) => {
+    try {
+      await adminCustomerAPI.updateStatus(id, !currentStatus);
+      setCustomers(customers.map((c) => (c.id === id ? { ...c, is_active: !currentStatus } : c)));
+      setSelectedCustomer((current) => (
+        current && current.id === id ? { ...current, is_active: !currentStatus } : current
+      ));
+    } catch (error) {
+      console.error('Error updating customer status:', error);
+    }
+  };
+
+  const handleViewCustomer = async (id) => {
+    setDetailLoading(true);
+    try {
+      const res = await adminCustomerAPI.getOne(id);
+      setSelectedCustomer(res.data.data || res.data);
+    } catch (error) {
+      console.error('Error fetching customer detail:', error);
+      adminToast.error(apiErrorMessage(error, 'Could not load customer details'));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+
+  const handleDeleteCustomer = async (customer) => {
+    const ok = await confirm({
+      title: 'Delete customer',
+      message: `Permanently delete ${customer.name || customer.email}? Their order history will be kept but unlinked.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCustomerAPI.deleteCustomer(customer.id);
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+      if (selectedCustomer?.id === customer.id) setSelectedCustomer(null);
+      adminToast.success('Customer deleted');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not delete customer'));
+    }
+  };
+
+  const closeModal = () => setSelectedCustomer(null);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
+      {!embedded && (
+      <div className="flex flex-col gap-4 mb-6 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col">
-          <h3 className="text-2xl font-serif font-bold text-gold-100">Customer Directory</h3>
+          <h3 className="text-xl sm:text-2xl font-serif font-bold text-gold-100">Customer Directory</h3>
           <p className="text-xs text-gold-500/40 mt-1">Managing {customers.length} registered clients</p>
         </div>
-        <div className="flex gap-3">
-          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2">
+        <div className="flex gap-3 w-full sm:w-auto">
+          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2 w-full sm:w-auto">
             <Search size={16} className="text-gold-500/40" />
             <input 
               type="text" 
               placeholder="Search customers..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20" 
+              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20 w-full sm:w-56" 
             />
           </div>
-          <button className="p-2.5 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl hover:bg-navy-800 transition-all">
-            <Filter size={20} />
-          </button>
         </div>
       </div>
+      )}
+      {embedded && (
+        <div className="flex flex-wrap gap-3 items-center justify-between">
+          <p className="text-xs text-gold-500/40">{customers.length} registered customers</p>
+          <div className="bg-navy-800/50 border border-gold-500/10 px-4 py-2 rounded-xl flex items-center gap-2 w-full sm:w-auto">
+            <Search size={16} className="text-gold-500/40" />
+            <input 
+              type="text" 
+              placeholder="Search customers..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none text-sm text-gold-100 placeholder:text-gold-500/20 w-full sm:w-48" 
+            />
+          </div>
+        </div>
+      )}
 
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+      <div className="overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-900/40 backdrop-blur-sm">
         {loading ? (
           <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gold-500"></div>
           </div>
         ) : filteredCustomers.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+          <AdminTable>
+          <table className="w-full min-w-[720px] text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold tracking-[0.2em] text-gold-500/40">
               <tr>
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Contact Info</th>
@@ -1452,416 +1633,509 @@ const CustomersView = () => {
             </thead>
             <tbody className="divide-y divide-gold-500/5">
               {filteredCustomers.map((c) => (
-                <tr key={c.id} className="hover:bg-navy-800/30 transition-colors">
+                <tr key={c.id} className="transition-colors hover:bg-navy-800/30">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 bg-gold-600 rounded-full flex items-center justify-center text-navy-950 font-bold border-2 border-navy-800 shadow-lg`}>
-                        {c.name ? c.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-navy-800 bg-gold-600 font-bold text-navy-950 shadow-lg">
+                        {userInitials(c)}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gold-100 flex items-center gap-2">
+                        <div className="flex items-center gap-2 text-sm font-bold text-gold-100">
                           {c.name}
-                          {c.is_verified && <CheckCircle size={14} className="text-blue-400" />}
+                          {c.is_verified && <CheckCircle2 size={14} className="text-blue-400" />}
                         </div>
-                        <div className="text-[10px] text-gold-500/40 uppercase tracking-widest mt-0.5">ID: {c.id.substring(0, 8)}</div>
+                        <div className="mt-0.5 text-[10px] text-gold-500/40">ID: {String(c.id).substring(0, 8)}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-xs text-gold-100">{c.email}</div>
-                    <div className="text-[10px] text-gold-500/40 mt-1 flex items-center gap-1">
+                    <div className="mt-1 flex items-center gap-1 text-[10px] text-gold-500/40">
                       <Phone size={10} /> {c.phone || 'No phone'}
                     </div>
                   </td>
                   <td className="px-6 py-4 font-serif font-bold text-gold-100">KSh {parseFloat(c.total_spent || 0).toLocaleString()}</td>
                   <td className="px-6 py-4 text-xs text-gold-500/60">{new Date(c.created_at).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-[0.1em] ${
-                      c.is_active ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
+                    <span className={`rounded px-2 py-0.5 text-[9px] font-black tracking-[0.1em] ${
+                      c.is_active !== false ? 'bg-green-400/10 text-green-400' : 'bg-red-400/10 text-red-400'
                     }`}>
-                      {c.is_active ? 'Active' : 'Suspended'}
+                      {c.is_active !== false ? 'Active' : 'Suspended'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all" title="View History"><Eye size={16} /></button>
-                      <button className="p-2 text-gold-500/40 hover:text-gold-500 hover:bg-navy-800 rounded-lg transition-all"><MoreVertical size={18} /></button>
+                      <button 
+                        onClick={() => handleToggleStatus(c.id, c.is_active !== false)}
+                        className={`rounded-lg p-2 transition-all ${c.is_active !== false ? 'text-red-400/40 hover:bg-red-400/5 hover:text-red-400' : 'text-green-400/40 hover:bg-green-400/5 hover:text-green-400'}`}
+                        title={c.is_active !== false ? 'Suspend Account' : 'Activate Account'}
+                      >
+                        {c.is_active !== false ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                      </button>
+                      <button type="button" onClick={() => handleDeleteCustomer(c)} className="rounded-lg p-2 text-red-400/50 transition-all hover:bg-red-400/10 hover:text-red-400" title="Delete customer"><Trash2 size={16} /></button>
+                      <button
+                        type="button"
+                        onClick={() => handleViewCustomer(c.id)}
+                        className="rounded-lg p-2 text-gold-500/40 transition-all hover:bg-navy-800 hover:text-gold-500"
+                        title="View details"
+                      >
+                        <Eye size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </AdminTable>
         ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
+          <div className="py-24 text-center text-sm text-gold-500/40">
             No customers found matching your search.
           </div>
         )}
       </div>
-    </div>
-  );
-};
 
-
-const AdminsView = () => {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Internal Access Controls</h3>
-        <button className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold flex items-center gap-2">
-          <UserPlus size={20} /> Add Staff
-        </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[
-          { name: 'Super Admin', email: 'admin@princeesquire.com', role: 'Superadmin', last: '13 May, 09:14', color: 'border-red-400' },
-          { name: 'Store Manager', email: 'manager@princeesquire.com', role: 'Admin', last: '12 May, 15:30', color: 'border-gold-500' },
-          { name: 'Content Editor', email: 'editor@princeesquire.com', role: 'Editor', last: '10 May, 11:05', color: 'border-blue-400' },
-        ].map((admin, i) => (
-          <div key={i} className={`bg-navy-900/40 border-l-4 ${admin.color} p-6 rounded-r-2xl border-y border-r border-gold-500/10 backdrop-blur-sm group`}>
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <div className="text-sm font-bold text-gold-100">{admin.name}</div>
-                <div className="text-xs text-gold-500/40">{admin.email}</div>
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <button
+            type="button"
+            aria-label="Close customer details"
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+          <div className="relative flex min-h-full items-center justify-center p-4 py-8">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative flex max-h-[min(90dvh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gold-500/20 bg-navy-900 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-gold-500/10 p-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-gold-500/10 bg-gold-600 text-lg font-bold text-navy-950">
+                    {userInitials(selectedCustomer)}
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-xl font-bold text-gold-100">{selectedCustomer.name}</h3>
+                    <p className="text-sm text-gold-500/50">Customer details and order history</p>
+                  </div>
+                </div>
+                <button type="button" onClick={closeModal} className="rounded-lg p-2 text-gold-500/40 transition-colors hover:text-gold-500">
+                  <X size={20} />
+                </button>
               </div>
-              <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded bg-navy-800 border border-gold-500/10`}>{admin.role}</span>
-            </div>
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-[10px] text-gold-500/40 uppercase tracking-widest flex items-center gap-2">
-                <Clock size={12} /> Last Login: {admin.last}
-              </div>
-              <button className="text-gold-500/40 hover:text-gold-500 transition-colors"><MoreVertical size={18} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
-const CouponsView = () => {
-  const [coupons, setCoupons] = useState([]);
-  const [loading, setLoading] = useState(true);
+              <div className="grid min-h-0 gap-6 overflow-hidden p-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {[
+                      { label: 'Email', value: selectedCustomer.email, icon: Mail },
+                      { label: 'Phone', value: selectedCustomer.phone || 'No phone', icon: Phone },
+                      { label: 'Joined', value: new Date(selectedCustomer.created_at).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }), icon: Clock },
+                      { label: 'Total Spent', value: `KSh ${parseFloat(selectedCustomer.total_spent || 0).toLocaleString()}`, icon: Package },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-gold-500/10 bg-navy-950/50 p-4">
+                        <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-500/40">
+                          <item.icon size={12} /> {item.label}
+                        </div>
+                        <div className="text-sm font-bold text-gold-100 break-words">{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
 
-  useEffect(() => {
-    const fetchCoupons = async () => {
-      try {
-        const res = await adminCouponAPI.getAll();
-        setCoupons(res.data.data);
-      } catch (error) {
-        console.error('Error fetching coupons:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCoupons();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Promotional Coupons</h3>
-        <button className="px-6 py-3 bg-gold-600 text-navy-950 rounded-xl font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-600/20">
-          Create Coupon
-        </button>
-      </div>
-
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        {loading ? (
-          <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-          </div>
-        ) : coupons.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-              <tr>
-                <th className="px-6 py-4">Code</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Value</th>
-                <th className="px-6 py-4 text-center">Uses</th>
-                <th className="px-6 py-4">Expiry</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-500/5">
-              {coupons.map((c) => (
-                <tr key={c.id} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="bg-gold-600/10 text-gold-500 font-mono font-bold px-3 py-1 rounded border border-gold-500/20 inline-block uppercase">
-                      {c.code}
+                  <div className="rounded-2xl border border-gold-500/10 bg-navy-950/50 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-gold-100">Account status</h4>
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${selectedCustomer.is_active !== false ? 'bg-green-400 text-navy-950' : 'bg-red-400 text-navy-950'}`}>
+                        {selectedCustomer.is_active !== false ? 'Active' : 'Suspended'}
+                      </span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-xs text-gold-200">{c.type === 'percentage' ? 'Percentage' : 'Fixed Amount'}</td>
-                  <td className="px-6 py-4 font-bold text-gold-100">
-                    {c.type === 'percentage' ? `${c.value}%` : `KSh ${parseFloat(c.value).toLocaleString()}`}
-                  </td>
-                  <td className="px-6 py-4 text-center text-sm text-gold-500/60">
-                    {c.used_count} / {c.usage_limit || '∞'}
-                  </td>
-                  <td className="px-6 py-4 text-xs text-gold-500/40">
-                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="p-2 text-gold-500/40 hover:text-gold-500 transition-colors"><Edit size={16} /></button>
-                      <button className="p-2 text-red-400/40 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(selectedCustomer.id, selectedCustomer.is_active !== false)}
+                        className="rounded-xl bg-gold-600 px-4 py-3 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-500"
+                      >
+                        Toggle status
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        className="rounded-xl border border-gold-500/15 px-4 py-3 text-sm font-bold text-gold-100 hover:border-gold-500/40"
+                      >
+                        Close
+                      </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
-            No coupons found.
+                  </div>
+                </div>
+
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-950/50">
+                  <div className="border-b border-gold-500/10 px-4 py-3">
+                    <h4 className="text-sm font-bold text-gold-100">Orders</h4>
+                    <p className="text-xs text-gold-500/40">{detailLoading ? 'Loading details...' : `${selectedCustomer.orders?.length || 0} order(s)`}</p>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+                    {!detailLoading && (selectedCustomer.orders || []).length > 0 ? (
+                      selectedCustomer.orders.map((order) => (
+                        <div key={order.id} className="rounded-xl border border-gold-500/10 bg-navy-900/60 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-gold-100">Order #{String(order.id).slice(0, 8)}</div>
+                              <div className="text-[10px] uppercase tracking-[0.2em] text-gold-500/40">{new Date(order.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <span className="rounded-full border border-gold-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-gold-500/60">
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="mt-3 text-sm font-bold text-gold-100">KSh {parseFloat(order.total_amount || 0).toLocaleString()}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gold-500/10 py-10 text-center text-sm text-gold-500/40">
+                        No orders recorded.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-
-const BannersView = () => {
-  const [banners, setBanners] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        const res = await adminBannerAPI.getAll();
-        setBanners(res.data.data);
-      } catch (error) {
-        console.error('Error fetching banners:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBanners();
-  }, []);
-
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-serif font-bold text-gold-100">Site Appearance — Banners</h3>
-        <button className="px-6 py-3 bg-navy-800/50 border border-gold-500/10 text-gold-500 rounded-xl font-bold flex items-center gap-2">
-           <Plus size={18} /> New Banner
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="py-24 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-        </div>
-      ) : banners.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {banners.map((banner) => (
-            <div key={banner.id} className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden group backdrop-blur-sm">
-              <div className="h-48 overflow-hidden relative">
-                <img 
-                  src={banner.image_url} 
-                  alt={banner.title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-transparent to-transparent opacity-80" />
-                <div className="absolute bottom-4 left-6">
-                  <div className="text-xs font-bold text-gold-500/60 uppercase tracking-widest">{banner.position || 'Main Hero'}</div>
-                  <div className="text-lg font-serif font-bold text-gold-100">{banner.title}</div>
-                </div>
-                <div className="absolute top-4 right-4">
-                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${banner.is_active ? 'bg-green-400 text-navy-950' : 'bg-navy-900 text-gold-500/40'}`}>
-                     {banner.is_active ? 'Active' : 'Draft'}
-                   </span>
-                </div>
-              </div>
-              <div className="p-6 flex items-center justify-between">
-                <div className="text-xs text-gold-500/60 line-clamp-1 max-w-[200px]">
-                  {banner.subtitle || 'No subtitle provided.'}
-                </div>
-                <div className="flex gap-2">
-                  <button className="p-2 bg-navy-800/50 rounded-lg border border-gold-500/10 text-gold-500 hover:text-gold-400 transition-all"><Edit size={16} /></button>
-                  <button className="p-2 bg-navy-800/50 rounded-lg border border-gold-500/10 text-red-400 hover:text-red-300 transition-all"><Trash2 size={16} /></button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="py-24 text-center text-gold-500/40 text-sm bg-navy-900/40 border border-gold-500/10 rounded-2xl border-dashed">
-          No banners found. Click "New Banner" to create your first promotion.
         </div>
       )}
     </div>
   );
 };
-
-
-const NewsletterView = () => {
-  const [subscribers, setSubscribers] = useState([]);
+const AdminsView = ({ roleFilter = null }) => {
+  const currentUser = useAuthStore((s) => s.user);
+  const confirm = useConfirm();
+  const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    accessPreset: 'pos-only',
+    permissions: ['pos-terminal'],
+  });
+  const [users, setUsers] = useState([]);
+
+  const fetchAdmins = async () => {
+    setLoading(true);
+    try {
+      const [resStaff, resAdmin] = await Promise.all([
+        adminCustomerAPI.getStaff(),
+        adminCustomerAPI.getAdmins(),
+      ]);
+      const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])].filter(u => u.email !== 'jones@gmail.com');
+      setUsers(combined);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchSubscribers = async () => {
-      try {
-        const res = await adminNewsletterAPI.getSubscribers();
-        setSubscribers(res.data.data);
-      } catch (error) {
-        console.error('Error fetching subscribers:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSubscribers();
+    fetchAdmins();
   }, []);
+
+  const handleOpenModal = () => {
+    setEditingStaff(null);
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      accessPreset: 'pos-only',
+      permissions: ['pos-terminal'],
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (staff) => {
+    const permissions = parsePermissions(staff.permissions);
+    setEditingStaff(staff);
+    setFormData({
+      name: staff.name || '',
+      email: staff.email || '',
+      password: '',
+      accessPreset: detectStaffPreset(permissions),
+      permissions,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handlePresetChange = (presetId) => {
+    const preset = STAFF_ACCESS_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setFormData({
+      ...formData,
+      accessPreset: presetId,
+      permissions: preset.id === 'custom' ? formData.permissions : [...preset.permissions],
+    });
+  };
+
+  const handlePermissionToggle = (permission, checked) => {
+    setFormData({
+      ...formData,
+      accessPreset: 'custom',
+      permissions: applyPermissionToggle(formData.permissions, permission, checked),
+    });
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingStaff(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (editingStaff) {
+        await adminCustomerAPI.updateStaff(editingStaff.id, {
+          name: formData.name,
+          permissions: normalizeStaffPermissions(formData.permissions),
+        });
+      } else {
+        await adminCustomerAPI.createStaff({ ...formData, permissions: normalizeStaffPermissions(formData.permissions) });
+      }
+      handleCloseModal();
+      await fetchAdmins();
+      adminToast.success(`Staff ${editingStaff ? 'updated' : 'created'}`);
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
+  const handleDeleteStaff = async (member) => {
+    const ok = await confirm({
+      title: 'Remove staff member',
+      message: `Remove ${member.name || member.email} from staff?`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCustomerAPI.deleteStaff(member.id);
+      await fetchAdmins();
+      adminToast.success('Staff member removed');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not remove staff'));
+    }
+  };
+
+  const filteredAdmins = roleFilter ? users.filter(a => a.role === roleFilter) : users;
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {[
-          { label: 'Total Subscribers', val: subscribers.length.toLocaleString(), icon: Mail },
-          { label: 'Growth Rate', val: '+12.5%', icon: ArrowUpRight },
-          { label: 'Email Open Rate', val: '68.2%', icon: Eye },
-        ].map((s, i) => (
-          <div key={i} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2 text-gold-500/40">
-              <s.icon size={16} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">{s.label}</span>
-            </div>
-            <div className="text-2xl font-serif font-bold text-gold-100">{s.val}</div>
-          </div>
-        ))}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gold-500/40">{filteredAdmins.length} {roleFilter || 'admin'} users</p>
+        <button
+          type="button"
+          onClick={handleOpenModal}
+          className="flex items-center gap-2 px-4 py-2 bg-navy-800/50 border border-gold-500/10 rounded-xl text-xs font-bold text-gold-500 hover:bg-navy-800 transition-all"
+        >
+          <UserPlus size={16} /> Invite Staff
+        </button>
       </div>
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-          <h3 className="font-serif font-bold text-lg text-gold-100">Audience List</h3>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gold-600 text-navy-950 rounded-lg text-xs font-bold hover:bg-gold-500 transition-all">
-            <Download size={16} /> Export Subscribers
-          </button>
-        </div>
-        
+
+      <div className="overflow-hidden rounded-2xl border border-gold-500/10 bg-navy-900/40 backdrop-blur-sm">
         {loading ? (
           <div className="py-24 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gold-500" />
           </div>
-        ) : subscribers.length > 0 ? (
-          <table className="w-full text-left">
-            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
+        ) : filteredAdmins.length > 0 ? (
+          <AdminTable>
+          <table className="w-full min-w-[640px] text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold tracking-[0.2em] text-gold-500/40">
               <tr>
-                <th className="px-6 py-4">Subscriber Email</th>
-                <th className="px-6 py-4">Subscription Date</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Access Level</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gold-500/5">
-              {subscribers.map((s) => (
-                <tr key={s.id} className="hover:bg-navy-800/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gold-100">{s.email}</td>
-                  <td className="px-6 py-4 text-xs text-gold-500/60">{new Date(s.created_at).toLocaleDateString()}</td>
+              {filteredAdmins.map((admin) => (
+                <tr key={admin.id} className="transition-colors hover:bg-navy-800/30">
                   <td className="px-6 py-4">
-                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-green-400/10 text-green-400`}>Active</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-navy-800 bg-gold-600 font-bold text-navy-950">
+                        {userInitials(admin)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-gold-100">{admin.name || admin.fullName}</div>
+                        <div className="text-xs text-gold-500/50">{admin.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-bold capitalize text-gold-100">{admin.role}</td>
+                  <td className="px-6 py-4 text-xs capitalize text-gold-300">
+                    {detectStaffPreset(parsePermissions(admin.permissions))}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-red-400/40 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+                    <div className="flex justify-end gap-2">
+                      {admin.role === 'staff' && (
+                        <button type="button" onClick={() => handleDeleteStaff(admin)} className="rounded-lg p-2 text-red-400/50 transition-all hover:bg-red-400/10 hover:text-red-400" title="Remove staff"><Trash2 size={16} /></button>
+                      )}
+                      {currentUser?.email === 'jones@gmail.com' && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(admin)}
+                        className="rounded-lg p-2 text-gold-500/60 transition-all hover:bg-navy-800 hover:text-gold-500"
+                        title="Edit permissions"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </AdminTable>
         ) : (
-          <div className="py-24 text-center text-gold-500/40 text-sm">
-            No newsletter subscribers found.
-          </div>
+          <div className="py-24 text-center text-sm text-gold-500/40">No {roleFilter} users found.</div>
         )}
       </div>
-    </div>
-  );
-};
 
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <button
+            type="button"
+            aria-label="Close modal"
+            className="fixed inset-0 bg-navy-950/80 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          />
+          <div className="relative z-10 mx-auto mt-12 flex max-w-2xl flex-col">
+            <motion.form
+              onSubmit={handleSubmit}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative flex flex-col rounded-2xl border border-gold-500/20 bg-navy-900 shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-gold-500/10 p-6">
+                <h3 className="font-serif text-xl font-bold text-gold-100">
+                  {editingStaff ? 'Edit Staff Permissions' : 'Invite New Staff'}
+                </h3>
+                <button type="button" onClick={handleCloseModal} className="rounded-lg p-2 text-gold-500/40 transition-colors hover:text-gold-500">
+                  <X size={20} />
+                </button>
+              </div>
 
-const PaymentsView = () => {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-navy-900/40 border border-gold-500/10 p-8 rounded-3xl relative overflow-hidden group">
-          <div className="relative z-10">
-            <div className="text-xs font-bold text-gold-500/40 uppercase tracking-widest mb-2">M-Pesa Collections</div>
-            <div className="text-3xl font-serif font-bold text-gold-100 mb-6">KSh 3,745,200</div>
-            <div className="flex gap-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Transactions</span>
-                <span className="text-lg font-bold text-gold-200">842</span>
+              <div className="p-6">
+                <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-gold-500/60">Full Name</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      className="w-full rounded-lg border border-gold-500/20 bg-navy-950/50 px-4 py-2 text-gold-100 outline-none transition-colors focus:border-gold-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-gold-500/60">Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      disabled={!!editingStaff}
+                      className="w-full rounded-lg border border-gold-500/20 bg-navy-950/50 px-4 py-2 text-gold-100 outline-none transition-colors focus:border-gold-500/50 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {!editingStaff && (
+                  <div className="mb-6">
+                    <label className="mb-2 block text-xs font-bold text-gold-500/60">Password</label>
+                    <input
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required={!editingStaff}
+                      className="w-full rounded-lg border border-gold-500/20 bg-navy-950/50 px-4 py-2 text-gold-100 outline-none transition-colors focus:border-gold-500/50"
+                    />
+                  </div>
+                )}
+                
+                <div className="mb-6">
+                  <label className="mb-3 block text-xs font-bold text-gold-500/60">Access Level</label>
+                  <div className="flex flex-wrap gap-3">
+                    {STAFF_ACCESS_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handlePresetChange(preset.id)}
+                        className={`rounded-lg border px-4 py-2 text-sm font-bold transition-colors ${
+                          formData.accessPreset === preset.id
+                            ? 'border-gold-600 bg-gold-600 text-navy-950'
+                            : 'border-gold-500/20 bg-navy-800/50 text-gold-100/70 hover:border-gold-500/50'
+                        }`}
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-gold-500/40">
+                    {STAFF_ACCESS_PRESETS.find(p => p.id === formData.accessPreset)?.description}
+                  </p>
+                </div>
+                
+                   <div className="rounded-lg border border-gold-500/10 bg-navy-950/30 p-4">
+                    <label className="mb-3 block text-xs font-bold text-gold-500/60">{formData.accessPreset === 'custom' ? 'Custom Permissions' : 'Included Permissions'}</label>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      {STAFF_PERMISSION_GROUPS.map(group => (
+                        <div key={group.name}>
+                           <h4 className="mb-2 text-sm font-bold text-gold-300">{group.name}</h4>
+                           <div className="space-y-3">
+                            {group.permissions.map(p => (
+                               <label key={p.id} className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.permissions.includes(p.id)}
+                                  onChange={(e) => handlePermissionToggle(p.id, e.target.checked)}
+                                  className="h-4 w-4 rounded border-gold-500/40 bg-navy-800 text-gold-600 focus:ring-gold-500"
+                                />
+                                <span className="text-sm text-gold-100/80">{p.name}</span>
+                              </label>
+                            ))}
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+              <div className="flex justify-end gap-4 border-t border-gold-500/10 p-6">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="rounded-lg border border-gold-500/20 px-6 py-2 text-sm font-bold text-gold-100/70 transition-colors hover:border-gold-500/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-gold-600 px-6 py-2 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-500 disabled:opacity-50"
+                >
+                  {submitting ? (editingStaff ? 'Updating...' : 'Inviting...') : (editingStaff ? 'Update Staff' : 'Invite Staff')}
+                </button>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Success Rate</span>
-                <span className="text-lg font-bold text-green-400">98.4%</span>
-              </div>
-            </div>
+            </motion.form>
           </div>
-          <Laptop size={120} className="absolute -bottom-4 -right-4 text-gold-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
         </div>
-        <div className="bg-navy-900/40 border border-gold-500/10 p-8 rounded-3xl relative overflow-hidden group">
-          <div className="relative z-10">
-            <div className="text-xs font-bold text-gold-500/40 uppercase tracking-widest mb-2">Card Payments</div>
-            <div className="text-3xl font-serif font-bold text-gold-100 mb-6">KSh 1,076,100</div>
-            <div className="flex gap-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Transactions</span>
-                <span className="text-lg font-bold text-gold-200">142</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gold-500/30 uppercase">Success Rate</span>
-                <span className="text-lg font-bold text-green-400">94.2%</span>
-              </div>
-            </div>
-          </div>
-          <CardIcon size={120} className="absolute -bottom-4 -right-4 text-gold-500/5 -rotate-12 group-hover:rotate-0 transition-transform duration-700" />
-        </div>
-      </div>
-      
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-5 border-b border-gold-500/10 bg-navy-800/30">
-          <h3 className="font-serif font-bold text-lg text-gold-100">Transaction History</h3>
-        </div>
-        <table className="w-full text-left">
-          <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40 uppercase tracking-[0.2em]">
-            <tr>
-              <th className="px-6 py-4">Reference</th>
-              <th className="px-6 py-4">Order</th>
-              <th className="px-6 py-4">Method</th>
-              <th className="px-6 py-4">Amount</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gold-500/5">
-            {[
-              { ref: 'MP240513001', order: '#PE-0412', method: 'M-Pesa', amount: 'KSh 18,500', status: 'Success' },
-              { ref: 'MP240513002', order: '#PE-0411', method: 'M-Pesa', amount: 'KSh 9,750', status: 'Success' },
-              { ref: 'MP240512002', order: '#PE-0409', method: 'M-Pesa', amount: 'KSh 12,000', status: 'Refunded' },
-              { ref: 'CD240512001', order: '#PE-0410', method: 'Card', amount: 'KSh 34,200', status: 'Failed' },
-            ].map((p, i) => (
-              <tr key={i} className="hover:bg-navy-800/30 transition-colors">
-                <td className="px-6 py-4 font-mono text-xs text-gold-500">{p.ref}</td>
-                <td className="px-6 py-4 text-sm font-bold text-gold-100">{p.order}</td>
-                <td className="px-6 py-4 text-xs text-gold-500/60 uppercase">{p.method}</td>
-                <td className="px-6 py-4 font-bold text-gold-100">{p.amount}</td>
-                <td className="px-6 py-4">
-                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
-                    p.status === 'Success' ? 'border-green-400 text-green-400 bg-green-400/5' : 
-                    p.status === 'Refunded' ? 'border-gold-500 text-gold-500 bg-gold-500/5' : 'border-red-400 text-red-400 bg-red-400/5'
-                  }`}>
-                    {p.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-gold-500/40 hover:text-gold-500 transition-colors"><Eye size={16} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      )}
     </div>
   );
 };
@@ -1876,7 +2150,7 @@ const ReviewsView = () => {
         const res = await adminReviewAPI.getAll();
         setReviews(res.data.data);
       } catch (error) {
-        console.error('Error fetching reviews:', error);
+        console.error("Error fetching reviews:", error);
       } finally {
         setLoading(false);
       }
@@ -1884,175 +2158,194 @@ const ReviewsView = () => {
     fetchReviews();
   }, []);
 
-  const handleApprove = async (id) => {
+  const handleToggle = async (id, currentStatus) => {
     try {
-      await adminReviewAPI.approve(id);
-      setReviews(reviews.map(r => r.id === id ? { ...r, is_approved: true } : r));
+      await adminReviewAPI.toggle(id);
+      setReviews(
+        reviews.map((r) =>
+          r.id === id ? { ...r, is_approved: !currentStatus } : r
+        )
+      );
     } catch (error) {
-      console.error('Error approving review:', error);
+      console.error("Error toggling review status:", error);
     }
   };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this review?')) return;
-    try {
-      await adminReviewAPI.remove(id);
-      setReviews(reviews.filter(r => r.id !== id));
-    } catch (error) {
-      console.error('Error deleting review:', error);
-    }
-  };
-
-  const pendingCount = reviews.filter(r => !r.is_approved).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-serif font-bold text-gold-100">Customer Feedback</h3>
-          {pendingCount > 0 && (
-            <span className="bg-gold-600 text-navy-950 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-              {pendingCount} Pending
-            </span>
-          )}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="py-24 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
-        </div>
-      ) : reviews.length > 0 ? (
-        <div className="space-y-4">
-          {reviews.map((r) => (
-            <div key={r.id} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl backdrop-blur-sm relative group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-navy-800 rounded-full flex items-center justify-center text-gold-500 font-bold border border-gold-500/10">
-                    {r.user_name?.[0] || 'U'}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-gold-100">{r.user_name || 'Anonymous'}</div>
-                    <div className="text-xs text-gold-500/40">{r.product_name}</div>
-                  </div>
-                </div>
-                <div className="flex gap-0.5">
-                  {[1,2,3,4,5].map(star => (
-                    <Star key={star} size={14} className={star <= r.rating ? 'fill-gold-500 text-gold-500' : 'text-gold-500/10'} />
-                  ))}
-                </div>
-              </div>
-              <p className="text-sm text-gold-200/80 leading-relaxed mb-6 italic">"{r.comment}"</p>
-              <div className="flex items-center justify-between border-t border-gold-500/5 pt-4">
-                <span className="text-[10px] text-gold-500/30 uppercase tracking-widest">{new Date(r.created_at).toLocaleDateString()}</span>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!r.is_approved && (
+      <h3 className="text-xl font-serif font-bold text-gold-100">Product Reviews</h3>
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
+        {loading ? (
+          <div className="py-24 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500 mx-auto" /></div>
+        ) : (
+          <AdminTable>
+          <table className="w-full min-w-[700px] text-left">
+            <thead className="bg-navy-800/50 text-[10px] font-bold text-gold-500/40  tracking-[0.2em]">
+              <tr>
+                <th className="px-6 py-4">Product</th>
+                <th className="px-6 py-4">Customer</th>
+                <th className="px-6 py-4">Rating</th>
+                <th className="px-6 py-4">Review</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gold-500/5 text-sm">
+              {reviews.map(review => (
+                <tr key={review.id} className="hover:bg-navy-800/30">
+                  <td className="px-6 py-4 text-gold-100">{review.product?.name || 'N/A'}</td>
+                  <td className="px-6 py-4 text-gold-100">{review.customer_name}</td>
+                  <td className="px-6 py-4 text-gold-100">{review.rating}/5</td>
+                  <td className="px-6 py-4 text-gold-500/60 max-w-sm truncate">{review.comment}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-[10px] font-bold  px-2 py-1 rounded-full ${review.is_approved ? 'bg-green-400/10 text-green-400' : 'bg-gold-500/10 text-gold-500'}`}>
+                      {review.is_approved ? 'Approved' : 'Pending'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
                     <button 
-                      onClick={() => handleApprove(r.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-green-400 text-navy-950 rounded-lg text-[10px] font-black uppercase tracking-widest"
+                      onClick={() => handleToggle(review.id, review.is_approved)}
+                      className="text-xs font-bold  px-3 py-1.5 rounded-lg border border-gold-500/20 text-gold-100 hover:bg-gold-600 hover:text-navy-950 transition-all"
                     >
-                      <CheckCircle2 size={12} /> Approve
+                      {review.is_approved ? 'Unapprove' : 'Approve'}
                     </button>
-                  )}
-                  <button 
-                    onClick={() => handleDelete(r.id)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-400/10 text-red-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-400/20"
-                  >
-                     <Trash2 size={12} /> Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="py-24 text-center text-gold-500/40 text-sm bg-navy-900/40 border border-gold-500/10 rounded-2xl border-dashed">
-          No reviews yet.
-        </div>
-      )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </AdminTable>
+        )}
+      </div>
     </div>
   );
 };
 
 
 const SettingsView = () => {
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await adminSettingsAPI.get();
+        setSettings(res.data.data);
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await adminSettingsAPI.update(settings);
+      adminToast.success('Settings updated');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not save settings'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setSettings({
+      ...settings,
+      [name]: type === 'checkbox' ? checked : value,
+    });
+  };
+
+  if(loading) return <SectionLoader />;
+
   return (
-    <div className="space-y-8 pb-12">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          {/* Store Info */}
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8">
-            <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
-              <Settings size={20} className="text-gold-500" /> Store Information
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { label: 'Store Name', val: 'Prince Esquire' },
-                { label: 'Support Email', val: 'hello@princeesquire.com' },
-                { label: 'Phone Number', val: '+254 700 000 000' },
-                { label: 'Store Currency', val: 'KES (KSh)' },
-              ].map((f, i) => (
-                <div key={i} className="space-y-2">
-                  <label className="text-[10px] font-bold text-gold-500/40 uppercase tracking-widest">{f.label}</label>
-                  <input type="text" defaultValue={f.val} className="w-full bg-navy-800/50 border border-gold-500/10 px-4 py-3 rounded-xl text-sm text-gold-100 focus:border-gold-500/40 transition-all outline-none" />
-                </div>
-              ))}
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-serif font-bold text-gold-100">Store Configurations</h3>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-6 py-3 rounded-xl bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 transition-all disabled:opacity-50"
+        >
+          {saving ? 'UPDATING...' : 'SAVE CONFIGURATIONS'}
+        </button>
+      </div>
+
+      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8 backdrop-blur-sm">
+        <div className="max-w-2xl mx-auto space-y-8">
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gold-100">Store Name</label>
+              <input 
+                type="text" 
+                name="store_name"
+                value={settings.store_name || ''}
+                onChange={handleInputChange}
+                className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gold-100">Contact Email</label>
+              <input 
+                type="email" 
+                name="support_email"
+                value={settings.support_email || ''}
+                onChange={handleInputChange}
+                className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gold-100">Contact Phone</label>
+              <input 
+                type="tel" 
+                name="phone_number"
+                value={settings.phone_number || ''}
+                onChange={handleInputChange}
+                className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+              />
             </div>
           </div>
+          
+          <div className="border-t border-gold-500/10" />
 
-          {/* Shipping Zones */}
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8">
-             <h4 className="font-serif font-bold text-xl text-gold-100 mb-6 flex items-center gap-3">
-              <Truck size={20} className="text-gold-500" /> Shipping & Logistics
-            </h4>
-            <div className="space-y-4">
-               {[
-                 { zone: 'Nairobi Metro', counties: 'Nairobi, Kiambu, Kajiado', rate: 'KSh 350', time: 'Same Day' },
-                 { zone: 'Central & Rift', counties: 'Nakuru, Nyeri, Meru', rate: 'KSh 650', time: '24 - 48 Hours' },
-               ].map((z, i) => (
-                 <div key={i} className="flex items-center justify-between p-4 bg-navy-800/30 border border-gold-500/5 rounded-xl">
-                   <div>
-                     <div className="text-sm font-bold text-gold-100">{z.zone}</div>
-                     <div className="text-[10px] text-gold-500/40 mt-1">{z.counties}</div>
-                   </div>
-                   <div className="text-right">
-                     <div className="text-sm font-bold text-gold-500">{z.rate}</div>
-                     <div className="text-[9px] uppercase font-bold text-gold-500/20">{z.time}</div>
-                   </div>
-                 </div>
-               ))}
-            </div>
+          <div className="space-y-4">
+            <label className="flex items-center gap-4 cursor-pointer">
+              <input 
+                type="checkbox" 
+                name="enable_reviews"
+                checked={settings.enable_reviews || false}
+                onChange={handleInputChange}
+                className="w-5 h-5 rounded border-gold-500/20 bg-navy-950 text-gold-600 focus:ring-0 focus:ring-offset-0"
+              />
+              <span className="text-sm text-gold-100">Enable Product Reviews</span>
+            </label>
+            <p className="text-xs text-gold-500/40  pl-9">Allow customers to submit reviews on product pages.</p>
           </div>
-        </div>
+          
+          <div className="border-t border-gold-500/10" />
 
-        <div className="space-y-8">
-          {/* Integrations */}
-          <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl p-8">
-            <h4 className="font-serif font-bold text-lg text-gold-100 mb-6 flex items-center gap-3">
-              <Globe size={18} className="text-gold-500" /> System Integrations
-            </h4>
-            <div className="space-y-4">
-              {[
-                { name: 'M-Pesa Daraja API', status: 'Connected', color: 'text-green-400' },
-                { name: 'Cloudinary CDN', status: 'Connected', color: 'text-green-400' },
-                { name: 'SendGrid Email', status: 'Connected', color: 'text-green-400' },
-                { name: 'Google Analytics', status: 'Not Configured', color: 'text-gold-500/20' },
-              ].map((int, i) => (
-                <div key={i} className="flex items-center justify-between p-3 border-b border-gold-500/5 last:border-0">
-                  <span className="text-xs text-gold-200">{int.name}</span>
-                  <span className={`text-[9px] font-bold uppercase ${int.color}`}>{int.status}</span>
-                </div>
-              ))}
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gold-100">New Order Notifications Email</label>
+            <input 
+              type="email" 
+              name="new_order_email_recipient"
+              value={settings.new_order_email_recipient || ''}
+              onChange={handleInputChange}
+              className="w-full bg-navy-950 border border-gold-500/10 rounded-xl py-3 px-4 text-gold-100 outline-none focus:border-gold-500/40 transition-all font-bold "
+            />
+            <p className="text-xs text-gold-500/40">Send an email to this address for every new order.</p>
           </div>
-
-          <button className="w-full py-4 bg-gold-600 text-navy-950 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-gold-600/10 hover:bg-gold-500 hover:-translate-y-1 transition-all duration-300">
-            Save All Changes
-          </button>
         </div>
       </div>
     </div>
   );
 };
-
 export default AdminDashboard;

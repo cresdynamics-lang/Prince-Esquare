@@ -25,14 +25,14 @@
   --color-navy-900: #2b3b55;
   --color-navy-950: #0a1128;
 
-  --font-serif: "Cormorant", serif;
-  --font-sans: "Montserrat", sans-serif;
+  --font-serif: "Cormorant Garamond", "Cormorant", Georgia, serif;
+  --font-sans: "Outfit", system-ui, sans-serif;
 }
 
 :root {
   background-color: #0a1128;
   color: #f2f6fa;
-  font-family: "Montserrat", sans-serif;
+  font-family: "Outfit", system-ui, sans-serif;
   overflow-x: hidden;
 }
 
@@ -40,10 +40,29 @@ body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-feature-settings: "ss01" on, "kern" on;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: "Cormorant", serif;
+  font-family: "Cormorant Garamond", "Cormorant", Georgia, serif;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Premium body polish */
+.font-serif {
+  font-family: "Cormorant Garamond", "Cormorant", Georgia, serif;
+}
+
+.font-sans {
+  font-family: "Outfit", system-ui, sans-serif;
+}
+
+@keyframes cart-pop {
+  0% { transform: scale(0.55); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
 }
 
 /* Custom Utilities */

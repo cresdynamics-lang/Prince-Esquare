@@ -1,5 +1,6 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
+const { recordProductEvent } = require('../utils/productAnalytics');
 
 // @desc    Get user's cart
 // @route   GET /api/cart
@@ -45,6 +46,7 @@ exports.addItem = async (req, res, next) => {
                 'UPDATE cart_items SET quantity = quantity + $1 WHERE id = $2 RETURNING *',
                 [qty, existing.rows[0].id]
             );
+            recordProductEvent(product_id, 'cart_add', qty);
             return formatResponse(res, 200, true, 'Cart item quantity updated', result.rows[0]);
         }
 
@@ -52,6 +54,8 @@ exports.addItem = async (req, res, next) => {
             'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, size_label) VALUES ($1, $2, $3, $4, $5) RETURNING *',
             [userId, product_id, vid, qty, size]
         );
+
+        recordProductEvent(product_id, 'cart_add', qty);
 
         formatResponse(res, 201, true, 'Item added to cart', result.rows[0]);
     } catch (error) {

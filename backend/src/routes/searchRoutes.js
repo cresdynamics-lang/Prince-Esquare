@@ -4,5 +4,6 @@ const searchController = require('../controllers/searchController');
 
 router.get('/', searchController.search);
 router.get('/suggestions', searchController.getSuggestions);
+router.post('/restock-alert', searchController.restockAlert);
 
 module.exports = router;

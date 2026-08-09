@@ -7,20 +7,47 @@ const path = require('path');
 
 const app = express();
 
-// Middleware
-app.use(helmet());
+// Nginx / reverse proxy sets X-Forwarded-For — required for correct rate limiting
+app.set('trust proxy', 1);
+
+// Middleware — allow Cloudinary product images for Meta/IG crawlers & shop embeds
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "img-src": [
+          "'self'",
+          'data:',
+          'blob:',
+          'https://res.cloudinary.com',
+          'https://*.cloudinary.com',
+          'https://prince-esquire.co.ke',
+        ],
+        "media-src": ["'self'", 'https://res.cloudinary.com', 'https://*.cloudinary.com'],
+      },
+    },
+    // Meta crawlers fetch OG images cross-origin; same-origin CORP can break previews.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
+  })
+);
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-// Rate Limiting
+// Rate Limiting (higher ceiling so admin multi-request loads do not 429)
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.API_RATE_LIMIT_MAX || 800),
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Behind trusted proxy only
+    validate: { xForwardedForHeader: false },
 });
 app.use('/api/', limiter);
 
@@ -43,6 +70,11 @@ app.use('/api/banners', require('./routes/bannerRoutes'));
 app.use('/api/newsletter', require('./routes/newsletterRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/search', require('./routes/searchRoutes'));
+app.use('/api/analytics', require('./routes/analyticsTrackRoutes'));
+app.use('/api/admin/visitors', require('./routes/adminVisitorRoutes'));
+app.use('/api/seo', require('./routes/seoRoutes'));
+app.use('/api/feeds', require('./routes/feedRoutes'));
+app.use('/api/blog', require('./routes/blogRoutes'));
 app.get('/api/homepage', require('./controllers/bannerController').getHomepageData);
 
 // --- ADMIN ROUTES ---
@@ -57,6 +89,8 @@ app.use('/api/admin/coupons', require('./routes/adminCouponRoutes'));
 app.use('/api/admin/banners', require('./routes/adminBannerRoutes'));
 app.use('/api/admin/customers', require('./routes/customerRoutes'));
 app.use('/api/admin/dashboard', require('./routes/analyticsRoutes'));
+app.use('/api/admin/blog', require('./routes/adminBlogRoutes'));
+app.use('/api/admin/upload', require('./routes/adminUploadRoutes'));
 app.use('/api/admin/subscribers', require('./controllers/newsletterController').adminGetSubscribers);
 
 // Root route

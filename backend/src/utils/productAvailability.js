@@ -37,24 +37,28 @@ const attachVariantAvailability = async (products, { includePosStock = false } =
   const enriched = list.map((p) => {
     const v = byProduct[p.id];
     const hasVariants = v && v.variant_count > 0;
-    let onlineStock = hasVariants ? v.variant_stock_total : (p.stock_quantity ?? 0);
-    let onlineInStock = hasVariants ? v.variants_in_stock > 0 : (p.stock_quantity ?? 0) > 0;
+    const onlineStock = hasVariants ? v.variant_stock_total : (p.stock_quantity ?? 0);
 
-    if (includePosStock && p.pos_in_stock === true && !onlineInStock) {
-      onlineInStock = true;
-      onlineStock = Math.max(onlineStock, p.pos_stock_qty ?? 0);
+    if (includePosStock) {
+      let onlineInStock = hasVariants ? v.variants_in_stock > 0 : (p.stock_quantity ?? 0) > 0;
+      if (p.pos_in_stock === true && !onlineInStock) {
+        onlineInStock = true;
+      }
+      return {
+        ...p,
+        online_stock_total: onlineStock,
+        online_in_stock: onlineInStock,
+        out_of_stock: p.is_active === false || !onlineInStock,
+        display_stock: onlineStock,
+      };
     }
 
-    // Storefront availability: all products are shown as available to customers
-    // regardless of stock levels. Stock counts only gate staff/POS views
-    // (includePosStock). Customers see every product as purchasable.
-    const customerInStock = true;
-
+    // Storefront: never mark products out of stock (new uploads with 0 stock still show as available).
     return {
       ...p,
       online_stock_total: onlineStock,
-      online_in_stock: includePosStock ? onlineInStock : customerInStock,
-      out_of_stock: includePosStock ? (p.is_active === false || !onlineInStock) : false,
+      online_in_stock: true,
+      out_of_stock: false,
       display_stock: onlineStock,
     };
   });
