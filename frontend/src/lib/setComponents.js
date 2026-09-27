@@ -51,10 +51,31 @@ export const sumSetComponentsPrice = (components = []) =>
 export const isSetsCategory = (categoryName = '', parentName = '', slug = '', parentSlug = '') => {
   const s = String(slug || '').toLowerCase();
   const ps = String(parentSlug || '').toLowerCase();
-  if (s === 'sets' || ps === 'sets') return true;
+  if (s === 'sets' || ps === 'sets' || s === 'gift-sets' || ps === 'gift-sets') return true;
   const name = `${categoryName || ''} ${parentName || ''}`.toLowerCase();
+  if (/\bgift\s*sets?\b/.test(name)) return true;
   if (/\bsets\b/.test(name) && !/linen/.test(name) && !/track/.test(name) && !/belt/.test(name)) return true;
   return false;
+};
+
+/** Card line: "Shirt + Tie + Cufflinks" from set_components */
+export const formatSetContentsLine = (raw) => {
+  const list = normalizeSetComponents(raw);
+  if (!list.length) return null;
+  const parts = list.map((c) => {
+    const name = String(c.name || '').trim();
+    if (name && name.length <= 28) return name;
+    const hint = SET_CATEGORY_HINTS.find((h) => h.value === c.category_hint);
+    if (hint?.label && hint.value !== 'other') {
+      return hint.label
+        .replace(/\s+trousers$/i, '')
+        .replace(/^Formal\s+/i, '')
+        .replace(/\s+\/\s+/g, ' / ');
+    }
+    return name ? `${name.slice(0, 26)}…` : null;
+  }).filter(Boolean);
+  if (!parts.length) return null;
+  return parts.join(' + ');
 };
 
 export const buildSetDescriptionAppendix = (components = []) => {

@@ -148,3 +148,16 @@ export function trackCustomizeProduct(product, { color, size } = {}) {
 export function trackFindLocation() {
   fbTrack('FindLocation');
 }
+
+/** Category / collection view — feeds Meta product-group retargeting audiences */
+export function trackViewCategory({ name, slug } = {}) {
+  if (!name && !slug) return;
+  fbTrack('ViewContent', {
+    content_type: 'product_group',
+    content_name: name || slug,
+    content_category: name || slug,
+    content_ids: slug ? [String(slug)] : undefined,
+    currency: CURRENCY,
+  });
+}
+

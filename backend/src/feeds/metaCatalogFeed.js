@@ -132,7 +132,11 @@ function googleCategoryFor(product) {
 
 function mapProductRow(product, { linkToSale = true } = {}) {
   // Always sellable in Meta — never emit out of stock / zero inventory.
-  const productType = product.parent_category_name || product.category_name || 'Fashion';
+  // product_type uses home category only (category_id), never cross_tags.
+  const productType = [product.parent_category_name, product.category_name]
+    .filter(Boolean)
+    .filter((name, i, arr) => arr.indexOf(name) === i)
+    .join(' > ') || 'Fashion';
   const description = cleanField(product.description || product.name, 5000);
 
   return {

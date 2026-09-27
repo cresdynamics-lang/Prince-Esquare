@@ -26,6 +26,7 @@
   --color-navy-950: #0a1128;
 
   --font-serif: "Cormorant Garamond", "Cormorant", Georgia, serif;
+  --font-display: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
   --font-sans: "Outfit", system-ui, sans-serif;
 }
 
@@ -53,6 +54,12 @@ h1, h2, h3, h4, h5, h6 {
 /* Premium body polish */
 .font-serif {
   font-family: "Cormorant Garamond", "Cormorant", Georgia, serif;
+}
+
+.font-display {
+  font-family: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .font-sans {

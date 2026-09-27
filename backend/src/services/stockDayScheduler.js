@@ -81,6 +81,14 @@ const tick = async () => {
     if (now.getHours() === 0 && now.getMinutes() <= 1) {
       await ensureDayRollover();
     }
+    // Phase 4 merch maintenance — expire New flags; clear dishonest Limited tags
+    if (now.getMinutes() % 15 === 0) {
+      const { runMerchMaintenance } = require('../utils/merchTags');
+      const { expiredNew, clearedLimited } = await runMerchMaintenance(db);
+      if (expiredNew || clearedLimited) {
+        logger.info({ msg: 'Merch maintenance', expiredNew, clearedLimited });
+      }
+    }
   } catch (err) {
     logger.warn({ err, msg: 'Stock day scheduler tick failed' });
   } finally {

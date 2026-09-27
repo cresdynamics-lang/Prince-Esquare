@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import { trackContact, trackFindLocation, trackLead } from '../lib/metaPixel';
+import { contactAPI } from '../services/api';
 
 const ContactUs = () => {
   const [formData, setFormData] = useState({
@@ -14,18 +15,35 @@ const ContactUs = () => {
     message: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     trackFindLocation();
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    trackContact();
-    trackLead('contact_form');
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
-    setFormData({ name: '', email: '', subject: '', message: '' });
+    if (sending) return;
+    setSending(true);
+    setError('');
+    try {
+      await contactAPI.submit(formData);
+      trackContact();
+      trackLead('contact_form');
+      setSubmitted(true);
+      setFormData({ name: '', email: '', subject: '', message: '' });
+      setTimeout(() => setSubmitted(false), 4000);
+    } catch (err) {
+      // Contact channel is isolated — failures here must not break Meta or the rest of the site
+      setError(
+        err?.response?.data?.message ||
+          err?.userMessage ||
+          'Could not send just now. WhatsApp or email us — we are still here.'
+      );
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -152,6 +170,11 @@ const ContactUs = () => {
                     Thank you for your message! We'll get back to you soon.
                   </motion.div>
                 )}
+                {error ? (
+                  <div className="border border-red-500/30 bg-red-600/10 p-4 text-sm text-red-300 mb-6">
+                    {error}
+                  </div>
+                ) : null}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
@@ -208,10 +231,11 @@ const ContactUs = () => {
 
                   <button
                     type="submit"
-                    className="w-full bg-gold-600 text-navy-950 py-4 font-bold tracking-wider hover:bg-gold-500 transition-colors flex items-center justify-center space-x-2"
+                    disabled={sending}
+                    className="w-full bg-gold-600 text-navy-950 py-4 font-bold tracking-wider hover:bg-gold-500 transition-colors flex items-center justify-center space-x-2 disabled:opacity-60"
                   >
                     <Send size={18} />
-                    <span>Send Message</span>
+                    <span>{sending ? 'Sending…' : 'Send Message'}</span>
                   </button>
                 </form>
               </div>

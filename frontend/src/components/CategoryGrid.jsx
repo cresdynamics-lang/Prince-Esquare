@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CATEGORY_TILES } from '../data/homepageContent';
+import { canonicalShopPath } from '../data/taxonomy';
 
 const CategoryGrid = () => {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ const CategoryGrid = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             type="button"
-            onClick={() => navigate('/products')}
+            onClick={() => navigate('/shop/suits')}
             className="text-gold-400 border-b border-gold-400/30 pb-2  text-[10px] tracking-[0.2em] font-bold hover:text-gold-200 hover:border-gold-200 transition-all"
           >
             Explore All Categories
@@ -40,7 +41,7 @@ const CategoryGrid = () => {
               viewport={{ once: true }}
               transition={{ delay: index * 0.1, duration: 0.8 }}
               className={`relative min-h-[260px] overflow-hidden group cursor-pointer ${cat.span} border border-gold-500/10`}
-              onClick={() => navigate(cat.path || `/products?category=${cat.category}`)}
+              onClick={() => navigate(cat.path || canonicalShopPath(cat.category))}
             >
               <img
                 src={cat.image}

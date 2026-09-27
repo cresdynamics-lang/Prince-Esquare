@@ -6,6 +6,7 @@ router.get('/', productController.getProducts);
 router.get('/sale', productController.getSaleProducts);
 router.get('/featured', productController.getFeaturedProducts);
 router.get('/new-arrivals', productController.getNewArrivals);
+router.get('/editorial', productController.getEditorialPicks);
 router.get('/best-sellers', productController.getBestSellers);
 router.get('/:id/related', productController.getRelatedProducts);
 router.get('/:slug', productController.getProductBySlug);

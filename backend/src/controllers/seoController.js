@@ -417,6 +417,13 @@ exports.renderForCrawler = async (req, res, next) => {
 
 exports.getSitemap = async (_req, res, next) => {
   try {
+    const { flattenTaxonomy, TAXONOMY_TREE, canonicalShopPath } = require('../data/taxonomy');
+    const shopPaths = [
+      ...new Set(
+        flattenTaxonomy(TAXONOMY_TREE).map((row) => canonicalShopPath(row.slug))
+      ),
+    ];
+
     const [productsResult, blogsResult] = await Promise.all([
       db.query(`SELECT slug, updated_at FROM products WHERE is_active = true ORDER BY updated_at DESC`),
       db.query(
@@ -426,6 +433,7 @@ exports.getSitemap = async (_req, res, next) => {
 
     const urls = [
       ...staticPaths.map((p) => ({ loc: `${SITE_URL}${p === '/' ? '' : p}`, priority: p === '/' ? '1.0' : '0.8' })),
+      ...shopPaths.map((p) => ({ loc: `${SITE_URL}${p}`, priority: '0.8' })),
       ...productsResult.rows.map((row) => ({
         loc: `${SITE_URL}/product/${row.slug}`,
         lastmod: row.updated_at,
@@ -438,9 +446,16 @@ exports.getSitemap = async (_req, res, next) => {
       })),
     ];
 
+    const seen = new Set();
+    const deduped = urls.filter((entry) => {
+      if (seen.has(entry.loc)) return false;
+      seen.add(entry.loc);
+      return true;
+    });
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls
+${deduped
   .map((entry) => {
     const lastmod = entry.lastmod
       ? `<lastmod>${new Date(entry.lastmod).toISOString().slice(0, 10)}</lastmod>`

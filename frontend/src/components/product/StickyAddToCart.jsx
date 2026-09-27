@@ -11,6 +11,7 @@ const StickyAddToCart = ({
   addedToCart,
   disabled,
   onAddToCart,
+  ctaLabel = 'Add to cart',
 }) => (
   <AnimatePresence>
     {visible && (
@@ -69,7 +70,7 @@ const StickyAddToCart = ({
                 <Plus size={9} strokeWidth={3} className="absolute -top-0.5 -right-1.5 bg-white text-navy-950 rounded-full" />
               )}
             </span>
-            <span className="whitespace-nowrap">{addedToCart ? 'Added' : 'Add to cart'}</span>
+            <span className="whitespace-nowrap">{addedToCart ? 'Added' : ctaLabel}</span>
           </button>
         </div>
       </motion.div>

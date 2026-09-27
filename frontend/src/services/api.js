@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
+import { cachedGet } from '../lib/deviceCache';
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -82,11 +83,36 @@ export const authAPI = {
 };
 
 export const productAPI = {
-  list: (params) => API.get('/products', { params }),
-  featured: () => API.get('/products/featured'),
-  sale: () => API.get('/products/sale'),
-  getBySlug: (slug) => API.get(`/products/${encodeURIComponent(slug)}`),
+  list: (params) =>
+    cachedGet(API, '/products', { params }, { ttlMs: 3 * 60 * 1000, softMs: 30 * 1000 }),
+  featured: () =>
+    cachedGet(API, '/products/featured', {}, { ttlMs: 5 * 60 * 1000, softMs: 60 * 1000 }),
+  sale: () =>
+    cachedGet(API, '/products/sale', {}, { ttlMs: 3 * 60 * 1000, softMs: 30 * 1000 }),
+  newArrivals: (params) =>
+    cachedGet(API, '/products/new-arrivals', { params }, { ttlMs: 3 * 60 * 1000, softMs: 30 * 1000 }),
+  editorial: () =>
+    cachedGet(API, '/products/editorial', {}, { ttlMs: 5 * 60 * 1000, softMs: 60 * 1000 }),
+  getBySlug: (slug) =>
+    cachedGet(
+      API,
+      `/products/${encodeURIComponent(slug)}`,
+      {},
+      { ttlMs: 2 * 60 * 1000, softMs: 20 * 1000 }
+    ),
   related: (productId) => API.get(`/products/${productId}/related`),
+};
+
+/** Phase 0 taxonomy — 6 primaries + Sale/New anchors */
+export const taxonomyAPI = {
+  tree: () => cachedGet(API, '/taxonomy', {}, { ttlMs: 15 * 60 * 1000, softMs: 2 * 60 * 1000 }),
+  landing: (slug) =>
+    cachedGet(
+      API,
+      `/taxonomy/${encodeURIComponent(slug)}`,
+      {},
+      { ttlMs: 10 * 60 * 1000, softMs: 60 * 1000 }
+    ),
 };
 
 export const catalogueAPI = {
@@ -414,9 +440,17 @@ export const onlineSaleAPI = {
 
 
 export const searchAPI = {
-  search: (q) => API.get('/search', { params: { q } }),
-  suggestions: (q) => API.get('/search/suggestions', { params: { q } }),
+  // Short soft TTL — search stays network-first after 20s; never shares product list cache
+  search: (q) =>
+    cachedGet(API, '/search', { params: { q } }, { ttlMs: 2 * 60 * 1000, softMs: 20 * 1000 }),
+  suggestions: (q) =>
+    cachedGet(API, '/search/suggestions', { params: { q } }, { ttlMs: 5 * 60 * 1000, softMs: 60 * 1000 }),
   restockAlert: (body) => API.post('/search/restock-alert', body),
+};
+
+/** Isolated contact channel — failures never touch productAPI / searchAPI */
+export const contactAPI = {
+  submit: (body) => API.post('/contact', body, { timeout: 12000 }),
 };
 
 export const analyticsAPI = {

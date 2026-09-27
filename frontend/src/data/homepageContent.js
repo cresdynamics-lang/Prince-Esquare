@@ -1,124 +1,127 @@
 /**
- * Curated homepage content — Prince Esquire, The Man's Shop (Yala Towers, Nairobi).
- * Optimized WebP images live in /public/hero (generated from the original photography).
+ * Homepage editorial content — Prince Esquire display spec.
+ * Collection CTAs use /shop/... canonical paths.
  */
 
 export const BRAND_TAGLINE = "The Man's Shop";
 export const BRAND_LOCATION = 'Yala Towers, Nairobi';
 
-export const HERO_SLIDES = [
+/** Section 2 — single full-bleed hero (no carousel). */
+export const HOME_HERO = {
+  title: 'Some men dress for the room. You dress for the entrance.',
+  subhead:
+    "Curated suits, shoes and tailoring for men who've stopped asking permission to stand out.",
+  primaryCta: { label: 'Shop New Arrivals', href: '/new-arrivals' },
+  secondaryCta: { label: 'Explore the Collection', href: '#shop-by-category' },
+  image: '/hero/presidential-1600.webp',
+  imageSm: '/hero/presidential-800.webp',
+};
+
+/**
+ * Section 3 — Shop by Category (3×3 grid).
+ * Suits moved off lead; Track Suits closes as card 9.
+ */
+export const HOME_CATEGORY_CARDS = [
   {
+    name: 'Shirts',
+    href: '/shop/shirts',
     image: '/hero/presidential-1600.webp',
     imageSm: '/hero/presidential-800.webp',
-    subtitle: 'Bespoke Craftsmanship',
-    title: 'THE PRESIDENTIAL COLLECTION',
-    desc: 'Presidential shirts cut for clean collars, confident structure, and a polished finish for the boardroom and beyond.',
-    cta: 'Discover Collection',
-    link: '/products?category=shirts',
   },
   {
+    name: 'Shoes',
+    href: '/shop/shoes',
+    image: '/hero/santoni-1600.webp',
+    imageSm: '/hero/shoe-atelier-800.webp',
+  },
+  {
+    name: 'Trousers',
+    href: '/shop/trousers',
+    image: '/hero/trousers-1600.webp',
+    imageSm: '/hero/trousers-800.webp',
+  },
+  {
+    name: 'Suits',
+    href: '/shop/suits',
     image: '/hero/suits-1600.webp',
     imageSm: '/hero/suits-800.webp',
-    subtitle: 'Tailored Excellence',
-    title: 'LUXURY SUITS NAIROBI',
-    desc: 'Tailored two piece and three piece suits selected for weddings, boardrooms, and evenings that demand presence.',
-    cta: 'Shop Suits',
-    link: '/suits',
   },
   {
-    image: '/hero/santoni-1600.webp',
-    imageSm: '/hero/santoni-800.webp',
-    subtitle: 'Luxury Footwear',
-    title: 'THE SANTONI EDIT',
-    desc: 'Polished loafers and formal shoes in refined leather, with the kind of finish that lifts the whole outfit.',
-    cta: 'Shop Footwear',
-    link: '/products?category=shoes',
+    name: 'Jackets & Outerwear',
+    href: '/shop/jackets',
+    image: '/hero/outerwear-1600.webp',
+    imageSm: '/hero/outerwear-800.webp',
   },
   {
+    name: 'Accessories',
+    href: '/shop/accessories',
+    image: '/hero/belts-1600.webp',
+    imageSm: '/hero/belts-800.webp',
+  },
+  {
+    name: 'The Linen Edit',
+    href: '/shop/linen-edit',
     image: '/hero/linen-1600.webp',
     imageSm: '/hero/linen-800.webp',
-    subtitle: 'Summer Elegance',
-    title: 'LINEN MASTERY',
-    desc: 'Breathable linen sets and trousers built for warm-weather dressing with ease, texture, and a clean silhouette.',
-    cta: 'View Linen',
-    link: '/products?category=linen',
   },
   {
+    name: 'Gift Sets & Boxes',
+    href: '/shop/gift-sets',
+    image: '/hero/polo-salon-1600.webp',
+    imageSm: '/hero/polo-salon-800.webp',
+  },
+  {
+    name: 'Track Suits',
+    href: '/shop/jackets/track-tops',
     image: '/hero/tracksuits-1600.webp',
     imageSm: '/hero/tracksuits-800.webp',
-    subtitle: 'Premium Tracksuits',
-    title: 'CASUAL LUXURY',
-    desc: 'Relaxed tracksuits in elevated fabrics for off-duty hours, travel days, and polished casual dressing.',
-    cta: 'Shop Tracksuits',
-    link: '/products?category=track-suits',
-  },
-  {
-    image: '/hero/polos-1600.webp',
-    imageSm: '/hero/polos-800.webp',
-    subtitle: 'Modern Gentlemen',
-    title: 'SIGNATURE POLOS',
-    desc: 'Signature polos with a neat shape and premium hand feel for smart weekends, lunches, and everyday wear.',
-    cta: 'View Polos',
-    link: '/polo-t-shirts',
   },
 ];
 
-export const CATEGORY_TILES = [
-  {
-    title: 'The Shoe Atelier',
-    subtitle: 'Premium Italian Craftsmanship',
-    image: '/hero/shoe-atelier-800.webp',
-    span: 'md:col-span-1 md:row-span-2',
-    category: 'shoes',
-  },
-  {
-    title: 'Luxury Tracksuits',
-    subtitle: 'Prada & Zegna Collections',
-    image: '/hero/tracksuits-800.webp',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'track-suits',
-  },
-  {
-    title: 'Executive Shirts',
-    subtitle: 'The Presidential Series',
-    image: '/hero/presidential-800.webp',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'shirts',
-  },
-  {
-    title: 'Tailored Essentials',
-    subtitle: 'Dockers & Smart Trousers',
-    image: '/hero/trousers-800.webp',
-    span: 'md:col-span-2 md:row-span-1',
-    category: 'trousers',
-  },
-  {
-    title: 'The Polo Salon',
-    subtitle: 'Six Shades of Weekend Elegance',
-    image: '/hero/polo-salon-800.webp',
-    span: 'md:col-span-2 md:row-span-1',
-    category: 'polo-t-shirts',
-    path: '/polo-t-shirts',
-  },
-  {
-    title: 'Outerwear Gallery',
-    subtitle: 'Layered Jackets & Half Jackets',
-    image: '/hero/outerwear-800.webp',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'jackets',
-  },
-  {
-    title: 'Leisure House',
-    subtitle: 'Relaxed Luxury for Off-Duty Hours',
-    image: '/hero/tracksuits-800.webp',
-    span: 'md:col-span-1 md:row-span-1',
-    category: 'track-suits',
-  },
-  {
-    title: 'The Finishing Room',
-    subtitle: 'Belts, Ties & Final Details',
-    image: '/hero/belts-800.webp',
-    span: 'md:col-span-2 md:row-span-1',
-    category: 'belts-ties',
-  },
-];
+/** Fallback editorial captions when product has no focus_description. */
+export const EDITORIAL_CAPTIONS = {
+  presidential_pick: 'The piece we would put our name on without a second thought.',
+  editors_choice: "Chosen for the man who already knows what he's looking for.",
+  default: 'A handful of pieces we would put our name on.',
+};
+
+export const HOME_BESPOKE = {
+  eyebrow: 'Made to You',
+  title: 'Not off the rack. Made for your foot.',
+  bodyTemplate:
+    "Bespoke formal shoes are built to order — expect {weeks} weeks from fitting to delivery. This is the tier for men who've stopped accepting \"close enough.\"",
+  cta: { label: 'Start a Bespoke Order', href: '/shop/shoes/bespoke-formal' },
+  defaultLeadDays: 14,
+};
+
+export const HOME_LINEN_BANNER = {
+  eyebrow: 'Season Edit',
+  title: "Nairobi heat doesn't have to mean compromise.",
+  cta: { label: 'Shop the Linen Edit', href: '/shop/linen-edit' },
+  image: '/hero/linen-1600.webp',
+  imageSm: '/hero/linen-800.webp',
+};
+
+export const HOME_GIFT_BANNER = {
+  eyebrow: 'Gifting',
+  title: 'Some gifts get worn once. This is the kind that gets remembered.',
+  cta: { label: 'Shop Gift Sets', href: '/shop/gift-sets' },
+  image: '/hero/polo-salon-1600.webp',
+  imageSm: '/hero/polo-salon-800.webp',
+};
+
+export const HOME_SIGNUP = {
+  title: 'The next drop lands before it\'s public.',
+  body: 'Join The Prince Esquire List and see every new arrival first.',
+  cta: 'Join The List',
+};
+
+/** @deprecated Prefer HOME_CATEGORY_CARDS — kept for any legacy imports. */
+export const CATEGORY_TILES = HOME_CATEGORY_CARDS.map((c) => ({
+  title: c.name,
+  subtitle: 'Shop Collection',
+  image: c.imageSm || c.image,
+  span: 'md:col-span-1 md:row-span-1',
+  category: c.href.replace(/^\/shop\//, '').split('/')[0],
+  path: c.href,
+}));

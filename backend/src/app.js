@@ -58,6 +58,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
+app.use('/api/taxonomy', require('./routes/taxonomyRoutes'));
 app.use('/api/brands', require('./routes/brandRoutes'));
 app.use('/api/cart', require('./routes/cartRoutes'));
 app.use('/api/wishlist', require('./routes/wishlistRoutes'));
@@ -68,6 +69,7 @@ app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/coupons', require('./routes/couponRoutes')); // Note: Reference has /api/coupons/validate
 app.use('/api/banners', require('./routes/bannerRoutes'));
 app.use('/api/newsletter', require('./routes/newsletterRoutes'));
+app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/search', require('./routes/searchRoutes'));
 app.use('/api/analytics', require('./routes/analyticsTrackRoutes'));

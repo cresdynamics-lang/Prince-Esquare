@@ -96,8 +96,6 @@ const Sale = () => {
                     <ProductCard
                       key={product.id}
                       product={product}
-                      showSaleTag
-                      showWhatsAppOrder
                       motionProps={{
                         layout: true,
                         initial: { opacity: 0, y: 20 },

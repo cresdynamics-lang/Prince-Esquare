@@ -27,6 +27,7 @@ import {
   isSetsCategory,
   buildSetDescriptionAppendix,
 } from '../../lib/setComponents';
+import { CROSS_TAG_OPTIONS, MERCH_TAGS, LIMITED_MAX_UNITS, EDITORIAL_TAG_CAP } from '../../data/taxonomy';
 
 const AdminTable = ({ children }) => (
   <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">{children}</div>
@@ -119,6 +120,9 @@ const ProductsView = () => {
     sku: '',
     parent_category_id: '',
     category_id: '',
+    cross_tags: [],
+    merch_tags: [],
+    bespoke_lead_time_days: 14,
     stock_quantity: 0,
     is_featured: false,
     is_active: true,
@@ -130,6 +134,51 @@ const ProductsView = () => {
     gallery: [], // Combined state: { id, preview, url, isUploading }
     set_components: [],
   });
+
+  const toggleCrossTag = (slug) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.cross_tags) ? prev.cross_tags : [];
+      const next = current.includes(slug)
+        ? current.filter((t) => t !== slug)
+        : [...current, slug];
+      return { ...prev, cross_tags: next };
+    });
+  };
+
+  const toggleMerchTag = (id) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.merch_tags) ? prev.merch_tags : [];
+      const isOn = current.includes(id);
+      if (!isOn && id === 'limited') {
+        const stock = Number(prev.stock_quantity) || 0;
+        if (stock > LIMITED_MAX_UNITS) {
+          adminToast.error(
+            `Limited is blocked while stock is above ${LIMITED_MAX_UNITS} units (current: ${stock}). Drop stock to ${LIMITED_MAX_UNITS} or below, then add Limited.`
+          );
+          return prev;
+        }
+      }
+      const next = isOn ? current.filter((t) => t !== id) : [...current, id];
+      return { ...prev, merch_tags: next };
+    });
+  };
+
+  const normalizeMerchIds = (tags) => {
+    const alias = {
+      'editors-choice': 'editors_choice',
+      'presidential-pick': 'presidential_pick',
+      new: null,
+    };
+    return [...new Set(
+      (Array.isArray(tags) ? tags : [])
+        .map((t) => {
+          const key = String(t).toLowerCase();
+          if (key in alias) return alias[key];
+          return key;
+        })
+        .filter(Boolean)
+    )];
+  };
 
   const handleInputChange = (e, field) => {
     let value = e.target.value;
@@ -755,6 +804,9 @@ const ProductsView = () => {
         sku: productSku,
         parent_category_id: parentCategoryId,
         category_id: product.category_id || '',
+        cross_tags: Array.isArray(product.cross_tags) ? product.cross_tags : [],
+        merch_tags: normalizeMerchIds(product.merch_tags),
+        bespoke_lead_time_days: product.bespoke_lead_time_days ?? 14,
         stock_quantity: totalVariantStock(productColorGroups) || product.stock_quantity || 0,
         is_featured: product.is_featured || false,
         is_active: product.is_active ?? true,
@@ -793,6 +845,9 @@ const ProductsView = () => {
         sku: '',
         parent_category_id: '',
         category_id: '',
+        cross_tags: [],
+        merch_tags: [],
+        bespoke_lead_time_days: 14,
         stock_quantity: 0,
         is_featured: false,
         is_active: true,
@@ -843,7 +898,7 @@ const ProductsView = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.category_id) {
-      adminToast.error('Please select a category before saving this product.');
+      adminToast.error('Please select a home category before saving this product.');
       return;
     }
     setSubmitting(true);
@@ -852,6 +907,15 @@ const ProductsView = () => {
       const components = normalizeSetComponents(formData.set_components);
       const asSet = editingAsSet || components.length > 0;
       payload.set_components = components;
+      payload.cross_tags = Array.isArray(formData.cross_tags)
+        ? [...new Set(formData.cross_tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
+        : [];
+      payload.merch_tags = normalizeMerchIds(formData.merch_tags);
+      payload.bespoke_lead_time_days = payload.merch_tags.includes('bespoke')
+        ? (Number(formData.bespoke_lead_time_days) > 0
+            ? Math.round(Number(formData.bespoke_lead_time_days))
+            : 14)
+        : null;
       if (asSet) {
         payload.price = sumSetComponentsPrice(components);
         payload.variants = [];
@@ -1265,7 +1329,9 @@ const ProductsView = () => {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-black  tracking-[0.25em] text-gold-400">Offers</p>
-                      <p className="text-[9px]  tracking-wider text-gold-500/35 mt-1">Enable when this product has a sale or special price.</p>
+                      <p className="text-[9px]  tracking-wider text-gold-500/35 mt-1">
+                        Discount price only — does not add a Sale badge. Use Sale Catalog to put items on /sale.
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -1298,8 +1364,8 @@ const ProductsView = () => {
 
                 <div className="rounded-2xl border border-gold-500/10 bg-navy-950/60 p-5 space-y-5">
                   <div>
-                    <p className="text-[10px] font-black  tracking-[0.25em] text-gold-400">Category</p>
-                    <p className="text-[9px]  tracking-wider text-gold-500/35 mt-1">Tick the main category first, then tick a subcategory when it applies.</p>
+                    <p className="text-[10px] font-black  tracking-[0.25em] text-gold-400">Home category</p>
+                    <p className="text-[9px]  tracking-wider text-gold-500/35 mt-1">One home only — SEO, Meta feed, and canonical URL use this. Tick a primary, then a subcategory when it applies.</p>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1348,6 +1414,95 @@ const ProductsView = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-3 pt-4 border-t border-gold-500/10">
+                    <div>
+                      <p className="text-[9px] font-black tracking-[0.25em] text-gold-500/50">Also show in</p>
+                      <p className="text-[9px] tracking-wider text-gold-500/35 mt-1">
+                        Cross-tags surface this SKU on other landings (e.g. blazers → Jackets) without duplicating the product.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {CROSS_TAG_OPTIONS.map((opt) => {
+                        const checked = (formData.cross_tags || []).includes(opt.slug);
+                        return (
+                          <label
+                            key={opt.slug}
+                            className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all ${
+                              checked
+                                ? 'border-gold-500 bg-gold-600/10 text-gold-100'
+                                : 'border-gold-500/10 bg-navy-900/50 text-gold-500/60 hover:border-gold-500/30'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleCrossTag(opt.slug)}
+                              className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0"
+                            />
+                            <span className="text-[10px] font-black">{opt.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-gold-500/10">
+                    <div>
+                      <p className="text-[9px] font-black tracking-[0.25em] text-gold-500/50">Merch tags</p>
+                      <p className="text-[9px] tracking-wider text-gold-500/35 mt-1">
+                        New appears automatically for 21 days (get_new / new_until) — not selectable.
+                        Limited blocked above {LIMITED_MAX_UNITS} units. Editorial picks · {EDITORIAL_TAG_CAP} each.
+                        Bestseller badge → /sale#bestsellers. Sale is catalog-only (no badge).
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {MERCH_TAGS.map((opt) => {
+                        const checked = (formData.merch_tags || []).includes(opt.id);
+                        const stock = Number(formData.stock_quantity) || 0;
+                        const limitedBlocked = opt.id === 'limited' && !checked && stock > LIMITED_MAX_UNITS;
+                        return (
+                          <label
+                            key={opt.id}
+                            title={limitedBlocked ? `Stock must be ≤ ${LIMITED_MAX_UNITS} to tag Limited` : undefined}
+                            className={`flex items-center gap-3 rounded-xl border p-3 transition-all ${
+                              limitedBlocked
+                                ? 'cursor-not-allowed opacity-40 border-gold-500/5 bg-navy-900/30 text-gold-500/30'
+                                : checked
+                                  ? 'cursor-pointer border-gold-500 bg-gold-600/10 text-gold-100'
+                                  : 'cursor-pointer border-gold-500/10 bg-navy-900/50 text-gold-500/60 hover:border-gold-500/30'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={limitedBlocked}
+                              onChange={() => toggleMerchTag(opt.id)}
+                              className="h-4 w-4 rounded border-gold-500/30 bg-navy-950 text-gold-600 focus:ring-0 disabled:cursor-not-allowed"
+                            />
+                            <span className="text-[10px] font-black">{opt.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {(formData.merch_tags || []).includes('bespoke') ? (
+                      <div className="space-y-2 pt-2">
+                        <label className="text-[9px] font-black tracking-[0.2em] text-gold-500/50">
+                          Bespoke lead time (working days)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="90"
+                          value={formData.bespoke_lead_time_days ?? 14}
+                          onChange={(e) =>
+                            setFormData({ ...formData, bespoke_lead_time_days: e.target.value })
+                          }
+                          className="w-full max-w-[160px] bg-navy-950 border border-gold-500/10 rounded-xl py-2.5 px-4 text-gold-100 outline-none focus:border-gold-500/40 font-bold"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-2">

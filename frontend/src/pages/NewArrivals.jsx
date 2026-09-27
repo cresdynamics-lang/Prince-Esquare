@@ -17,13 +17,10 @@ const NewArrivals = () => {
     (async () => {
       setLoading(true);
       try {
-        const res = await productAPI.list({ limit: 100, page: 1, sort: 'updated' });
+        const res = await productAPI.newArrivals({ limit: 48 });
         if (cancelled) return;
-        const list = res.data?.data?.products || [];
-        list.sort(
-          (a, b) =>
-            new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
-        );
+        const payload = res.data?.data;
+        const list = Array.isArray(payload) ? payload : payload?.products || [];
         setProducts(list);
       } catch {
         if (!cancelled) setProducts([]);
@@ -58,7 +55,7 @@ const NewArrivals = () => {
             </span>
             <h1 className="text-5xl md:text-6xl font-serif text-white tracking-tight">New Arrivals</h1>
             <p className="text-navy-200 font-light leading-relaxed">
-              Products freshly added or updated on the site — newest first.
+              Everything currently New (21-day window) plus recently updated pieces — across every category.
             </p>
           </div>
         </div>

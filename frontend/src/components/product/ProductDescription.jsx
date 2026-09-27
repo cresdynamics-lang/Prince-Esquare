@@ -16,14 +16,21 @@ const Callout = ({ children }) => (
   </div>
 );
 
+/**
+ * PDP copy pattern:
+ * 1. Aspirational opener (focus_description) — outcome / presence
+ * 2. Practical body below — features, colours, sizes, delivery
+ */
 const ProductDescription = ({
   productName,
   brandName,
+  focusDescription,
   description,
   parsedColors = [],
   parsedSizes = [],
   isShoe = false,
 }) => {
+  const focus = String(focusDescription || '').trim();
   const sections = parseDescriptionSections(description);
   const colorLines = sections.colors.length ? sections.colors : parsedColors;
   const sizeLines = sections.sizes.length ? sections.sizes : parsedSizes;
@@ -37,6 +44,12 @@ const ProductDescription = ({
     (l) => !deliveryLines.includes(l) && !whyLines.includes(l)
   );
 
+  // Prefer focus as aspirational lead; fall back to first intro para
+  const aspirational = focus || sections.intro[0] || '';
+  const practicalIntro = focus
+    ? sections.intro
+    : sections.intro.slice(1);
+
   return (
     <div className="space-y-10">
       <div className="space-y-2">
@@ -45,13 +58,21 @@ const ProductDescription = ({
         <h2 className="text-base md:text-lg font-serif text-white leading-snug">{productName}</h2>
       </div>
 
-      <div className="space-y-5 text-[15px] font-light leading-[1.75] text-slate-300/90">
-        {sections.intro.map((para) => (
-          <p key={para.slice(0, 48)} className="text-slate-200/90">
-            {para}
-          </p>
-        ))}
-      </div>
+      {aspirational && (
+        <p className="text-[16px] md:text-[17px] font-light leading-[1.7] text-gold-100/90 font-serif italic">
+          {aspirational}
+        </p>
+      )}
+
+      {practicalIntro.length > 0 && (
+        <div className="space-y-5 text-[15px] font-light leading-[1.75] text-slate-300/90">
+          {practicalIntro.map((para) => (
+            <p key={para.slice(0, 48)} className="text-slate-200/90">
+              {para}
+            </p>
+          ))}
+        </div>
+      )}
 
       {sections.features.length > 0 && (
         <Section title="Key Features" icon="*">
@@ -94,7 +115,7 @@ const ProductDescription = ({
         </Section>
       )}
 
-        <Section title="Delivery and Service" icon="*">
+      <Section title="Delivery and Service" icon="*">
         <Callout>
           <ul className="space-y-2 text-[14px] font-light leading-relaxed text-slate-300/90">
             {(deliveryLines.length ? deliveryLines : [
@@ -121,8 +142,8 @@ const ProductDescription = ({
             'Dedicated customer support before and after your purchase',
           ]).map((line) => (
             <li key={line} className="flex gap-2">
-                <span className="shrink-0 text-gold-500">•</span>
-                <span>{line.replace(/^[-•]\s*/, '')}</span>
+              <span className="shrink-0 text-gold-500">•</span>
+              <span>{line.replace(/^[-•]\s*/, '')}</span>
             </li>
           ))}
         </ul>

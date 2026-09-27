@@ -23,3 +23,17 @@ createRoot(document.getElementById('root')).render(
     <Toaster position="top-right" toastOptions={toastOptions} />
   </StrictMode>,
 )
+
+/** Register device cache SW after first paint — never blocks LCP */
+function registerDeviceCache() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+  const register = () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  }
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(register, { timeout: 4000 })
+  } else {
+    window.addEventListener('load', () => setTimeout(register, 1200))
+  }
+}
+registerDeviceCache()

@@ -6,6 +6,14 @@ const { getPosStockForProductIds } = require('../services/productPosLink');
 const { attachVariantAvailability } = require('../utils/productAvailability');
 const { generateProductSku, generateVariantSku } = require('../utils/sku');
 const { isAdminRole, isSellerRole } = require('../utils/posHelpers');
+const {
+  normalizeMerchTags,
+  computeNewUntil,
+  validateMerchTagsForSave,
+  withEffectiveMerchTags,
+  NEW_AUTO_DAYS,
+  DEFAULT_BESPOKE_LEAD_DAYS,
+} = require('../utils/merchTags');
 
 const isStaffUser = (user) => user && (isAdminRole(user) || isSellerRole(user));
 
@@ -159,10 +167,11 @@ const mapVariantRow = (v, productSku) => {
 // @route   GET /api/products
 exports.getProducts = async (req, res, next) => {
     try {
-        const { category, sub, brand, minPrice, maxPrice, sort, page = 1, limit = 10 } = req.query;
+        const { category, sub, brand, minPrice, maxPrice, sort, page = 1, limit = 10, taxonomy } = req.query;
         const offset = (page - 1) * limit;
         const categorySlug = normalizeCategoryParam(category);
         const subSlug = normalizeCategoryParam(sub);
+        const taxonomySlug = normalizeCategoryParam(taxonomy);
 
         let query = `
             SELECT p.*, c.name as category_name, c.slug as category_slug,
@@ -181,7 +190,22 @@ exports.getProducts = async (req, res, next) => {
         const params = [];
         let paramCount = 1;
 
-        if (categorySlug === 'presidential' || subSlug === 'presidential') {
+        if (taxonomySlug) {
+            const { resolveBrowseCategoryIds } = require('./taxonomyController');
+            const { categoryIds, crossTag } = await resolveBrowseCategoryIds(taxonomySlug);
+            if (categoryIds.length) {
+                query += ` AND (
+                    p.category_id = ANY($${paramCount}::uuid[])
+                    OR $${paramCount + 1} = ANY(COALESCE(p.cross_tags, '{}'))
+                ) `;
+                params.push(categoryIds, crossTag);
+                paramCount += 2;
+            } else {
+                query += ` AND $${paramCount} = ANY(COALESCE(p.cross_tags, '{}')) `;
+                params.push(crossTag);
+                paramCount += 1;
+            }
+        } else if (categorySlug === 'presidential' || subSlug === 'presidential') {
             query += ` AND (
                 LOWER(c.slug) = 'presidential'
                 OR LOWER(p.name) LIKE '%presidential%'
@@ -257,6 +281,14 @@ exports.getProducts = async (req, res, next) => {
         if (sort === 'price_asc') query += 'ORDER BY p.price ASC ';
         else if (sort === 'price_desc') query += 'ORDER BY p.price DESC ';
         else if (sort === 'newest') query += 'ORDER BY p.created_at DESC ';
+        else if (sort === 'bestselling') {
+          // Bespoke / made-to-order never participates in bestselling rank
+          query += `ORDER BY CASE
+              WHEN 'bespoke' = ANY(COALESCE(p.merch_tags, '{}')) OR c.slug = 'bespoke-formal' THEN 2
+              WHEN 'bestseller' = ANY(COALESCE(p.merch_tags, '{}')) THEN 0
+              ELSE 1
+            END, p.updated_at DESC NULLS LAST `;
+        }
         else if (sort === 'updated' || sort === 'updated_at') query += 'ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC ';
         else query += 'ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC ';
 
@@ -281,7 +313,7 @@ exports.getProducts = async (req, res, next) => {
         // Rebuild the same filters for an accurate count without LIMIT
         // (reuse main query params except limit/offset)
         const filterParams = params.slice(0, -2);
-        if (categorySlug || brand || minPrice || maxPrice) {
+        if (categorySlug || brand || minPrice || maxPrice || taxonomySlug) {
             // Extract WHERE clause portion from main query between WHERE and ORDER BY
             const whereMatch = query.match(/WHERE[\s\S]*?(?=ORDER BY|LIMIT)/i);
             if (whereMatch) {
@@ -301,8 +333,9 @@ exports.getProducts = async (req, res, next) => {
         const total = parseInt(countResult.rows[0].count);
 
         let products = result.rows.map((p) => applyProductImageOptimization(p));
+        products = await attachVariants(products);
         products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
-
+        products = products.map((p) => withEffectiveMerchTags(p));
         products = forAudience(products, req);
         formatResponse(res, 200, true, 'Products fetched successfully', {
             products,
@@ -492,17 +525,53 @@ function rotateSaleFeaturedSlots(products, windowIndex, sectionSlug) {
   return shuffled;
 }
 
-// @desc    Sale showcase — admin-managed is_on_sale products (flat mixed grid, no categories)
+// @desc    Sale page — Bestsellers shelf (#bestsellers) + markdown grid (is_on_sale), deduped
 // @route   GET /api/products/sale
 exports.getSaleProducts = async (req, res, next) => {
   try {
-    let products = await attachVariants(await fetchOnSaleProducts());
-    products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
-    products = forAudience(products, req);
+    const IMAGE_OK = `
+      p.is_active = true
+      AND p.thumbnail IS NOT NULL
+      AND TRIM(p.thumbnail::text) <> ''
+      AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+    `;
+
+    const enrich = async (rows) => {
+      let list = await attachVariants(rows);
+      list = await attachPosStock(list, { forStaff: isStaffUser(req.user) });
+      list = list.map((p) => withEffectiveMerchTags(applyProductImageOptimization(p)));
+      return forAudience(list, req);
+    };
+
+    const bestsellersResult = await db.query(
+      `SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+              p_cat.name AS parent_category_name, p_cat.slug AS parent_category_slug,
+              b.name AS brand_name
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+       LEFT JOIN brands b ON p.brand_id = b.id
+       WHERE ${IMAGE_OK}
+         AND 'bestseller' = ANY(COALESCE(p.merch_tags, '{}'))
+       ORDER BY p.is_featured DESC, p.updated_at DESC NULLS LAST, p.name ASC
+       LIMIT 48`
+    );
+
+    let bestsellers = await enrich(bestsellersResult.rows);
+    const bestsellerIds = new Set(bestsellers.map((p) => p.id));
+
+    let onSale = await attachVariants(await fetchOnSaleProducts());
+    onSale = await attachPosStock(onSale, { forStaff: isStaffUser(req.user) });
+    onSale = onSale.map((p) => withEffectiveMerchTags(applyProductImageOptimization(p)));
+    onSale = forAudience(onSale, req);
+    // Deduplicate: anything already on the Bestsellers shelf stays out of the markdown grid
+    onSale = onSale.filter((p) => !bestsellerIds.has(p.id));
+
     const rotation = saleRotationWindow();
-    const mixed = rotateSaleFeaturedSlots(products, rotation.windowIndex, 'sale-all');
+    const mixed = rotateSaleFeaturedSlots(onSale, rotation.windowIndex, 'sale-markdown');
 
     formatResponse(res, 200, true, 'Sale products fetched', {
+      bestsellers,
       products: mixed,
       sections: [],
       rotation: {
@@ -522,8 +591,9 @@ exports.getSaleProducts = async (req, res, next) => {
 exports.getFeaturedProducts = async (req, res, next) => {
     try {
         const result = await db.query('SELECT * FROM products WHERE is_featured = true AND is_active = true LIMIT 8');
-        let products = result.rows.map((p) => applyProductImageOptimization(p));
+        let products = result.rows.map((p) => withEffectiveMerchTags(applyProductImageOptimization(p)));
         products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+        products = products.map((p) => withEffectiveMerchTags(p));
         products = forAudience(products, req);
         formatResponse(res, 200, true, 'Featured products fetched', products);
     } catch (error) {
@@ -538,7 +608,9 @@ exports.getProductBySlug = async (req, res, next) => {
         const { slug } = req.params;
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug);
         const productResult = await db.query(
-            'SELECT p.*, c.name as category_name, p_cat.name as parent_category_name, b.name as brand_name FROM products p ' +
+            'SELECT p.*, c.name as category_name, c.slug as category_slug, ' +
+            'p_cat.name as parent_category_name, p_cat.slug as parent_category_slug, ' +
+            'b.name as brand_name FROM products p ' +
             'LEFT JOIN categories c ON p.category_id = c.id ' +
             'LEFT JOIN categories p_cat ON c.parent_id = p_cat.id ' +
             'LEFT JOIN brands b ON p.brand_id = b.id ' +
@@ -557,10 +629,10 @@ exports.getProductBySlug = async (req, res, next) => {
         product.variants = variantsResult.rows.map((v) => mapVariantRow(v, product.sku || product.slug || product.name));
 
         const enriched = await attachPosStock(
-            applyProductImageOptimization(product),
+            withEffectiveMerchTags(applyProductImageOptimization(product)),
             { forStaff: isStaffUser(req.user) }
         );
-        formatResponse(res, 200, true, 'Product details fetched', forAudience(enriched, req));
+        formatResponse(res, 200, true, 'Product details fetched', forAudience(withEffectiveMerchTags(enriched), req));
     } catch (error) {
         next(error);
     }
@@ -589,6 +661,9 @@ exports.createProduct = async (req, res, next) => {
             variants,
             set_components,
             sku,
+            cross_tags,
+            merch_tags,
+            bespoke_lead_time_days,
         } = req.body;
         const productSku = generateProductSku({ name, slug, sku });
         const isStaff = req.user?.role === 'staff';
@@ -596,10 +671,33 @@ exports.createProduct = async (req, res, next) => {
         const setComponents = normalizeSetComponents(set_components);
         const setTotal = sumSetComponents(setComponents);
         const finalPrice = setComponents.length ? setTotal : (price || 0);
+        const crossTags = Array.isArray(cross_tags)
+          ? [...new Set(cross_tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
+          : [];
+
+        if (!category_id) {
+            return formatResponse(res, 400, false, 'Home category is required (one category per product).');
+        }
+
+        const stockEstimate = Number(stock_quantity) || 0;
+        // New is system-owned — never accept it from merch_tags multi-select
+        const merchCheck = await validateMerchTagsForSave(db, {
+          merchTags: merch_tags,
+          productId: null,
+          stockQty: stockEstimate > 0 ? stockEstimate : null,
+        });
+        if (!merchCheck.ok) {
+          return formatResponse(res, 400, false, merchCheck.message);
+        }
+        const merchTags = merchCheck.tags;
+        const newUntil = computeNewUntil();
+        const leadDays = merchTags.includes('bespoke')
+          ? (Number(bespoke_lead_time_days) > 0 ? Math.round(Number(bespoke_lead_time_days)) : DEFAULT_BESPOKE_LEAD_DAYS)
+          : null;
 
         const result = await db.query(
-            'INSERT INTO products (name, slug, sku, description, focus_description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, set_components) ' +
-            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *',
+            'INSERT INTO products (name, slug, sku, description, focus_description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, set_components, cross_tags, merch_tags, get_new, new_until, bespoke_lead_time_days) ' +
+            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, true, $19, $20) RETURNING *',
             [
                 name,
                 slug,
@@ -617,6 +715,10 @@ exports.createProduct = async (req, res, next) => {
                 thumbnail || null,
                 JSON.stringify(images || []),
                 JSON.stringify(setComponents),
+                crossTags,
+                merchTags,
+                newUntil,
+                leadDays,
             ]
         );
 
@@ -670,15 +772,23 @@ exports.createProduct = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, slug, description, focus_description, price, discount_price, pos_sell_price, cost_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, set_components, sku } = req.body;
+        const { name, slug, description, focus_description, price, discount_price, pos_sell_price, cost_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, set_components, sku, cross_tags, merch_tags, bespoke_lead_time_days } = req.body;
         const isStaff = req.user?.role === 'staff';
         const productSku = generateProductSku({ name, slug, sku });
 
-        const existingR = await db.query('SELECT is_active FROM products WHERE id = $1', [id]);
+        const existingR = await db.query(
+          'SELECT is_active, merch_tags, new_until, get_new, bespoke_lead_time_days FROM products WHERE id = $1',
+          [id]
+        );
         if (existingR.rows.length === 0) {
             return formatResponse(res, 404, false, 'Product not found');
         }
+        const existing = existingR.rows[0];
         const nextActive = is_active === false ? false : (is_active !== undefined ? Boolean(is_active) : true);
+
+        if (!category_id) {
+            return formatResponse(res, 400, false, 'Home category is required (one category per product).');
+        }
 
         // Website visibility is size/category based — do not block publish on POS stock link.
 
@@ -686,11 +796,37 @@ exports.updateProduct = async (req, res, next) => {
         const setComponents = normalizeSetComponents(set_components);
         const setTotal = sumSetComponents(setComponents);
         const finalPrice = setComponents.length ? setTotal : (price || 0);
+        const crossTags = Array.isArray(cross_tags)
+          ? [...new Set(cross_tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
+          : [];
 
+        const stockEstimate =
+          Number(stock_quantity) ||
+          (Array.isArray(variants)
+            ? variants.reduce((s, v) => s + (parseInt(v.stock, 10) || 0), 0)
+            : null);
+        const previousTags = normalizeMerchTags(existing.merch_tags);
+        const merchCheck = await validateMerchTagsForSave(db, {
+          merchTags: Array.isArray(merch_tags) ? merch_tags : previousTags,
+          productId: id,
+          stockQty: stockEstimate != null && stockEstimate > 0 ? stockEstimate : null,
+          previousTags,
+        });
+        if (!merchCheck.ok) {
+          return formatResponse(res, 400, false, merchCheck.message);
+        }
+        const merchTags = merchCheck.tags;
+        const leadDays = merchTags.includes('bespoke')
+          ? (Number(bespoke_lead_time_days) > 0
+              ? Math.round(Number(bespoke_lead_time_days))
+              : (existing.bespoke_lead_time_days || DEFAULT_BESPOKE_LEAD_DAYS))
+          : null;
+
+        // Freshness is system-owned — preserve get_new / new_until on update
         const result = await db.query(
             'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, focus_description = $5, price = $6, discount_price = $7, pos_sell_price = $8, cost_price = $9, category_id = $10, brand_id = $11, ' +
-            'stock_quantity = $12, is_featured = $13, is_active = $14, thumbnail = $15, images = $16, set_components = $17, updated_at = NOW() WHERE id = $18 RETURNING *',
-            [name, slug, productSku, description || null, focus_description || null, finalPrice, discount_price || null, pos_sell_price ?? null, parsedCost, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), JSON.stringify(setComponents), id]
+            'stock_quantity = $12, is_featured = $13, is_active = $14, thumbnail = $15, images = $16, set_components = $17, cross_tags = $18, merch_tags = $19, bespoke_lead_time_days = $20, updated_at = NOW() WHERE id = $21 RETURNING *',
+            [name, slug, productSku, description || null, focus_description || null, finalPrice, discount_price || null, pos_sell_price ?? null, parsedCost, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), JSON.stringify(setComponents), crossTags, merchTags, leadDays, id]
         );
 
         if (result.rows.length === 0) {
@@ -879,11 +1015,86 @@ const ACTIVE_WITH_IMAGE_SQL = `
 
 exports.getNewArrivals = async (req, res, next) => {
     try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 48, 1), 100);
+        // Unified feed: get_new window OR recent meaningful updates — all categories
         const result = await db.query(
-            `SELECT * FROM products WHERE ${ACTIVE_WITH_IMAGE_SQL} ORDER BY created_at DESC LIMIT 8`
+            `SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+                    p_cat.name AS parent_category_name, p_cat.slug AS parent_category_slug
+             FROM products p
+             LEFT JOIN categories c ON p.category_id = c.id
+             LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+             WHERE p.is_active = true
+               AND p.thumbnail IS NOT NULL
+               AND TRIM(p.thumbnail::text) <> ''
+               AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+               AND (
+                 p.get_new = true
+                 OR (p.new_until IS NOT NULL AND p.new_until > NOW())
+                 OR p.updated_at > NOW() - INTERVAL '14 days'
+               )
+             ORDER BY
+               CASE WHEN p.get_new = true THEN 0 ELSE 1 END,
+               COALESCE(p.new_until, p.updated_at, p.created_at) DESC NULLS LAST
+             LIMIT $1`,
+            [limit]
         );
-        formatResponse(res, 200, true, 'New arrivals fetched', result.rows.map(applyProductImageOptimization));
-    } catch (error) { next(error); }
+        let products = result.rows.map((p) => withEffectiveMerchTags(applyProductImageOptimization(p)));
+        products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+        products = products.map((p) => withEffectiveMerchTags(p));
+        products = forAudience(products, req);
+        formatResponse(res, 200, true, 'New arrivals fetched', { products });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Homepage editorial — Editor's Choice + Presidential Pick (capped)
+// @route   GET /api/products/editorial
+exports.getEditorialPicks = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+              p_cat.name AS parent_category_name, p_cat.slug AS parent_category_slug,
+              b.name AS brand_name
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+       LEFT JOIN brands b ON p.brand_id = b.id
+       WHERE p.is_active = true
+         AND p.thumbnail IS NOT NULL
+         AND TRIM(p.thumbnail::text) <> ''
+         AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+         AND (
+           'editors_choice' = ANY(COALESCE(p.merch_tags, '{}'))
+           OR 'presidential_pick' = ANY(COALESCE(p.merch_tags, '{}'))
+         )
+       ORDER BY
+         CASE WHEN 'presidential_pick' = ANY(COALESCE(p.merch_tags, '{}')) THEN 0 ELSE 1 END,
+         p.updated_at DESC NULLS LAST
+       LIMIT 6`
+    );
+
+    let products = result.rows.map((p) => withEffectiveMerchTags(applyProductImageOptimization(p)));
+    products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+    products = products.map((p) => withEffectiveMerchTags(p));
+    products = forAudience(products, req);
+
+    const leadR = await db.query(
+      `SELECT COALESCE(AVG(bespoke_lead_time_days), $1)::int AS days
+       FROM products
+       WHERE is_active = true
+         AND 'bespoke' = ANY(COALESCE(merch_tags, '{}'))
+         AND bespoke_lead_time_days IS NOT NULL`,
+      [DEFAULT_BESPOKE_LEAD_DAYS]
+    );
+
+    formatResponse(res, 200, true, 'Editorial picks fetched', {
+      products,
+      bespokeLeadDays: leadR.rows[0]?.days || DEFAULT_BESPOKE_LEAD_DAYS,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 exports.getBestSellers = async (req, res, next) => {
@@ -949,7 +1160,7 @@ exports.adminGetProducts = async (req, res, next) => {
             where = ` WHERE (p.name ILIKE $1 OR p.sku ILIKE $1 OR p.slug ILIKE $1) `;
         }
         const productCols = lite
-            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.cost_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.images, p.category_id, p.brand_id, p.focus_description, p.description, p.set_components, p.created_at`
+            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.cost_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.images, p.category_id, p.brand_id, p.focus_description, p.description, p.set_components, p.cross_tags, p.merch_tags, p.get_new, p.new_until, p.bespoke_lead_time_days, p.created_at`
             : 'p.*';
         const result = await db.query(
             `SELECT ${productCols}, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.created_at DESC`,

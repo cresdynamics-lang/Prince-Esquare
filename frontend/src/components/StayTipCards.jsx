@@ -180,7 +180,7 @@ export const SALE_STAY_TIPS = [
     durationMs: 4800,
     pointTo: 'menu',
     lines: ['Trending khaki trousers.', 'Find them in the menu.'],
-    cta: { label: 'Shop khaki', to: '/products?category=khaki' },
+    cta: { label: 'Shop khaki', to: '/shop/trousers/khaki' },
   },
   {
     id: 'two-khakis',
@@ -189,7 +189,7 @@ export const SALE_STAY_TIPS = [
     gapMs: 2000,
     durationMs: 5000,
     lines: ['Buy two khakis today.', 'They last you four years.'],
-    cta: { label: 'See khaki', to: '/products?category=khaki' },
+    cta: { label: 'See khaki', to: '/shop/trousers/khaki' },
   },
 ];
 

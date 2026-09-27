@@ -19,6 +19,8 @@ import { toCartVariantId } from '../utils/ids';
 import { trackViewContent, trackInitiateCheckout, trackCustomizeProduct } from '../lib/metaPixel';
 import { launchWhatsAppOrder } from '../lib/whatsappOrder';
 import { normalizeSetComponents, sumSetComponentsPrice, isSetsCategory } from '../lib/setComponents';
+import { getAllProductMerchBadges, bespokeLeadCopy, isBespokeProduct } from '../utils/merchTags';
+import { productBreadcrumbs } from '../data/taxonomy';
 
 // Storefront shows every size/color for an active product. Availability is
 // size-driven (a size exists = it can be ordered); stock counts don't hide sizes.
@@ -112,7 +114,16 @@ const enrichShoeVariants = (variants, categoryName, parentCategoryName = '') => 
   return enriched;
 };
 
-/** Thumbnail carousel - color slides first (multi-color), then gallery + angles for selected color. */
+/** Classify gallery/image roles — modeled/lifestyle first, packshot/flat last. */
+const imageRole = (image, index = 0) => {
+  const blob = `${image?.role || ''} ${image?.type || ''} ${image?.label || ''} ${image?.angle || ''}`.toLowerCase();
+  if (/model|lifestyle|worn|on.?body|editorial/.test(blob)) return 0;
+  if (/pack|flat|still|product.?only|mannequin/.test(blob)) return 2;
+  // Without explicit tags: earlier gallery slots read as modeled; later as packshot.
+  return index === 0 ? 0 : 1;
+};
+
+/** Thumbnail carousel — modeled primary, then angles, packshot secondary. */
 const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides = []) => {
   if (!product) return [];
 
@@ -131,8 +142,25 @@ const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides
       strip = add(strip, { ...slide, type: 'color' });
     });
   } else {
+    const gallery = parseProductImages(product.images)
+      .map((image, index) => ({ image, index, role: imageRole(image, index) }))
+      .sort((a, b) => a.role - b.role || a.index - b.index);
+
+    const modeled = gallery.filter((g) => g.role === 0);
+    const secondary = gallery.filter((g) => g.role !== 0);
+
+    modeled.forEach(({ image, index }) => {
+      strip = add(strip, {
+        id: `gallery-${index}`,
+        src: getImageSrc(image),
+        thumb: getImageSrc(image, 'thumbnail'),
+        label: `${product.name} modeled view`,
+        type: 'modeled',
+      });
+    });
+
     const base = getProductBaseImage(product);
-    if (base) {
+    if (base && modeled.length === 0) {
       strip = add(strip, {
         id: 'main',
         src: base,
@@ -142,13 +170,13 @@ const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides
       });
     }
 
-    parseProductImages(product.images).forEach((image, index) => {
+    secondary.forEach(({ image, index }) => {
       strip = add(strip, {
         id: `gallery-${index}`,
         src: getImageSrc(image),
         thumb: getImageSrc(image, 'thumbnail'),
-        label: `${product.name} view ${index + 1}`,
-        type: 'gallery',
+        label: `${product.name} packshot`,
+        type: 'packshot',
       });
     });
   }
@@ -164,20 +192,28 @@ const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides
       });
     });
 
-    if (colorSlides.length <= 1) {
-      parseProductImages(product.images).forEach((image, index) => {
-        strip = add(strip, {
-          id: `gallery-${index}`,
-          src: getImageSrc(image),
-          thumb: getImageSrc(image, 'thumbnail'),
-          label: `${product.name} view ${index + 1}`,
-          type: 'gallery',
+    if (colorSlides.length > 1) {
+      parseProductImages(product.images)
+        .map((image, index) => ({ image, index, role: imageRole(image, index) }))
+        .sort((a, b) => a.role - b.role || a.index - b.index)
+        .forEach(({ image, index }) => {
+          strip = add(strip, {
+            id: `gallery-${index}`,
+            src: getImageSrc(image),
+            thumb: getImageSrc(image, 'thumbnail'),
+            label: `${product.name} view ${index + 1}`,
+            type: imageRole(image, index) === 0 ? 'modeled' : 'packshot',
+          });
         });
-      });
     }
   }
 
-  return strip;
+  // Modeled first overall when mixed types exist
+  const modeledFirst = [...strip].sort((a, b) => {
+    const rank = (t) => (t === 'modeled' || t === 'color' ? 0 : t === 'angle' ? 1 : t === 'main' ? 2 : 3);
+    return rank(a.type) - rank(b.type);
+  });
+  return modeledFirst;
 };
 
 const ProductDetail = () => {
@@ -515,6 +551,8 @@ const ProductDetail = () => {
     );
   }
 
+  const crumbs = productBreadcrumbs(product);
+
   return (
     <div className="bg-navy-950 min-h-screen">
       <SEO
@@ -528,11 +566,9 @@ const ProductDetail = () => {
         image={currentDisplayImage}
         keywords={[product.name, product.brand_name, product.category_name, 'luxury fashion Kenya'].filter(Boolean)}
         schema={[
-          buildBreadcrumbSchema([
-            { name: 'Home', path: '/' },
-            { name: product.category_name || 'Products', path: '/products' },
-            { name: product.name, path: `/product/${product.slug}` },
-          ]),
+          buildBreadcrumbSchema(
+            crumbs.map((c) => ({ name: c.name, path: c.href }))
+          ),
           buildProductSchema(product, currentDisplayImage, displayPrice),
         ]}
       />
@@ -541,6 +577,21 @@ const ProductDetail = () => {
 
       <main className={`pt-24 pb-24 transition-[padding] ${showStickyCart ? 'pb-28 md:pb-32' : ''}`}>
         <div className="container mx-auto px-4 md:px-6 max-w-7xl">
+          <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] tracking-wide text-gold-600/50">
+            {crumbs.map((crumb, i) => (
+              <span key={`${crumb.href}-${i}`} className="inline-flex items-center gap-2">
+                {i > 0 && <span aria-hidden className="text-gold-600/30">/</span>}
+                {i === crumbs.length - 1 ? (
+                  <span className="text-gold-500/80 line-clamp-1 max-w-[14rem]">{crumb.name}</span>
+                ) : (
+                  <Link to={crumb.href} className="hover:text-gold-400 transition-colors">
+                    {crumb.name}
+                  </Link>
+                )}
+              </span>
+            ))}
+          </nav>
+
           <div className="flex items-center space-x-4 mb-8">
             <button type="button" onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
               <ChevronLeft size={24} />
@@ -687,6 +738,32 @@ const ProductDetail = () => {
                 {product.brand_name && !['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase()) && (
                   <p className="text-[10px] font-bold tracking-[0.3em] text-gold-500">{product.brand_name}</p>
                 )}
+                {(() => {
+                  const badges = getAllProductMerchBadges(product);
+                  if (!badges.length) return null;
+                  return (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {badges.map((badge) =>
+                        badge.href ? (
+                          <Link
+                            key={badge.id}
+                            to={badge.href}
+                            className="bg-navy-900 text-gold-300 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] ring-1 ring-gold-500/40 transition-colors hover:bg-gold-500 hover:text-navy-950"
+                          >
+                            {badge.label}
+                          </Link>
+                        ) : (
+                          <span
+                            key={badge.id}
+                            className="bg-navy-900 text-gold-300 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] ring-1 ring-gold-500/40"
+                          >
+                            {badge.label}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  );
+                })()}
                 <h1 className="text-2xl md:text-3xl font-serif text-white leading-tight">{product.name}</h1>
 
                 <div className="flex items-baseline gap-3 flex-wrap">
@@ -820,6 +897,11 @@ const ProductDetail = () => {
               )}
 
               <div className="space-y-3 pt-2">
+                {isBespokeProduct(product) ? (
+                  <p className="font-sans text-[11px] font-medium leading-relaxed tracking-[0.04em] text-gold-400/80">
+                    {bespokeLeadCopy(product)}
+                  </p>
+                ) : null}
                 <div className="flex items-center gap-3">
                   <div className="flex items-center border border-gold-600/20 px-3 py-2.5 bg-navy-950 rounded-full">
                     <button
@@ -854,7 +936,13 @@ const ProductDetail = () => {
                     }`}
                   >
                     <ShoppingBag size={14} />
-                    <span>{addedToCart ? 'Added to Bag' : 'Add to cart'}</span>
+                    <span>
+                      {addedToCart
+                        ? 'Added to Bag'
+                        : isBespokeProduct(product)
+                          ? 'Order Bespoke'
+                          : 'Add to cart'}
+                    </span>
                   </motion.button>
                 </div>
 
@@ -887,11 +975,8 @@ const ProductDetail = () => {
                 <ProductDescription
                   productName={product.name}
                   brandName={product.brand_name}
-                  description={
-                    product.focus_description
-                      ? `${product.focus_description}\n\n${product.description || ''}`.trim()
-                      : product.description
-                  }
+                  focusDescription={product.focus_description}
+                  description={product.description}
                   parsedColors={parsedColorList}
                   parsedSizes={[sizeLine]}
                   isShoe={variantMeta.isShoe}
@@ -954,6 +1039,7 @@ const ProductDetail = () => {
         addedToCart={addedToCart}
         disabled={shopOutOfStock}
         onAddToCart={handleAddToCart}
+        ctaLabel={isBespokeProduct(product) ? 'Order Bespoke' : 'Add to cart'}
       />
 
       <Footer />

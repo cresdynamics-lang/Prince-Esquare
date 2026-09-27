@@ -1,6 +1,9 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
 const { applyProductImageOptimization, optimizeCloudinaryUrl } = require('../utils/cloudinaryImage');
+const { canonicalShopPath, LEGACY_SLUG_ALIASES } = require('../data/taxonomy');
+
+const resolveTaxonomySlug = (slug) => LEGACY_SLUG_ALIASES[slug] || slug;
 
 const toImage = (row) => row?.thumbnail || row?.image_url || row?.image || null;
 
@@ -83,38 +86,20 @@ const mapHeroProductSlide = (p) => {
     desc,
     cta: 'View Product',
     link: `/product/${p.slug}`,
-    fallbackLink: `/products?category=${category}`,
+    fallbackLink: canonicalShopPath(resolveTaxonomySlug(category)),
     productSlug: p.slug,
   };
-};
-
-const DEDICATED_CATEGORY_ROUTES = {
-  'polo-t-shirts': '/polo-t-shirts',
-  shoes: '/shoes',
-  shirts: '/shirts',
-  suits: '/suits',
-  trousers: '/trousers',
-  linen: '/linen',
 };
 
 /** Subcategories hidden from homepage product rows, tiles, and hero carousel. */
 const HOMEPAGE_HIDDEN_CATEGORY_SLUGS = new Set(['casual', 'caps-hats']);
 
 /** Category tiles shown first (used by buildCategoryTiles). */
-const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['track-suits', 'knitted-polos'];
+const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['track-tops', 'polo-t-shirts', 'suits', 'shoes'];
 
 const categoryViewAllPath = (row) => {
-  const parentSlug = row.parent_slug;
-  const slug = row.slug;
-  const name = row.name;
-
-  if (parentSlug && DEDICATED_CATEGORY_ROUTES[parentSlug]) {
-    const base = DEDICATED_CATEGORY_ROUTES[parentSlug];
-    return slug !== parentSlug ? `${base}?sub=${encodeURIComponent(name)}` : base;
-  }
-  if (DEDICATED_CATEGORY_ROUTES[slug]) return DEDICATED_CATEGORY_ROUTES[slug];
-  if (parentSlug) return `/products?category=${parentSlug}&sub=${encodeURIComponent(name)}`;
-  return `/products?category=${slug}`;
+  const slug = resolveTaxonomySlug(row.slug);
+  return canonicalShopPath(slug);
 };
 
 const HOMEPAGE_ROW_MIN = 4;
@@ -330,7 +315,7 @@ const buildCategoryTiles = async () => {
       image: c.image,
       category: c.parent_slug || c.slug,
       slug: c.slug,
-      path: c.parent_slug ? `/${c.parent_slug}` : `/products?category=${c.slug}`,
+      path: canonicalShopPath(resolveTaxonomySlug(c.slug)),
       span: index === 0 ? 'md:col-span-1 md:row-span-2' : index === 3 ? 'md:col-span-2 md:row-span-1' : 'md:col-span-1 md:row-span-1',
     }));
 
