@@ -15,7 +15,8 @@ const stockError = (message) => {
 };
 
 /** Resolve cart/guest lines with authoritative DB pricing and stock checks */
-const resolveOrderLines = async (rawItems, client = db) => {
+const resolveOrderLines = async (rawItems, client = db, options = {}) => {
+  const skipStock = Boolean(options.skipStock);
   if (!Array.isArray(rawItems) || rawItems.length === 0) {
     throw stockError('No items in order');
   }
@@ -53,7 +54,7 @@ const resolveOrderLines = async (rawItems, client = db) => {
         throw stockError(`Variant unavailable for ${product.name}`);
       }
       const variant = variantR.rows[0];
-      if (Number(variant.stock_quantity) < qty) {
+      if (!skipStock && Number(variant.stock_quantity) < qty) {
         throw stockError(`Not enough stock for ${product.name} (size ${sizeLabel || 'selected'})`);
       }
       priceModifier = parseFloat(variant.price_modifier || 0);
@@ -63,10 +64,10 @@ const resolveOrderLines = async (rawItems, client = db) => {
         [productId]
       );
       const hasVariants = variantsR.rows[0]?.cnt > 0;
-      if (hasVariants) {
+      if (hasVariants && !skipStock) {
         throw stockError(`Please select a size/variant for ${product.name}`);
       }
-      if (Number(product.stock_quantity) < qty) {
+      if (!skipStock && Number(product.stock_quantity) < qty) {
         throw stockError(`Not enough stock for ${product.name}`);
       }
     }

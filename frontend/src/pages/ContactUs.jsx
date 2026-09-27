@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, Clock } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
+import { trackContact, trackFindLocation, trackLead } from '../lib/metaPixel';
 
 const ContactUs = () => {
   const [formData, setFormData] = useState({
@@ -14,8 +15,14 @@ const ContactUs = () => {
   });
   const [submitted, setSubmitted] = useState(false);
 
+  useEffect(() => {
+    trackFindLocation();
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    trackContact();
+    trackLead('contact_form');
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
     setFormData({ name: '', email: '', subject: '', message: '' });
@@ -73,7 +80,7 @@ const ContactUs = () => {
                       </div>
                       <div>
                         <h3 className="text-white font-semibold mb-1">Call Us</h3>
-                        <p className="text-navy-300 text-sm">0724-494089</p>
+                        <a href="tel:+254724494089" className="text-navy-300 text-sm hover:text-gold-400" onClick={() => trackContact()}>0724-494089</a>
                       </div>
                     </div>
 
@@ -83,7 +90,7 @@ const ContactUs = () => {
                       </div>
                       <div>
                         <h3 className="text-white font-semibold mb-1">Email Us</h3>
-                        <p className="text-navy-300 text-sm">prince.esquire.staff@gmail.com</p>
+                        <a href="mailto:prince.esquire.staff@gmail.com" className="text-navy-300 text-sm hover:text-gold-400" onClick={() => trackContact()}>prince.esquire.staff@gmail.com</a>
                       </div>
                     </div>
 

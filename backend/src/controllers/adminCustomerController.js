@@ -336,4 +336,48 @@ exports.deleteStaff = async (req, res, next) => {
         next(error);
     }
 };
-
+exports.deleteCustomer = async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        if (String(req.user.id) === String(id)) {
+            return formatResponse(res, 400, false, 'You cannot delete your own account');
+        }
+        const userR = await db.query('SELECT id, role, email FROM users WHERE id = $1', [id]);
+        if (!userR.rows.length) {
+            return formatResponse(res, 404, false, 'User not found');
+        }
+        const user = userR.rows[0];
+        if (user.role === 'admin') {
+            return formatResponse(res, 403, false, 'Admin accounts cannot be deleted here');
+        }
+        if (user.role === 'staff') {
+            return formatResponse(res, 400, false, 'Use the Staff tab to remove staff accounts');
+        }
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('UPDATE orders SET user_id = NULL WHERE user_id = $1', [id]);
+            await client.query('DELETE FROM cart_items WHERE user_id = $1', [id]);
+            await client.query('DELETE FROM wishlist WHERE user_id = $1', [id]);
+            await client.query('DELETE FROM notifications WHERE user_id = $1', [id]);
+            await client.query('UPDATE reviews SET user_id = NULL WHERE user_id = $1', [id]);
+            const result = await client.query(
+                "DELETE FROM users WHERE id = $1 AND role = 'customer' RETURNING id, name, email",
+                [id]
+            );
+            if (!result.rows.length) {
+                await client.query('ROLLBACK');
+                return formatResponse(res, 404, false, 'Customer not found');
+            }
+            await client.query('COMMIT');
+            formatResponse(res, 200, true, 'Customer deleted successfully', result.rows[0]);
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        next(error);
+    }
+};

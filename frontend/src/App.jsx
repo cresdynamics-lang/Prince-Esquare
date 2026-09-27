@@ -1,110 +1,60 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
-import Blog from './pages/Blog';
-import BlogArticle from './pages/BlogArticle';
+import Sale from './pages/Sale';
+import NewArrivals from './pages/NewArrivals';
 import Cart from './pages/Cart';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Checkout from './pages/Checkout';
 import Payment from './pages/Payment';
-import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
-import ContactUs from './pages/ContactUs';
-import BespokeServices from './pages/BespokeServices';
-import ShippingReturns from './pages/ShippingReturns';
-import SizeGuide from './pages/SizeGuide';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import SEO from './components/SEO';
+import AnalyticsPageView from './components/AnalyticsPageView';
+import VisitorTracker from './components/VisitorTracker';
+import ScrollToTop from './components/ScrollToTop';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 
-const NoIndexPage = ({ title, children }) => (
-  <>
-    <SEO
-      title={title}
-      description="Private Prince Esquire customer area."
-      path={window.location.pathname}
-      noindex
-    />
-    {children}
-  </>
-);
-
 function App() {
-  const [authHydrated, setAuthHydrated] = useState(
-    () => useAuthStore.persist?.hasHydrated?.() ?? true
-  );
-
   useEffect(() => {
-    // Drop legacy localStorage auth — staff must enter password each browser session
-    try {
-      localStorage.removeItem('prince-esquire-auth');
-    } catch {
-      /* ignore */
-    }
-
-    const done = () => setAuthHydrated(true);
-    if (useAuthStore.persist?.hasHydrated?.()) {
-      setAuthHydrated(true);
-    } else {
-      const unsub = useAuthStore.persist?.onFinishHydration?.(done);
-      useAuthStore.persist?.rehydrate?.();
-      return unsub;
-    }
-    return undefined;
+    const t = setTimeout(() => {
+      if (useAuthStore.getState().isAuthenticated) {
+        useCartStore.getState().loadCart();
+      }
+    }, 0);
+    return () => clearTimeout(t);
   }, []);
-
-  useEffect(() => {
-    if (!authHydrated) return;
-    const { isAuthenticated, isSeller, token } = useAuthStore.getState();
-    if (isAuthenticated && token && !isSeller) {
-      useCartStore.getState().loadCart();
-    }
-  }, [authHydrated]);
-
-  if (!authHydrated) {
-    return <div className="min-h-screen bg-navy-950" aria-busy="true" />;
-  }
 
   return (
     <Router>
+      <ScrollToTop />
+      <AnalyticsPageView />
+      <VisitorTracker />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/sale" element={<Sale />} />
+        <Route path="/new-arrivals" element={<NewArrivals />} />
         <Route path="/products" element={<Products />} />
-        <Route path="/polo-t-shirts" element={<Products categoryOverride="polo-t-shirts" />} />
-        <Route path="/shoes" element={<Products categoryOverride="shoes" />} />
-        <Route path="/shirts" element={<Products categoryOverride="shirts" />} />
-        <Route path="/suits" element={<Products categoryOverride="suits" />} />
-        <Route path="/trousers" element={<Products categoryOverride="trousers" />} />
-        <Route path="/linen" element={<Products categoryOverride="linen" />} />
+        <Route path="/shirts" element={<Products />} />
+        <Route path="/polo-t-shirts" element={<Products />} />
+        <Route path="/shoes" element={<Products />} />
+        <Route path="/suits" element={<Products />} />
+        <Route path="/trousers" element={<Products />} />
+        <Route path="/linen" element={<Products />} />
         <Route path="/product/:slug" element={<ProductDetail />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/blog/:slug" element={<BlogArticle />} />
-        <Route path="/cart" element={<NoIndexPage title="Shopping Bag"><Cart /></NoIndexPage>} />
-        <Route path="/login" element={<NoIndexPage title="Client Login"><Login /></NoIndexPage>} />
-        <Route path="/signup" element={<NoIndexPage title="Create Account"><SignUp /></NoIndexPage>} />
-        <Route path="/checkout" element={<NoIndexPage title="Checkout"><Checkout /></NoIndexPage>} />
-        <Route path="/payment/:orderId" element={<NoIndexPage title="Payment"><Payment /></NoIndexPage>} />
-        <Route path="/profile" element={<NoIndexPage title="Profile"><Profile /></NoIndexPage>} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/payment/:orderId" element={<Payment />} />
 
-        {/* Legacy POS URLs → unified staff portal */}
-        <Route path="/pos/login" element={<Navigate to="/admin/login" replace />} />
-        <Route path="/pos" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/pos/shift-summary" element={<Navigate to="/admin/dashboard" replace />} />
-
-        {/* Staff portal — admin, staff & sellers */}
-        <Route path="/admin/login" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
-        <Route path="/admin/dashboard" element={<NoIndexPage title="Admin Dashboard"><AdminDashboard /></NoIndexPage>} />
-        <Route path="/admin" element={<NoIndexPage title="Staff Login"><AdminLogin /></NoIndexPage>} />
-        <Route path="/contact-us" element={<ContactUs />} />
-        <Route path="/bespoke-services" element={<BespokeServices />} />
-        <Route path="/shipping-returns" element={<ShippingReturns />} />
-        <Route path="/size-guide" element={<SizeGuide />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin" element={<AdminLogin />} />
       </Routes>
     </Router>
   );

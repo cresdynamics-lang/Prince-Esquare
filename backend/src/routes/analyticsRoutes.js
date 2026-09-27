@@ -1,8 +1,10 @@
+const analyticsInsightsController = require('../controllers/analyticsInsightsController');
 const express = require('express');
 const router = express.Router();
 const analyticsController = require('../controllers/analyticsController');
 const { protect } = require('../middleware/auth');
 
+router.get('/insights', protect, analyticsInsightsController.getDashboardInsights);
 router.get('/stats', protect, analyticsController.getDashboardStats);
 router.get('/sales-chart', protect, analyticsController.getSalesChart);
 router.get('/top-products', protect, analyticsController.getTopProducts);

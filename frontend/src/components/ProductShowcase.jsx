@@ -1,123 +1,98 @@
-import { useState } from 'react';
-import { ArrowRight, ShoppingBag } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useCartStore } from '../store/useCartStore';
-import { getPremiumImage } from '../utils/productImages';
+import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import ProductCard from './ProductCard';
 
-const needsSizeSelection = (product) =>
-  ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts', 'polo-t-shirts']
-    .includes((product.category_name || product.parent_category_name || '').toLowerCase());
+const MIN_ROW_PRODUCTS = 4;
 
-const hideBrandLabel = (product) => ['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase());
+const toCardProduct = (product) => ({
+  ...product,
+  thumbnail:
+    product.thumbnail_optimized ||
+    product.thumbnail ||
+    product.image_url ||
+    '',
+});
 
-const ProductCard = ({ product, onAddToCart, addedProductId }) => (
-  <article className="group flex-shrink-0 w-[46%] sm:w-[32%] md:w-[24%] lg:w-[18%] min-w-[140px]">
-    <Link to={`/product/${product.slug}`} className="block">
-      <div className="relative aspect-[4/5] bg-navy-900 overflow-hidden border border-gold-600/10 group-hover:border-gold-600/60 transition-colors">
-        <img
-          src={product.image_url || getPremiumImage(product, { width: 400 })}
-          alt={product.name}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-contain p-3 bg-white"
-        />
-        <div className="absolute inset-0 bg-navy-950/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 px-4 pointer-events-none group-hover:pointer-events-auto">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              onAddToCart(product);
-            }}
-            className="bg-white text-navy-950 px-4 py-3 text-[10px] font-bold flex items-center gap-2"
-          >
-            <ShoppingBag size={13} />
-            {addedProductId === product.id ? 'Added' : 'Add to Cart'}
-          </button>
-        </div>
-      </div>
-    </Link>
-    <div className="pt-3 space-y-1">
-      {!hideBrandLabel(product) && (
-        <p className="text-[11px] font-bold text-gold-600/50">{product.brand_name}</p>
-      )}
-        <h3 className="text-[9px] md:text-[11px] font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">
-          {product.name}
-        </h3>
-      <p className="text-gold-500 font-light italic text-sm">
-        KSh {parseFloat(product.price).toLocaleString()}
-      </p>
-    </div>
-  </article>
-);
-
+/**
+ * Homepage category rails: horizontal scroll, newest-first products, lazy images.
+ */
 const ProductShowcase = ({ categoryRows = [] }) => {
-  const navigate = useNavigate();
-  const addToCart = useCartStore((state) => state.addToCart);
-  const [addedProductId, setAddedProductId] = useState(null);
+  const rows = categoryRows
+    .map((row) => {
+      const products = [...(row.products || [])]
+        .filter(Boolean)
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at || 0) -
+            new Date(a.updated_at || a.created_at || 0),
+        );
+      return { ...row, products };
+    })
+    .filter((row) => row.products.length >= MIN_ROW_PRODUCTS);
 
-  const handleAddToCart = async (product) => {
-    if (needsSizeSelection(product)) {
-      navigate(`/product/${product.slug}`);
-      return;
-    }
-
-    await addToCart({
-      productId: product.id,
-      variantId: null,
-      quantity: 1,
-      sizeLabel: '',
-      name: product.name,
-      price: parseFloat(product.price),
-      image: getPremiumImage(product),
-      slug: product.slug,
-      brandName: product.brand_name,
-    });
-
-    setAddedProductId(product.id);
-    setTimeout(() => setAddedProductId(null), 1400);
-  };
-
-  if (!categoryRows.length) return null;
+  if (!rows.length) return null;
 
   return (
-    <section className="pt-8 pb-20 md:pt-10 md:pb-24 bg-navy-950">
-      <div className="container mx-auto px-6 space-y-12 md:space-y-14">
-        {categoryRows.map((row) => (
-          <div key={row.slug}>
-            <div className="flex items-center justify-between gap-4 mb-5 md:mb-6">
-              <h2 className="text-xl md:text-2xl font-serif text-white">
-                {row.title}
-              </h2>
+    <section className="bg-navy-950 pb-16 pt-6 md:pb-24 md:pt-8">
+      <div className="space-y-10 md:space-y-14">
+        {rows.map((row, rowIndex) => (
+          <div key={row.slug || row.title}>
+            <div className="container mx-auto mb-4 flex items-end justify-between gap-4 px-5 sm:px-6 md:mb-5">
+              <div>
+                <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.35em] text-gold-500/70">
+                  Just in
+                </p>
+                <h2 className="font-serif text-xl text-white md:text-2xl">{row.title}</h2>
+              </div>
               <Link
                 to={row.path || '/products'}
-                className="text-gold-500 text-[10px] font-bold  tracking-[0.3em] flex items-center gap-2 hover:gap-3 transition-all shrink-0"
+                className="flex shrink-0 items-center gap-2 text-[10px] font-bold tracking-[0.28em] text-gold-500 transition-all hover:gap-3"
               >
                 View All <ArrowRight size={14} />
               </Link>
             </div>
 
-            <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-gold-600/30 scrollbar-track-transparent">
-              {row.products.map((product) => (
-                <ProductCard
+            <div
+              className="homepage-product-rail flex gap-3 overflow-x-auto overscroll-x-contain px-5 pb-2 sm:gap-4 sm:px-6 md:gap-5"
+              style={{
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+              aria-label={`${row.title} products`}
+            >
+              {row.products.map((product, i) => (
+                <div
                   key={product.id}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                  addedProductId={addedProductId}
-                />
+                  className="w-[42vw] max-w-[200px] shrink-0 snap-start sm:w-[30vw] sm:max-w-[220px] md:w-[22vw] md:max-w-[240px] lg:w-[18vw] lg:max-w-[260px]"
+                >
+                  <ProductCard
+                    product={toCardProduct(product)}
+                    priority={rowIndex === 0 && i < 2}
+                    className="h-full"
+                    sizes="(max-width: 640px) 42vw, (max-width: 1024px) 28vw, 240px"
+                  />
+                </div>
               ))}
+              {/* end spacer so last card clears the edge */}
+              <div className="w-1 shrink-0" aria-hidden="true" />
             </div>
           </div>
         ))}
 
-        <div className="pt-4 flex justify-center">
+        <div className="flex justify-center px-6 pt-2">
           <Link
             to="/products"
-            className="inline-flex items-center gap-3 border border-gold-500/50 text-gold-500 px-10 py-4 text-[10px] font-bold  tracking-[0.35em] hover:bg-gold-500 hover:text-navy-950 transition-all"
+            className="inline-flex items-center gap-3 rounded-full border border-gold-500/50 px-10 py-4 text-[10px] font-bold tracking-[0.35em] text-gold-500 transition-all hover:bg-gold-500 hover:text-navy-950"
           >
             View All Products <ArrowRight size={14} />
           </Link>
         </div>
       </div>
+      <style>{`
+        .homepage-product-rail::-webkit-scrollbar { display: none; }
+      `}</style>
     </section>
   );
 };

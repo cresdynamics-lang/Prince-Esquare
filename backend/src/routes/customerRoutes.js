@@ -12,6 +12,7 @@ router.post('/staff', protect, requireAdmin, adminCustomerController.createStaff
 router.patch('/staff/:id/permissions', protect, requireAdmin, adminCustomerController.updateStaffPermissions);
 router.patch('/staff/:id', protect, requireAdmin, adminCustomerController.updateStaff);
 router.delete('/staff/:id', protect, requireAdmin, adminCustomerController.deleteStaff);
+router.delete('/:id', protect, requireAdmin, adminCustomerController.deleteCustomer);
 
 module.exports = router;
 

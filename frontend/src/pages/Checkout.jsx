@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Truck, ChevronLeft, ShoppingBag } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Truck, ChevronLeft, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import MpesaCheckoutSection from '../components/MpesaCheckoutSection';
 import { Link, Navigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -9,6 +9,10 @@ import { useCartStore } from '../store/useCartStore';
 import { orderAPI } from '../services/api';
 import { toCartVariantId } from '../utils/ids';
 import { buildOrderTrackUrl, buildWhatsAppOrderUrl } from '../lib/storeContact';
+import { trackInitiateCheckout, trackAddPaymentInfo } from '../lib/metaPixel';
+
+const DRAFT_KEY = 'prince-esquire-draft-order-id';
+const phoneDigits = (v) => String(v || '').replace(/\D/g, '');
 
 const isCustomerSession = () => {
   const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
@@ -28,11 +32,16 @@ const Checkout = () => {
   const [paymentChoice, setPaymentChoice] = useState('');
   const [fulfillmentMethod, setFulfillmentMethod] = useState('');
   const [deliveryZone, setDeliveryZone] = useState('');
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [draftId, setDraftId] = useState(() => sessionStorage.getItem(DRAFT_KEY) || '');
+  const draftTimer = useRef(null);
+  const formRef = useRef({});
+  const checkoutTracked = useRef(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(() => sessionStorage.getItem('prince-esquire-cart-phone') || '');
   const [address, setAddress] = useState('');
 
   useEffect(() => {
@@ -45,6 +54,12 @@ const Checkout = () => {
   }, [prepareForCheckout, isAuthenticated]);
 
   useEffect(() => {
+    if (!cartReady || !items.length || checkoutTracked.current) return;
+    checkoutTracked.current = true;
+    trackInitiateCheckout(items, getCheckoutTotals().total);
+  }, [cartReady, items, getCheckoutTotals]);
+
+  useEffect(() => {
     if (!user) return;
     const names = String(user.name || '').trim().split(/\s+/);
     setFirstName((current) => current || names[0] || '');
@@ -55,6 +70,66 @@ const Checkout = () => {
     setAddress((current) => current || saved.line1 || '');
     setDeliveryZone((current) => current || saved.delivery_zone || '');
   }, [user]);
+
+  formRef.current = {
+    firstName, lastName, email, phone, address, fulfillmentMethod, deliveryZone, paymentChoice, user,
+  };
+
+  const lineItems = useCallback(
+    (list) =>
+      list
+        .filter((it) => String(it.productId).length >= 32)
+        .map((it) => ({
+          product_id: it.productId,
+          variant_id: toCartVariantId(it.variantId),
+          quantity: it.quantity,
+          size_label: it.sizeLabel || null,
+        })),
+    []
+  );
+
+  const saveDraft = useCallback(async () => {
+    const f = formRef.current;
+    const rawPhone = (f.phone || f.user?.phone || '').trim();
+    if (phoneDigits(rawPhone).length < 9 || !items.length) return;
+    try {
+      const shipping_address = {
+        first_name: f.firstName || '',
+        last_name: f.lastName || '',
+        email: (f.email || f.user?.email || '').trim(),
+        phone: rawPhone,
+        fulfillment_method: f.fulfillmentMethod || '',
+        delivery_zone: f.deliveryZone || '',
+        line1: f.address || 'Details pending at checkout',
+        city: 'Nairobi',
+        country: 'Kenya',
+        payment_choice: f.paymentChoice || '',
+      };
+      const res = await orderAPI.saveDraft({
+        draft_id: draftId || sessionStorage.getItem(DRAFT_KEY) || undefined,
+        shipping_address,
+        billing_address: shipping_address,
+        items: lineItems(items),
+      });
+      if (res.data?.success && res.data?.data?.id) {
+        sessionStorage.setItem(DRAFT_KEY, res.data.data.id);
+        setDraftId(res.data.data.id);
+        setDraftSaved(true);
+      }
+    } catch {
+      /* ignore draft errors */
+    }
+  }, [items, draftId, lineItems]);
+
+  useEffect(() => {
+    const rawPhone = (phone || user?.phone || '').trim();
+    if (phoneDigits(rawPhone).length < 9 || !items.length) return undefined;
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => { saveDraft(); }, 900);
+    return () => {
+      if (draftTimer.current) clearTimeout(draftTimer.current);
+    };
+  }, [phone, firstName, lastName, email, address, fulfillmentMethod, deliveryZone, paymentChoice, items, user?.phone, saveDraft]);
 
   if (!cartReady) {
     return (
@@ -79,16 +154,6 @@ const Checkout = () => {
     ? Boolean(effectiveEmail && effectivePhone)
     : Boolean(firstName.trim() && lastName.trim() && effectiveEmail && effectivePhone);
   const canPlaceOrder = contactReady && fulfillmentMethod && hasDeliveryDetails && hasPaymentChoice && !submitting;
-
-  const lineItems = (list) =>
-    list
-      .filter((it) => String(it.productId).length >= 32)
-      .map((it) => ({
-        product_id: it.productId,
-        variant_id: toCartVariantId(it.variantId),
-        quantity: it.quantity,
-        size_label: it.sizeLabel || null,
-      }));
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
@@ -125,6 +190,7 @@ const Checkout = () => {
         billing_address: shipping_address,
         payment_method: paymentChoice === 'mpesa' ? 'whatsapp_mpesa' : 'pay_on_delivery',
         items: lineItems(syncedItems),
+        draft_id: draftId || sessionStorage.getItem(DRAFT_KEY) || undefined,
       };
 
       const res = customerLoggedIn
@@ -134,6 +200,7 @@ const Checkout = () => {
       if (!res.data?.success) throw new Error(res.data?.message || 'Order failed');
       const order = res.data.data;
       sessionStorage.setItem('checkout-email', shipping_address.email);
+      sessionStorage.removeItem(DRAFT_KEY);
       useCartStore.getState().clearLocalItems();
 
       const trackUrl = buildOrderTrackUrl(order.id, shipping_address.email);
@@ -172,9 +239,16 @@ const Checkout = () => {
             <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-400 text-sm py-3 px-4 text-center">{error}</div>
           )}
 
+          {draftSaved && (
+            <div className="mb-6 flex items-center gap-2 bg-green-500/10 border border-green-500/25 text-green-400 text-sm py-3 px-4 rounded-xl">
+              <CheckCircle2 size={16} className="shrink-0" />
+              <span>Phone &amp; bag saved. Complete the form when you&apos;re ready — we already have this order on hand.</span>
+            </div>
+          )}
+
           {!customerLoggedIn ? (
             <div className="mb-6 bg-navy-900/50 border border-gold-500/20 text-gold-400/90 text-sm py-3 px-4 sm:px-6 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-              <span>Checking out as guest — no account needed.</span>
+              <span>Checking out as guest — enter your phone early so we can hold your order.</span>
               <Link to="/login?redirect=/checkout" className="text-gold-500 text-[10px] font-bold uppercase tracking-widest hover:text-gold-300 shrink-0">
                 Sign in instead
               </Link>
@@ -206,7 +280,17 @@ const Checkout = () => {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-gold-500 uppercase tracking-widest font-bold">Phone</label>
-                    <input required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-navy-950 border border-gold-500/10 py-3 px-4 text-white outline-none focus:border-gold-500 text-base" placeholder="0712 345 678" />
+                    <input
+                      required
+                      type="tel"
+                      inputMode="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      onBlur={() => saveDraft()}
+                      className="w-full bg-navy-950 border border-gold-500/10 py-3 px-4 text-white outline-none focus:border-gold-500 text-base"
+                      placeholder="0712 345 678"
+                    />
+                    <p className="text-[10px] text-navy-400 font-light">Saved as soon as you type a valid number — before Place order.</p>
                   </div>
                 </div>
               ) : (
@@ -216,7 +300,30 @@ const Checkout = () => {
                   {!effectivePhone && (
                     <div className="mt-4 space-y-1.5">
                       <label className="text-[10px] text-gold-500 uppercase tracking-widest font-bold">Phone</label>
-                      <input required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-navy-950 border border-gold-500/10 py-3 px-4 text-white outline-none focus:border-gold-500 text-base" placeholder="0712 345 678" />
+                      <input
+                        required
+                        type="tel"
+                        inputMode="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        onBlur={() => saveDraft()}
+                        className="w-full bg-navy-950 border border-gold-500/10 py-3 px-4 text-white outline-none focus:border-gold-500 text-base"
+                        placeholder="0712 345 678"
+                      />
+                    </div>
+                  )}
+                  {customerLoggedIn && effectivePhone && (
+                    <div className="mt-4 space-y-1.5">
+                      <label className="text-[10px] text-gold-500 uppercase tracking-widest font-bold">Phone</label>
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={phone || effectivePhone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        onBlur={() => saveDraft()}
+                        className="w-full bg-navy-950 border border-gold-500/10 py-3 px-4 text-white outline-none focus:border-gold-500 text-base"
+                        placeholder="0712 345 678"
+                      />
                     </div>
                   )}
                 </div>
@@ -292,6 +399,7 @@ const Checkout = () => {
                     onClick={() => {
                       setPaymentChoice(value);
                       setMpesaConfirmed(value === 'mpesa');
+                      trackAddPaymentInfo(items, totals.total);
                     }}
                     className={`border px-4 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
                       paymentChoice === value

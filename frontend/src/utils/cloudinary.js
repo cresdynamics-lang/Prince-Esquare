@@ -1,7 +1,3 @@
-/**
- * Cloudinary image helpers (preset: PRINCE-eSQUIIRE)
- */
-
 export const CLOUDINARY_PRESET = 'PRINCE-eSQUIIRE';
 
 export const isCloudinaryUrl = (url) =>
@@ -10,14 +6,12 @@ export const isCloudinaryUrl = (url) =>
 export const isBlobUrl = (url) =>
   typeof url === 'string' && url.startsWith('blob:');
 
-/** Safe src for <img> — blob URLs expire after navigation/reload and must not be persisted. */
 export const resolveDisplayImageUrl = (url, { width = 400 } = {}) => {
   if (!url || isBlobUrl(url)) return '';
   if (typeof url === 'object') return getImageSrc(url, width <= 480 ? 'thumbnail' : 'optimized');
   return isCloudinaryUrl(url) ? optimizeCloudinaryUrl(url, { width }) : url;
 };
 
-/** Raw Cloudinary URL for DB storage (transforms applied at display time). */
 export const getPersistImageUrl = (item) => {
   if (!item) return '';
   if (typeof item === 'string') return item;
@@ -34,30 +28,23 @@ export const revokeBlobUrl = (url) => {
   }
 };
 
-/**
- * @param {string|{ url?: string, optimized?: string, thumbnail?: string }} image
- */
 export const getImageSrc = (image, variant = 'optimized') => {
   if (!image) return '';
   if (typeof image === 'string') {
     return variant === 'thumbnail'
-      ? optimizeCloudinaryUrl(image, { width: 400 })
+      ? optimizeCloudinaryUrl(image, { width: 400, quality: 'auto:eco' })
       : optimizeCloudinaryUrl(image, { width: 800 });
   }
   if (variant === 'thumbnail') return image.thumbnail || image.optimized || image.url || '';
   return image.optimized || image.url || image.thumbnail || '';
 };
 
-/**
- * Extract display URL from upload API response item (string legacy or JSON object).
- */
 export const getUploadUrl = (item) => {
   if (!item) return '';
   if (typeof item === 'string') return item;
   return item.optimized || item.url || item.secure_url || '';
 };
 
-/** Store-friendly JSON for product.images column */
 export const toImageJson = (item) => {
   if (!item) return null;
   if (typeof item === 'string') {
@@ -83,19 +70,53 @@ const stripCloudinaryTransforms = (pathAfterUpload) => {
   return segments.join('/');
 };
 
-export const optimizeCloudinaryUrl = (url, { width = 800, height, crop = 'limit' } = {}) => {
+export const optimizeCloudinaryUrl = (url, { width = 800, height, crop = 'limit', quality = 'auto:good' } = {}) => {
   if (!url || !isCloudinaryUrl(url)) return url;
   const marker = '/upload/';
   const idx = url.indexOf(marker);
   if (idx === -1) return url;
   const base = url.slice(0, idx + marker.length);
   const assetPath = stripCloudinaryTransforms(url.slice(idx + marker.length));
-  const transforms = [`f_auto`, `q_auto`, `w_${width}`, `c_${crop}`];
+  const q = String(quality).replace(/^q_/, '');
+  const transforms = [
+    'f_auto',
+    `q_${q}`,
+    `w_${Math.min(Number(width) || 800, 2000)}`,
+    `c_${crop}`,
+    'dpr_auto',
+  ];
   if (height) transforms.push(`h_${height}`);
   return `${base}${transforms.join(',')}/${assetPath}`;
 };
 
-/** Hero carousel — fills viewport without aggressive zoom */
+/** Responsive card image URLs for product grids */
+export const productCardSrcSet = (url) => {
+  if (!url) return { src: '', srcSet: '' };
+  const base = typeof url === 'object'
+    ? (url.url || url.secure_url || url.optimized || url.thumbnail || '')
+    : url;
+  if (!base || isBlobUrl(base)) return { src: '', srcSet: '' };
+  if (!isCloudinaryUrl(base)) return { src: base, srcSet: '' };
+  const w320 = optimizeCloudinaryUrl(base, { width: 320, quality: 'auto:eco' });
+  const w480 = optimizeCloudinaryUrl(base, { width: 480, quality: 'auto:eco' });
+  const w640 = optimizeCloudinaryUrl(base, { width: 640, quality: 'auto:good' });
+  return {
+    src: w480,
+    srcSet: `${w320} 320w, ${w480} 480w, ${w640} 640w`,
+  };
+};
+
+export const hasProductImage = (product) => {
+  const t = product?.thumbnail || product?.image_url || product?.thumbnail_optimized;
+  if (!t) return false;
+  if (typeof t === 'string') return t.trim().length > 8 && !t.startsWith('blob:');
+  if (typeof t === 'object') {
+    const u = t.url || t.secure_url || t.optimized || t.thumbnail;
+    return typeof u === 'string' && u.trim().length > 8;
+  }
+  return false;
+};
+
 export const heroImageUrl = (url) =>
   isCloudinaryUrl(url)
     ? optimizeCloudinaryUrl(url, { width: 1600, height: 900, crop: 'fill' })

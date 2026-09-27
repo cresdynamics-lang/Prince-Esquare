@@ -1,14 +1,51 @@
-export const getSizeOptionsForCategory = (categoryName = '') => {
-  const name = (categoryName || '').toLowerCase();
-  if (name.includes('belt') || name.includes('tie')) {
+/**
+ * Size chips for admin product form.
+ * Pass both leaf + parent names — ambiguous subs like "Casual" under Shoes
+ * must not fall through to S/M/L shirt sizes.
+ */
+export const getSizeOptionsForCategory = (categoryName = '', parentCategoryName = '') => {
+  const leaf = (categoryName || '').toLowerCase();
+  const parent = (parentCategoryName || '').toLowerCase();
+  const name = `${parent} ${leaf}`.trim();
+
+  if (
+    name.includes('belt') ||
+    name.includes('tie') ||
+    parent.includes('belts') ||
+    parent.includes('ties')
+  ) {
     return [];
   }
-  if (name.includes('shoe') || name.includes('sneaker') || name.includes('loafer') || name.includes('boot')) {
+
+  const underShoes =
+    parent.includes('shoe') ||
+    parent === 'shoes' ||
+    leaf.includes('shoe') ||
+    leaf.includes('sneaker') ||
+    leaf.includes('loafer') ||
+    leaf.includes('boot') ||
+    leaf.includes('sandal');
+
+  if (underShoes) {
     return ['38', '39', '40', '41', '42', '43', '44', '45', '46'];
   }
-  if (name.includes('trouser') || name.includes('chino') || name.includes('pant') || name.includes('khaki')) {
+
+  if (
+    parent.includes('trouser') ||
+    name.includes('trouser') ||
+    name.includes('chino') ||
+    name.includes('pant') ||
+    name.includes('khaki') ||
+    name.includes('jean') ||
+    name.includes('gurkha')
+  ) {
     return ['28', '30', '32', '34', '36', '38', '40', '42'];
   }
+
+  if (name.includes('boxer')) {
+    return ['S', 'M', 'L', 'XL', 'XXL'];
+  }
+
   return ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
 };
 
@@ -27,6 +64,42 @@ export const newSizeRow = (size = '') => ({
   stock: 0,
   price_override: '',
 });
+
+/** Pre-select every size for a category (admin removes unavailable). */
+export const sizeRowsForOptions = (sizeOptions = []) =>
+  (sizeOptions || []).map((size) => newSizeRow(String(size).toUpperCase()));
+
+export const withAllSizesForCategory = (
+  colorGroups = [],
+  categoryName = '',
+  parentCategoryName = '',
+) => {
+  const options = getSizeOptionsForCategory(categoryName, parentCategoryName);
+  const groups = Array.isArray(colorGroups) && colorGroups.length
+    ? colorGroups
+    : [newColorGroup('')];
+  if (!options.length) return groups;
+  return groups.map((group) => ({
+    ...group,
+    sizes: sizeRowsForOptions(options),
+  }));
+};
+
+export const colorGroupsFromAi = (
+  colors = [],
+  categoryName = '',
+  parentCategoryName = '',
+) => {
+  const list = (Array.isArray(colors) ? colors : [])
+    .map((c) => String(c || '').trim())
+    .filter((c) => c && c.toLowerCase() !== 'original');
+  const names = list.length ? list : [''];
+  const options = getSizeOptionsForCategory(categoryName, parentCategoryName);
+  return names.map((color) => ({
+    ...newColorGroup(color),
+    sizes: sizeRowsForOptions(options),
+  }));
+};
 
 export const flattenColorGroups = (colorGroups = []) => {
   const variants = [];
@@ -53,9 +126,9 @@ export const flattenColorGroups = (colorGroups = []) => {
 export const buildColorGroupsFromVariants = (variants = []) => {
   const groups = new Map();
   for (const variant of variants || []) {
-    const color = (variant.color || 'Original').trim() || 'Original';
-    if (!groups.has(color)) {
-      groups.set(color, {
+    const color = (variant.color || '').trim() || '';
+    if (!groups.has(color || '__empty__')) {
+      groups.set(color || '__empty__', {
         _key: Math.random().toString(36).slice(2),
         color,
         image_url: variant.image_url || '',
@@ -63,7 +136,7 @@ export const buildColorGroupsFromVariants = (variants = []) => {
         sizes: [],
       });
     }
-    const group = groups.get(color);
+    const group = groups.get(color || '__empty__');
     if (!group.image_url && variant.image_url) {
       group.image_url = variant.image_url;
       group.imagePreview = variant.image_url;

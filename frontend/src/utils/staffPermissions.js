@@ -24,7 +24,7 @@ export const hasPermission = (user, permission) => {
 
 export const canManageUsers = (user) => {
   if (!user) return false;
-  return user.role === 'admin' && user.email === 'jones@gmail.com';
+  return user.role === 'admin' && user.email === 'charles@prince-esquire.co.ke';
 };
 
 export const canViewCustomers = (user) =>

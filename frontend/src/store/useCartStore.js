@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { cartAPI } from '../services/api';
 import { useAuthStore } from './useAuthStore';
 import { toCartVariantId } from '../utils/ids';
+import { trackAddToCart } from '../lib/metaPixel';
 
 const isCustomerSession = () => {
   const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
@@ -143,42 +144,64 @@ export const useCartStore = create(
 
         if (isCustomerSession()) {
           try {
-            await cartAPI.addItem({
-              product_id: payload.productId,
-              variant_id: toCartVariantId(payload.variantId),
-              quantity: qty,
-              size_label: payload.sizeLabel || null,
-            });
-            await get().loadCart();
+            // Keep UI optimistic — sync server in background after local cart updates
+            void cartAPI
+              .addItem({
+                product_id: payload.productId,
+                variant_id: toCartVariantId(payload.variantId),
+                quantity: qty,
+                size_label: payload.sizeLabel || null,
+              })
+              .then(() => get().loadCart())
+              .catch((e) => {
+                console.error('addToCart', e);
+                set({ items: snapshot });
+              });
           } catch (e) {
             console.error('addToCart', e);
             set({ items: snapshot });
             throw e;
           }
         }
+
+        trackAddToCart({ ...payload, quantity: qty });
       },
 
       updateQuantity: async (item, newQty) => {
         const q = Math.max(1, newQty);
-        if (isCustomerSession() && item.cartItemId) {
-          await cartAPI.updateItem(item.cartItemId, { quantity: q });
-          await get().loadCart();
-          return;
-        }
         const k = lineKey(item);
+        const snapshot = get().items;
+        // Optimistic quantity for instant badge / bag totals
         set({
           items: get().items.map((i) => (lineKey(i) === k ? { ...i, quantity: q } : i)),
         });
+        if (isCustomerSession() && item.cartItemId) {
+          try {
+            await cartAPI.updateItem(item.cartItemId, { quantity: q });
+            void get().loadCart();
+          } catch (e) {
+            console.error('updateQuantity', e);
+            set({ items: snapshot });
+            throw e;
+          }
+          return;
+        }
       },
 
       removeFromCart: async (item) => {
-        if (isCustomerSession() && item.cartItemId) {
-          await cartAPI.removeItem(item.cartItemId);
-          await get().loadCart();
-          return;
-        }
         const k = lineKey(item);
+        const snapshot = get().items;
         set({ items: get().items.filter((i) => lineKey(i) !== k) });
+        if (isCustomerSession() && item.cartItemId) {
+          try {
+            await cartAPI.removeItem(item.cartItemId);
+            void get().loadCart();
+          } catch (e) {
+            console.error('removeFromCart', e);
+            set({ items: snapshot });
+            throw e;
+          }
+        }
       },
 
       clearLocalItems: () => set({ items: [] }),

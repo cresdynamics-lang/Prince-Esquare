@@ -3,30 +3,14 @@ import { Store, ShoppingBag, Globe, Pencil, FileText, EyeOff } from 'lucide-reac
 import { formatKES } from '../../../lib/format';
 import InventoryStockAddPanel from './InventoryStockAddPanel';
 
-const SizeChip = ({ size, stock, outOfStockStyle }) => {
-  const out = stock == null ? false : Number(stock) <= 0;
-  const qty = stock == null ? null : Number(stock);
-  return (
-    <span
-      title={out ? `${size} — out of stock` : `${size} — ${stock} in stock`}
-      className={`inline-flex flex-col items-center justify-center min-w-[2.5rem] px-2 py-1 text-[10px] font-bold border rounded ${
-        out && outOfStockStyle
-          ? 'border-red-500/40 bg-red-500/10 text-red-400/90 line-through opacity-70'
-          : out
-            ? 'border-slate-600/40 bg-slate-800/40 text-slate-500'
-            : 'border-gold-500/30 bg-gold-500/10 text-gold-200'
-      }`}
-    >
-      <span>{size}</span>
-      {qty != null && !out && (
-        <span className="text-[9px] font-normal text-gold-400/80 tabular-nums">{qty}</span>
-      )}
-      {out && outOfStockStyle && (
-        <span className="text-[8px] font-normal text-red-400/70 no-underline">OUT</span>
-      )}
-    </span>
-  );
-};
+const SizeChip = ({ size }) => (
+  <span
+    title={size}
+    className="inline-flex flex-col items-center justify-center min-w-[2.5rem] px-2 py-1 text-[10px] font-bold border rounded border-gold-500/30 bg-gold-500/10 text-gold-200"
+  >
+    <span>{size}</span>
+  </span>
+);
 
 const publishStatus = (p) => {
   const live = p.on_website ?? (p.website_product_id && p.website_published);
@@ -176,25 +160,21 @@ const InventoryProductCard = ({
       {hasVariants && (
         <div className="px-4 pb-4 space-y-3 border-t border-gold-500/10 pt-3 mx-4">
           <p className="text-[10px]   text-gold-500/50">
-            {liveOnWeb ? 'Colors & sizes (shop floor count)' : 'Colors & sizes (draft — publish to go live)'}
+            {liveOnWeb ? 'Colors & sizes available' : 'Colors & sizes (draft — publish to go live)'}
           </p>
           {colorGroups.map((group) => {
             const sizes = group.sizes || [];
-            const allOut = liveOnWeb && sizes.length > 0 && sizes.every((s) => (s.stock ?? 0) <= 0);
             return (
               <div
                 key={group.color || 'default'}
-                className={`rounded-lg p-3 border ${
-                  allOut ? 'border-red-500/25 bg-red-500/5' : 'border-gold-500/10 bg-navy-900/40'
-                }`}
+                className="rounded-lg p-3 border border-gold-500/10 bg-navy-900/40"
               >
                 <div className="flex items-center gap-2 mb-2">
                   {liveOnWeb && group.image_url && (
                     <img src={group.image_url} alt="" className="w-8 h-8 rounded object-cover border border-gold-500/10" />
                   )}
-                  <p className={`text-xs font-medium ${allOut ? 'text-red-400/90 line-through' : 'text-gold-300/90'}`}>
-                    {group.color || 'Original'}
-                    {allOut && <span className="ml-2 text-[10px] no-underline text-red-400/70">(color out of stock)</span>}
+                  <p className="text-xs font-medium text-gold-300/90">
+                    {group.color || '—'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -202,8 +182,6 @@ const InventoryProductCard = ({
                     <SizeChip
                       key={`${group.color}-${s.size}`}
                       size={s.size}
-                      stock={s.stock}
-                      outOfStockStyle={liveOnWeb}
                     />
                   ))}
                 </div>

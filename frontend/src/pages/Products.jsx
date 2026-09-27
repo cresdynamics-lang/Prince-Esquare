@@ -1,481 +1,200 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronLeft } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Search } from 'lucide-react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import SEO from '../components/SEO';
-import { useCartStore } from '../store/useCartStore';
-import { getPremiumImage } from '../utils/productImages';
-import { catalogueAPI, productAPI, adminCategoryAPI } from '../services/api';
-import { buildBreadcrumbSchema, categoryFallbackIntro, routeSeo } from '../seo/seoData';
-const categoryPages = ['polo-t-shirts', 'shoes', 'shirts', 'suits', 'trousers', 'linen'];
-const beltProductSlugs = new Set([
-  'black-leather-belt-set',
-  'dark-brown-leather-belt-set',
-]);
+import ProductCard from '../components/ProductCard';
+import { productAPI } from '../services/api';
 
-const isBeltCategory = (value) => {
-  const normalized = String(value || '').toLowerCase();
-  return normalized.includes('belt') || normalized.includes('tie');
+/** Labels for page title only — navigation lives in the menu. */
+const CATEGORY_LABELS = {
+  'polo-t-shirts': 'Polo T-shirts',
+  shoes: 'Shoes',
+  'formal-shoes': 'Formal Shoes',
+  casual: 'Casual Shoes',
+  boots: 'Boots',
+  sandals: 'Sandals',
+  loafers: 'Loafers',
+  shirts: 'Shirts',
+  'formal-shirts': 'Formal Shirts',
+  'shirts-casual': 'Casual Shirts',
+  presidential: 'Presidential Shirts',
+  suits: 'Suits',
+  'two-piece': 'Two Piece Suits',
+  'three-piece': 'Three Piece Suits',
+  blazers: 'Blazers',
+  'track-suits': 'Track Suits',
+  jackets: 'Jackets',
+  'full-jackets': 'Full Jackets',
+  'half-jackets': 'Half Jackets',
+  vests: 'Vests',
+  boxers: 'Boxers',
+  trousers: 'Trousers',
+  khaki: 'Khaki',
+  formal: 'Formal Trousers',
+  chino: 'Chinos',
+  jeans: 'Jeans',
+  gurkha: 'Gurkha',
+  linen: 'Linen',
+  'linen-set': 'Linen Set',
+  'linen-trousers': 'Linen Trousers',
+  'linen-shirts': 'Linen Shirts',
+  'linen-shorts': 'Linen Shorts',
+  sets: 'Sets',
+  'caps-hats': 'Caps & Hats',
+  'belts-ties': 'Belts & Ties',
+  socks: 'Socks',
+  sweaters: 'Sweaters',
+  't-shirts': 'T-shirts',
+  'sweat-shirts': 'Sweat-shirts',
+  'round-neck-t-shirts': 'Round-neck T-shirts',
+  'v-neck-t-shirts': 'V-neck T-shirts',
+  'knitted-polos': 'Knitted Polos',
+  polos: 'Polos',
 };
 
-const shouldHideBrand = (product) => ['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase());
-
-const CATEGORY_DATA = [
-  { id: 'All', name: 'All', sub: [] },
-  { id: 'polo-t-shirts', name: 'Polo T-shirts', sub: ['Knitted Polos', 'Polos'] },
-  { id: 'shoes', name: 'Shoes', sub: ['Formal shoes', 'Casual', 'Boots', 'Sandals', 'Loafers'] },
-  { id: 'trousers', name: 'Trousers', sub: ['Khaki', 'Formal', 'Chino', 'Jeans', 'Gurkha'] },
-  { id: 'shirts', name: 'Shirts', sub: ['Formal shirts', 'Casual', 'Presidential'] },
-  { id: 'suits', name: 'Suits', sub: ['Two piece', 'Three piece'] },
-  { id: 'blazers', name: 'Blazers', sub: ['Modern', 'Casual', 'Classic'] },
-  { id: 'track-suits', name: 'Track Suits', sub: [] },
-  { id: 'jackets', name: 'Jackets', sub: ['Jackets', 'Half jackets'] },
-  { id: 'linen', name: 'Linen', sub: ['Linen Set', 'Linen Trousers', 'Linen shirts', 'Linen shorts'] },
-  { id: 'caps-hats', name: 'Caps & Hats', sub: [] },
-  { id: 'belts-ties', name: 'Belts & Ties', sub: [] },
-  { id: 'sweaters', name: 'Sweaters', sub: [] },
-  { id: 't-shirts', name: 'T-shirts', sub: ['Sweat-shirts', 'Round-neck T-shirts', 'V-neck T-shirts'] },
-];
-
-const normalizeName = (value) => String(value || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-
-const orderDatabaseCategories = (categories) => {
-  const ordered = CATEGORY_DATA.slice(1)
-    .map((canonical) => {
-      const fromDatabase = categories.find((category) => (
-        normalizeName(category.id) === normalizeName(canonical.id) ||
-        normalizeName(category.name) === normalizeName(canonical.name)
-      ));
-
-      if (!fromDatabase) return null;
-
-      const databaseSubs = fromDatabase.sub || [];
-      const orderedSubs = [
-        ...canonical.sub.filter((sub) => databaseSubs.some((dbSub) => normalizeName(dbSub) === normalizeName(sub))),
-        ...databaseSubs.filter((dbSub) => !canonical.sub.some((sub) => normalizeName(sub) === normalizeName(dbSub))),
-      ];
-
-      return {
-        id: fromDatabase.id || canonical.id,
-        name: fromDatabase.name || canonical.name,
-        sub: orderedSubs.length ? orderedSubs : canonical.sub,
-      };
-    })
-    .filter(Boolean);
-
-  return ordered.length ? [{ id: 'All', name: 'All', sub: [] }, ...ordered] : CATEGORY_DATA;
+const labelFor = (slug) => {
+  if (!slug || slug === 'All') return null;
+  return CATEGORY_LABELS[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-const matchesText = (value, target) => (value || '').toLowerCase() === (target || '').toLowerCase();
-
-const filterCatalogueProducts = (allProducts, category, sub) => {
-  const beltOnly = isBeltCategory(category);
-  return allProducts.filter((product) => {
-    if (beltOnly) {
-      const slug = String(product.slug || '').toLowerCase();
-      const name = String(product.name || '').toLowerCase();
-      const categoryText = [
-        product.category_slug,
-        product.category_name,
-        product.parent_category_slug,
-        product.parent_category_name,
-        product.subcategory,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      const matchesBeltContent =
-        beltProductSlugs.has(slug) ||
-        /belt|tie/.test(slug) ||
-        /belt|tie/.test(name) ||
-        /belt|tie/.test(categoryText);
-
-      if (!matchesBeltContent) return false;
-    }
-
-    const productCategory = product.category_slug || product.category_name;
-    const parentCategory = product.parent_category_slug || product.parent_category_name;
-
-    const matchesCategory = category === 'All' || [
-      productCategory,
-      parentCategory,
-      product.category_name,
-      product.parent_category_name,
-    ].some((value) => matchesText(value, category));
-
-    const matchesSub = sub === 'All' || [
-      productCategory,
-      product.category_name,
-      product.subcategory,
-    ].some((value) => matchesText(value, sub));
-
-    return matchesCategory && matchesSub;
-  });
+const PATH_CATEGORY = {
+  '/shirts': 'shirts',
+  '/polo-t-shirts': 'polo-t-shirts',
+  '/shoes': 'shoes',
+  '/suits': 'suits',
+  '/trousers': 'trousers',
+  '/linen': 'linen',
 };
 
-const Products = ({ categoryOverride = null }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const addToCart = useCartStore((state) => state.addToCart);
-  
-  const [dynamicCategories, setDynamicCategories] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchParam = searchParams.get('search');
-  const [stockFilter, setStockFilter] = useState('all');
-
-  // Initialize search query from URL parameter
-  useEffect(() => {
-    if (searchParam) {
-      setSearchQuery(searchParam);
-    }
-  }, [searchParam]);
-  const [addedProductId, setAddedProductId] = useState(null);
-  const [fetchError, setFetchError] = useState('');
-  const [visibleCount, setVisibleCount] = useState(12);
-
-  const isDedicatedCategoryPage = Boolean(categoryOverride);
-  const currentCategory = categoryOverride || searchParams.get('category') || 'All';
+const Products = () => {
+  const [searchParams] = useSearchParams();
+  const { pathname } = useLocation();
+  const currentCategory = searchParams.get('category') || PATH_CATEGORY[pathname] || 'All';
   const currentSub = searchParams.get('sub') || 'All';
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setFetchError('');
-      const params = {};
-      if (currentCategory !== 'All') params.category = currentCategory;
-      if (currentSub !== 'All') params.sub = currentSub;
-      if (searchParam) params.search = searchParam;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  const pageTitle =
+    labelFor(currentSub !== 'All' ? currentSub : currentCategory) || 'The Collection';
+  const pageEyebrow =
+    currentCategory !== 'All' || currentSub !== 'All'
+      ? 'Browse collection'
+      : 'Curated Selections';
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
       try {
-        const catalogueRes = await catalogueAPI.get(params);
-        const catalogue = catalogueRes.data.data || {};
-        const fetchedProducts = filterCatalogueProducts(catalogue.products || [], currentCategory, currentSub);
-        const allCats = catalogue.categories || [];
-        const parents = allCats.filter(c => !c.parent_id);
-        const organized = parents.map(p => ({
-          id: p.slug,
-          name: p.name,
-          sub: allCats.filter(c => c.parent_id === p.id).map(c => c.name)
-        }));
-        setDynamicCategories(organized);
-        setProducts(fetchedProducts);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        try {
-          const [response, catRes] = await Promise.all([
-            productAPI.list(params),
-            adminCategoryAPI.getAll().catch(() => ({ data: { data: [] } })),
-          ]);
-          const fetchedProducts = response.data.data.products || response.data.data || [];
-          const allCats = catRes.data.data || [];
-          const parents = allCats.filter(c => !c.parent_id);
-          setDynamicCategories(parents.map(p => ({
-            id: p.slug,
-            name: p.name,
-            sub: allCats.filter(c => c.parent_id === p.id).map(c => c.name)
-          })));
-          setProducts(fetchedProducts);
-        } catch (fallbackError) {
-          console.error('Fallback product fetch failed:', fallbackError);
-          setFetchError('Could not load products. Please check your connection and try again.');
-          setProducts([]);
-        }
+        const params = { limit: 200, page: 1, sort: 'updated' };
+        if (currentCategory !== 'All') params.category = currentCategory;
+        if (currentSub !== 'All') params.sub = currentSub;
+        const res = await productAPI.list(params);
+        if (cancelled) return;
+        const list = res.data?.data?.products || [];
+        list.sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
+        );
+        setProducts(list);
+      } catch {
+        if (!cancelled) setProducts([]);
       } finally {
-        setLoading(false);
-        window.scrollTo(0, 0);
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchData();
   }, [currentCategory, currentSub]);
 
-  const allCategoryData = dynamicCategories.length ? orderDatabaseCategories(dynamicCategories) : CATEGORY_DATA;
-
-  const selectedCategory = allCategoryData.find(c => c.id === currentCategory || c.name.toLowerCase() === currentCategory.toLowerCase());
-  const seo = routeSeo[currentCategory] || routeSeo.products;
-  const intro = seo.introCopy
-    ? { title: seo.introTitle, copy: seo.introCopy }
-    : categoryFallbackIntro;
-  const subCategoryList = currentCategory === 'All'
-    ? [...new Set(allCategoryData.flatMap((category) => category.sub || []))]
-    : selectedCategory?.sub || [];
-
-  const setFilter = (cat, sub = 'All') => {
-    const params = {};
-
-    if (cat === 'All') {
-      if (sub !== 'All') params.sub = sub;
-      navigate(`/products${Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : ''}`);
-      return;
-    }
-
-    if (sub !== 'All') params.sub = sub;
-
-    if (categoryPages.includes(cat)) {
-      navigate(`/${cat}${Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : ''}`);
-      return;
-    }
-
-    params.category = cat;
-    if (sub !== 'All') params.sub = sub;
-    setSearchParams(params);
-  };
-
-  const handleQuickAdd = async (product) => {
-    const needsSize = ['shoes', 'shirts', 'trousers', 'suits', 'tracksuits', 'jackets', 'linen', 't-shirts', 'polo-t-shirts'].includes((product.category_name || '').toLowerCase());
-    
-    if (needsSize) {
-      navigate(`/product/${product.slug}`);
-    } else {
-      await addToCart({
-        productId: product.id,
-        variantId: null,
-        quantity: 1,
-        sizeLabel: '',
-        name: product.name,
-        price: parseFloat(product.price),
-        image: getPremiumImage(product),
-        slug: product.slug,
-        brandName: product.brand_name,
-      });
-      setAddedProductId(product.id);
-      setTimeout(() => setAddedProductId(null), 1400);
-    }
-  };
-
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = !searchQuery || (
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.brand_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      product.name.toLowerCase().includes(q) ||
+      (product.brand_name || '').toLowerCase().includes(q)
     );
-
-    if (!matchesSearch) return false;
-    if (stockFilter === 'in_stock' && product.out_of_stock) return false;
-    if (stockFilter === 'out_of_stock' && !product.out_of_stock) return false;
-    return true;
   });
 
-  useEffect(() => {
-    setVisibleCount(12);
-  }, [currentCategory, currentSub, searchQuery, stockFilter]);
-
-  const displayedProducts = filteredProducts.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredProducts.length;
+  const cardMotion = (i) => ({
+    layout: true,
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, scale: 0.9 },
+    transition: { delay: Math.min(i, 24) * 0.02 },
+  });
 
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
-      <SEO
-        {...seo}
-        schema={[
-          buildBreadcrumbSchema([
-            { name: 'Home', path: '/' },
-            { name: currentCategory === 'All' ? 'Collections' : selectedCategory?.name || 'Collections', path: seo.path },
-          ]),
-        ]}
-      />
       <Navbar />
 
-      <main className="pt-32 pb-20">
+      <section className="pt-32 pb-10 md:pb-12 bg-navy-950 border-b border-gold-600/5">
         <div className="container mx-auto px-6">
-          <div className="flex items-center space-x-4 mb-8">
-            <button onClick={() => navigate(-1)} className="text-gold-500 hover:text-gold-200 transition-colors">
-              <ChevronLeft size={24} />
-            </button>
-            <span className="text-[10px]   text-gold-600/50">Back</span>
-          </div>
-          <div className="mb-12">
-            <span className="text-gold-500 text-[10px]  tracking-[0.4em] font-bold">Prince Esquire</span>
-            <h1 className="text-3xl md:text-4xl font-serif text-white tracking-tight mt-2">
-              {currentCategory === 'All' ? 'Our Collections' : selectedCategory?.name}
+          <div className="space-y-4 max-w-3xl">
+            <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold font-sans">
+              {pageEyebrow}
+            </span>
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-serif text-white tracking-tight">
+              {pageTitle}
             </h1>
-            <div className="max-w-3xl mt-6 space-y-3">
-              <h2 className="text-lg md:text-xl font-serif text-gold-300">{intro.title}</h2>
-              <p className="text-sm text-navy-300 font-light leading-relaxed">{intro.copy}</p>
-            </div>
-            <div className="flex gap-4 mt-4">
-                {currentSub !== 'All' && (
-                <p className="text-gold-600/60 text-[12px]  ">
-                    Exploring: {currentSub}
-                </p>
-                )}
+            <p className="text-sm text-navy-200/80 font-light font-sans max-w-md">
+              Newest first. Switch collections anytime from the menu.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <main className="py-12 md:py-16">
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-10 md:mb-12 border-b border-gold-600/10 pb-8">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-gold-500/50 font-sans">
+              {loading
+                ? 'Loading…'
+                : `${filteredProducts.length} item${filteredProducts.length === 1 ? '' : 's'}`}
+            </p>
+            <div className="relative w-full sm:w-80 group">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-600/30 group-focus-within:text-gold-500 transition-colors"
+                size={16}
+              />
+              <input
+                type="text"
+                placeholder="Search this collection…"
+                className="w-full pl-12 pr-4 py-3.5 bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20 font-sans"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
-
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-8 lg:space-y-0 mb-16 border-b border-gold-600/10 pb-12">
-            <div className="w-full lg:w-auto space-y-8">
-              {!isDedicatedCategoryPage && (
-              <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-2">
-                {allCategoryData.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setFilter(cat.id, 'All')}
-                    className={`shrink-0 px-6 py-2.5 text-[9px] font-bold  tracking-[0.2em] transition-all border ${
-                      currentCategory === cat.id || currentCategory.toLowerCase() === cat.name.toLowerCase()
-                        ? 'bg-gold-600 text-navy-950 border-gold-600'
-                        : 'bg-navy-900/50 text-gold-400 border-gold-600/30 hover:border-gold-500 hover:text-gold-200 hover:bg-navy-800'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-              )}
-
-              <div className={`flex gap-2 items-center overflow-x-auto custom-scrollbar pb-2 ${isDedicatedCategoryPage ? '' : 'pt-4 border-t border-gold-600/5'}`}>
-                 <span className="text-[8px] font-black  text-gold-500/80 mr-2 ">
-                   Sub Categories:
-                 </span>
-                 <button
-                  type="button"
-                  onClick={() => setFilter(currentCategory, 'All')}
-                  className={`shrink-0 px-4 py-1.5 text-[8px] font-bold   transition-all rounded-full border ${
-                      currentSub === 'All'
-                        ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
-                        : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
-                    }`}
-                 >
-                   All
-                 </button>
-                 {subCategoryList.map((sub) => (
-                   <button
-                    key={sub}
-                    type="button"
-                    onClick={() => setFilter(currentCategory, sub)}
-                    className={`shrink-0 px-4 py-1.5 text-[8px] font-bold   transition-all rounded-full border ${
-                        currentSub === sub
-                          ? 'bg-gold-600/20 text-gold-400 border-gold-500/50 shadow-sm'
-                          : 'bg-navy-900/30 text-gold-400/80 border-gold-600/20 hover:border-gold-500/50 hover:text-gold-200 hover:bg-navy-800/50'
-                      }`}
-                   >
-                     {sub}
-                   </button>
-                 ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0">
-              <select
-                value={stockFilter}
-                onChange={(e) => setStockFilter(e.target.value)}
-                className="bg-navy-950 border border-gold-600/10 text-[10px]   text-white px-4 py-4 outline-none focus:border-gold-600 min-w-[160px]"
-              >
-                <option value="all">All availability</option>
-                <option value="in_stock">In stock only</option>
-                <option value="out_of_stock">Out of stock</option>
-              </select>
-              <div className="relative w-full sm:w-80 group">
-                <Search
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-600/30 group-focus-within:text-gold-500 transition-colors"
-                  size={16}
-                />
-                <input
-                  type="text"
-                  placeholder="Search collection..."
-                  className="w-full pl-12 pr-4 py-4 bg-navy-950 border border-gold-600/10 text-[10px]   text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          {fetchError && (
-            <p className="text-center text-red-400/80 text-sm py-8">{fetchError}</p>
-          )}
 
           {loading ? (
-            <p className="text-center text-gold-600/50 text-[10px]   py-24">Loading collectionÃ¢â‚¬Â¦</p>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 sm:gap-x-10 gap-y-12 sm:gap-y-20">
-               <AnimatePresence mode="popLayout">
-                 {displayedProducts.map((product, index) => {
-                  const outOfStock = product.out_of_stock === true;
-                  return (
-                  <motion.div
-                    key={product.id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="group"
-                  >
-                    <Link to={`/product/${product.slug}`} className="block">
-                      <div className="relative aspect-square bg-navy-950 overflow-hidden mb-6 border border-gold-600/10 group-hover:border-gold-600 transition-colors">
-                        <img
-                          src={product.image_url || getPremiumImage(product, { width: 400 })}
-                          alt={product.name}
-                          loading="lazy"
-                          decoding="async"
-                          fetchPriority={index < 2 ? 'high' : 'low'}
-                          className={`w-full h-full object-contain p-3 bg-white transition-transform duration-700 group-hover:scale-105 ${outOfStock ? 'opacity-50' : ''}`}
-                        />
-                        {outOfStock && (
-                          <span className="absolute top-3 left-3 bg-red-600/90 text-white text-[9px] font-bold  tracking-wider px-2 py-1">
-                            Out of Stock
-                          </span>
-                        )}
-                        <div className="absolute inset-0 bg-navy-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 px-4">
-                          <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (!outOfStock) handleQuickAdd(product);
-                            }}
-                            disabled={outOfStock}
-                            className="bg-white text-navy-950 px-5 py-3 text-[10px] font-bold   transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 disabled:opacity-40"
-                          >
-                            {outOfStock ? 'Unavailable' : addedProductId === product.id ? 'Added' : 'Add to Cart'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              navigate(`/product/${product.slug}`);
-                            }}
-                            className="border border-white/70 text-white px-5 py-3 text-[10px] font-bold   transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 hover:bg-white hover:text-navy-950"
-                          >
-                            View Product
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-start">
-                          {!shouldHideBrand(product) && (
-                            <span className="text-[10px] font-bold   text-gold-600/50">{product.brand_name}</span>
-                          )}
-                        </div>
-                        <h3 className="text-[0.72rem] md:text-sm font-serif text-white group-hover:text-gold-500 transition-colors line-clamp-2 leading-snug">{product.name}</h3>
-                        <p className="text-gold-500 font-light italic">KSh {parseFloat(product.price).toLocaleString()}</p>
-                      </div>
-                    </Link>
-                  </motion.div>
-                );})}
+            <p className="text-center text-gold-600/50 text-[10px] uppercase tracking-widest py-24 font-sans">
+              Loading collection…
+            </p>
+          ) : filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 md:gap-x-8 md:gap-y-14">
+              <AnimatePresence mode="popLayout">
+                {filteredProducts.map((product, i) => (
+                  <ProductCard key={product.id} product={product} motionProps={cardMotion(i)} />
+                ))}
               </AnimatePresence>
             </div>
-          )}
-
-          {hasMore && !loading && (
-            <div className="flex justify-center mt-12">
-              <button
-                onClick={() => setVisibleCount(prev => prev + 12)}
-                className="px-8 py-3 bg-gold-600 text-navy-950 text-[10px] font-bold   hover:bg-gold-500 transition-colors"
+          ) : (
+            <div className="py-32 text-center space-y-6">
+              <p className="text-gold-600/30 text-[10px] uppercase tracking-widest font-bold font-sans">
+                No products in this section yet.
+              </p>
+              <Link
+                to="/products"
+                className="inline-block text-[10px] font-bold uppercase tracking-widest text-gold-500 border-b border-gold-500/30 pb-1 font-sans"
               >
-                Show More
-              </button>
-            </div>
-          )}
-
-          {!loading && filteredProducts.length === 0 && (
-            <div className="text-center py-24 space-y-4">
-              <p className="text-gold-600/50 text-[10px]  ">No pieces found in this curation.</p>
-              <button 
-                onClick={() => setFilter('All')}
-                className="text-white text-[10px] font-bold   border-b border-white/20 pb-1 hover:border-white transition-all"
-              >
-                Clear Filters
-              </button>
+                View all products
+              </Link>
             </div>
           )}
         </div>

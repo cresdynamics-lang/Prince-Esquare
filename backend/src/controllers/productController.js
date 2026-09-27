@@ -9,6 +9,86 @@ const { isAdminRole, isSellerRole } = require('../utils/posHelpers');
 
 const isStaffUser = (user) => user && (isAdminRole(user) || isSellerRole(user));
 
+function normalizeSetComponents(raw) {
+  if (!raw) return [];
+  let list = raw;
+  if (typeof raw === 'string') {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item, index) => {
+      const name = String(item?.name || '').trim();
+      if (!name) return null;
+      const priceNum = Number(item.price);
+      return {
+        id: String(item.id || `set-${index + 1}`),
+        name,
+        category_hint: String(item.category_hint || 'other').trim().toLowerCase().slice(0, 40) || 'other',
+        size: String(item.size || '').trim(),
+        price: Number.isFinite(priceNum) ? Math.max(0, priceNum) : 0,
+        note: String(item.note || '').trim(),
+      };
+    })
+    .filter(Boolean);
+}
+
+function sumSetComponents(components) {
+  return components.reduce((sum, c) => sum + (Number(c.price) || 0), 0);
+}
+
+/** Map UI labels / aliases to canonical category slugs. */
+const CATEGORY_SLUG_ALIASES = {
+  trousers: 'trousers',
+  pants: 'trousers',
+  shoes: 'shoes',
+  tracksuits: 'track-suits',
+  'track-suit': 'track-suits',
+  'track suits': 'track-suits',
+  'belts & ties': 'belts-ties',
+  belts: 'belts-ties',
+  'polo t-shirts': 'polo-t-shirts',
+  polos: 'polo-t-shirts',
+  'knitted polos': 'knitted-polos',
+  'formal shoes': 'formal-shoes',
+  khaki: 'khaki',
+  chino: 'chino',
+  gurkha: 'gurkha',
+  ghurka: 'gurkha',
+  sets: 'sets',
+  set: 'sets',
+  outfits: 'sets',
+  look: 'sets',
+  vests: 'vests',
+  vest: 'vests',
+  boxers: 'boxers',
+  boxer: 'boxers',
+  jackets: 'jackets',
+  'full-jackets': 'full-jackets',
+  'half-jackets': 'half-jackets',
+  'casual-shirts': 'shirts-casual',
+  'shirts-casual': 'shirts-casual',
+  socks: 'socks',
+  sock: 'socks',
+  accessories: 'belts-ties',
+  'long-sleeve': 'formal-shirts',
+  'long-sleeved': 'formal-shirts',
+  'long-sleeved-shirts': 'formal-shirts',
+  'long sleeve shirts': 'formal-shirts',
+};
+
+const normalizeCategoryParam = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw || raw === 'all') return '';
+  if (CATEGORY_SLUG_ALIASES[raw]) return CATEGORY_SLUG_ALIASES[raw];
+  const slugish = raw.replace(/&/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
+  return CATEGORY_SLUG_ALIASES[slugish] || slugish;
+};
+
 const stripPosStockFields = (item) => {
     if (!item || typeof item !== 'object') return item;
     const {
@@ -22,8 +102,16 @@ const stripPosStockFields = (item) => {
 };
 
 const forAudience = (data, req) => {
-    if (isStaffUser(req.user)) return data;
-    return Array.isArray(data) ? data.map(stripPosStockFields) : stripPosStockFields(data);
+  if (isStaffUser(req.user)) return data;
+  const normalize = (item) => {
+    if (!item || typeof item !== 'object') return item;
+    return {
+      ...stripPosStockFields(item),
+      out_of_stock: false,
+      online_in_stock: true,
+    };
+  };
+  return Array.isArray(data) ? data.map(normalize) : normalize(data);
 };
 
 const attachPosStock = async (products, { forStaff = false } = {}) => {
@@ -73,34 +161,77 @@ exports.getProducts = async (req, res, next) => {
     try {
         const { category, sub, brand, minPrice, maxPrice, sort, page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
+        const categorySlug = normalizeCategoryParam(category);
+        const subSlug = normalizeCategoryParam(sub);
 
         let query = `
-            SELECT p.*, c.name as category_name, p_cat.name as parent_category_name, b.name as brand_name 
+            SELECT p.*, c.name as category_name, c.slug as category_slug,
+                   p_cat.name as parent_category_name, p_cat.slug as parent_category_slug,
+                   b.name as brand_name 
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
             LEFT JOIN brands b ON p.brand_id = b.id 
-            WHERE p.is_active = true 
+            WHERE p.is_active = true
+              AND p.thumbnail IS NOT NULL
+              AND TRIM(p.thumbnail::text) <> ''
+              AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
         `;
         
         const params = [];
         let paramCount = 1;
 
-        if (category && category !== 'All') {
-            if (sub && sub !== 'All') {
-                // Filter by specific sub-category AND its parent
-                query += ` AND (LOWER(c.name) = LOWER($${paramCount}) OR LOWER(c.slug) = LOWER($${paramCount})) `;
-                query += ` AND (LOWER(p_cat.name) = LOWER($${paramCount + 1}) OR LOWER(p_cat.slug) = LOWER($${paramCount + 1})) `;
-                params.push(sub, category);
+        if (categorySlug === 'presidential' || subSlug === 'presidential') {
+            query += ` AND (
+                LOWER(c.slug) = 'presidential'
+                OR LOWER(p.name) LIKE '%presidential%'
+            ) `;
+        } else if (categorySlug) {
+            if (subSlug) {
+                // Exact subcategory within the selected parent family only
+                query += ` AND (
+                    LOWER(c.slug) = LOWER($${paramCount})
+                    OR LOWER(REPLACE(c.name, ' ', '-')) = LOWER($${paramCount})
+                    OR LOWER(c.name) = LOWER($${paramCount})
+                ) `;
+                query += ` AND (
+                    LOWER(p_cat.slug) = LOWER($${paramCount + 1})
+                    OR LOWER(REPLACE(COALESCE(p_cat.name, ''), ' ', '-')) = LOWER($${paramCount + 1})
+                    OR LOWER(COALESCE(p_cat.name, '')) = LOWER($${paramCount + 1})
+                    OR LOWER(c.slug) = LOWER($${paramCount + 1})
+                ) `;
+                params.push(subSlug, categorySlug);
                 paramCount += 2;
             } else {
-                // Filter by parent category OR any product directly in this category
+                // Match this category itself or its direct children — never other families
                 query += ` AND (
-                    LOWER(c.name) = LOWER($${paramCount}) OR LOWER(c.slug) = LOWER($${paramCount})
-                    OR LOWER(p_cat.name) = LOWER($${paramCount}) OR LOWER(p_cat.slug) = LOWER($${paramCount})
+                    LOWER(c.slug) = LOWER($${paramCount})
+                    OR LOWER(REPLACE(c.name, ' ', '-')) = LOWER($${paramCount})
+                    OR LOWER(c.name) = LOWER($${paramCount})
+                    OR LOWER(p_cat.slug) = LOWER($${paramCount})
+                    OR LOWER(REPLACE(COALESCE(p_cat.name, ''), ' ', '-')) = LOWER($${paramCount})
+                    OR LOWER(COALESCE(p_cat.name, '')) = LOWER($${paramCount})
                 ) `;
-                params.push(category);
+                params.push(categorySlug);
                 paramCount++;
+            }
+
+            // Hard exclusions so shoes/belts never leak into trousers (and vice versa)
+            if (categorySlug === 'trousers' || ['chino', 'khaki', 'gurkha', 'jeans', 'formal'].includes(categorySlug)) {
+                query += ` AND LOWER(COALESCE(p_cat.slug, c.slug)) = 'trousers'
+                           AND LOWER(c.slug) NOT IN ('belts-ties', 'formal-shoes', 'boots', 'sandals', 'loafers')
+                           AND LOWER(COALESCE(p_cat.slug, '')) NOT IN ('shoes', 'belts-ties') `;
+            } else if (categorySlug === 'shoes') {
+                query += ` AND LOWER(p_cat.slug) = 'shoes'
+                           AND LOWER(c.slug) <> 'belts-ties'
+                           AND LOWER(COALESCE(p_cat.slug, c.slug)) <> 'trousers' `;
+            } else if (['formal-shoes', 'boots', 'sandals', 'loafers', 'casual'].includes(categorySlug)) {
+                query += ` AND LOWER(c.slug) = LOWER($${paramCount})
+                           AND LOWER(COALESCE(p_cat.slug, '')) = 'shoes' `;
+                params.push(categorySlug);
+                paramCount++;
+            } else if (categorySlug === 'belts-ties') {
+                query += ` AND LOWER(c.slug) = 'belts-ties' `;
             }
         }
 
@@ -122,11 +253,12 @@ exports.getProducts = async (req, res, next) => {
             paramCount++;
         }
 
-        // Sorting
+        // Sorting — newest updates first by default so freshly edited products appear
         if (sort === 'price_asc') query += 'ORDER BY p.price ASC ';
         else if (sort === 'price_desc') query += 'ORDER BY p.price DESC ';
         else if (sort === 'newest') query += 'ORDER BY p.created_at DESC ';
-        else query += 'ORDER BY p.created_at DESC ';
+        else if (sort === 'updated' || sort === 'updated_at') query += 'ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC ';
+        else query += 'ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC ';
 
         // Pagination
         query += `LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
@@ -134,9 +266,38 @@ exports.getProducts = async (req, res, next) => {
 
         const result = await db.query(query, params);
         
-        // Get total count for pagination
-        const countQuery = 'SELECT COUNT(*) FROM products WHERE is_active = true';
-        const countResult = await db.query(countQuery);
+        // Get total count for pagination (respect category filters)
+        let countQuery = `
+            SELECT COUNT(*) FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+            LEFT JOIN brands b ON p.brand_id = b.id
+            WHERE p.is_active = true
+              AND p.thumbnail IS NOT NULL
+              AND TRIM(p.thumbnail::text) <> ''
+              AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+        `;
+        const countParams = [];
+        // Rebuild the same filters for an accurate count without LIMIT
+        // (reuse main query params except limit/offset)
+        const filterParams = params.slice(0, -2);
+        if (categorySlug || brand || minPrice || maxPrice) {
+            // Extract WHERE clause portion from main query between WHERE and ORDER BY
+            const whereMatch = query.match(/WHERE[\s\S]*?(?=ORDER BY|LIMIT)/i);
+            if (whereMatch) {
+                countQuery = `
+                    SELECT COUNT(*) FROM products p
+                    LEFT JOIN categories c ON p.category_id = c.id
+                    LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+                    LEFT JOIN brands b ON p.brand_id = b.id
+                    ${whereMatch[0]}
+                `;
+            }
+        }
+        const countResult = await db.query(
+            countQuery.includes('$') ? countQuery : 'SELECT COUNT(*) FROM products WHERE is_active = true',
+            countQuery.includes('$') ? filterParams : []
+        );
         const total = parseInt(countResult.rows[0].count);
 
         let products = result.rows.map((p) => applyProductImageOptimization(p));
@@ -149,7 +310,7 @@ exports.getProducts = async (req, res, next) => {
                 total,
                 page: parseInt(page),
                 limit: parseInt(limit),
-                pages: Math.ceil(total / limit)
+                pages: Math.ceil(total / Math.max(parseInt(limit, 10) || 1, 1))
             }
         });
     } catch (error) {
@@ -157,12 +318,214 @@ exports.getProducts = async (req, res, next) => {
     }
 };
 
+
+function sectionFromProduct(product) {
+  const cat = product.category_slug || '';
+  const parent = product.parent_category_slug || '';
+  const name = product.name || '';
+
+  if (cat === 'track-suits' || parent === 'track-suits') {
+    return { title: 'Track Suits', slug: 'track-suits' };
+  }
+  if (cat === 'khaki' || parent === 'khaki') {
+    return { title: 'Khaki Trousers', slug: 'khaki' };
+  }
+  if (cat === 'boots' || parent === 'boots' || /boot/i.test(name)) {
+    return { title: 'Official Boots', slug: 'boots' };
+  }
+  if (cat === 'formal-shoes' || parent === 'formal-shoes' || parent === 'shoes' || cat.includes('shoe')) {
+    return { title: 'Official Shoes', slug: 'formal-shoes' };
+  }
+  return {
+    title: product.category_name || product.parent_category_name || 'Sale Picks',
+    slug: cat || parent || 'sale',
+  };
+}
+
+async function fetchOnSaleProducts() {
+  const sql = `
+    SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+           p_cat.name AS parent_category_name, p_cat.slug AS parent_category_slug,
+           b.name AS brand_name,
+           COALESCE(sales.units_sold, 0)::int AS units_sold,
+           COALESCE(carts.cart_adds, 0)::int AS cart_adds
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    LEFT JOIN (
+      SELECT oi.product_id, SUM(oi.quantity) AS units_sold
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id AND o.payment_status = 'paid'
+      GROUP BY oi.product_id
+    ) sales ON sales.product_id = p.id
+    LEFT JOIN (
+      SELECT product_id, COUNT(*) AS cart_adds
+      FROM product_events
+      WHERE event_type = 'cart_add' AND created_at >= NOW() - INTERVAL '90 days'
+      GROUP BY product_id
+    ) carts ON carts.product_id = p.id
+    WHERE p.is_active = true AND p.is_on_sale = true
+      AND p.thumbnail IS NOT NULL
+      AND TRIM(p.thumbnail::text) <> ''
+      AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+    ORDER BY COALESCE(sales.units_sold, 0) DESC, COALESCE(carts.cart_adds, 0) DESC,
+             p.is_featured DESC, p.created_at DESC
+  `;
+
+  try {
+    const result = await db.query(sql);
+    return result.rows;
+  } catch (err) {
+    if (err.code !== '42P01') throw err;
+    const fallbackSql = `
+      SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+             p_cat.name AS parent_category_name, p_cat.slug AS parent_category_slug,
+             b.name AS brand_name,
+             COALESCE(sales.units_sold, 0)::int AS units_sold,
+             0::int AS cart_adds
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
+      LEFT JOIN brands b ON p.brand_id = b.id
+      LEFT JOIN (
+        SELECT oi.product_id, SUM(oi.quantity) AS units_sold
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id AND o.payment_status = 'paid'
+        GROUP BY oi.product_id
+      ) sales ON sales.product_id = p.id
+      WHERE p.is_active = true AND p.is_on_sale = true
+        AND p.thumbnail IS NOT NULL
+        AND TRIM(p.thumbnail::text) <> ''
+        AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+      ORDER BY COALESCE(sales.units_sold, 0) DESC, p.is_featured DESC, p.created_at DESC
+    `;
+    const result = await db.query(fallbackSql);
+    return result.rows;
+  }
+}
+
+
+async function attachVariants(products) {
+  if (!products.length) return products;
+  const ids = products.map((p) => p.id);
+  const result = await db.query(
+    'SELECT * FROM product_variants WHERE product_id = ANY($1::uuid[]) ORDER BY value ASC',
+    [ids],
+  );
+  const byProduct = {};
+  for (const variant of result.rows) {
+    if (!byProduct[variant.product_id]) byProduct[variant.product_id] = [];
+    byProduct[variant.product_id].push(variant);
+  }
+  return products.map((p) => ({ ...p, variants: byProduct[p.id] || [] }));
+}
+
+/** Shared 2-minute sale grid rotation — same order for all visitors in a window (Meta ads). */
+const SALE_ROTATION_MS = 2 * 60 * 1000;
+const SALE_FEATURED_SLOTS = [0, 4, 5]; // grid positions 1, 5, 6 (0-based)
+
+function saleRotationWindow(now = Date.now()) {
+  const windowIndex = Math.floor(now / SALE_ROTATION_MS);
+  const windowStartsAt = windowIndex * SALE_ROTATION_MS;
+  return {
+    windowMs: SALE_ROTATION_MS,
+    windowIndex,
+    windowStartsAt,
+    nextRotationAt: windowStartsAt + SALE_ROTATION_MS,
+  };
+}
+
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function seededShuffle(items, rng) {
+  const list = [...items];
+  for (let i = list.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+/**
+ * Every 2 minutes: randomize products in slots 1, 5, and 6 (and reshuffle the rest).
+ * Seeded by the shared time window so Meta ad landings see the same order — not a fresh shuffle per visit.
+ */
+function rotateSaleFeaturedSlots(products, windowIndex, sectionSlug) {
+  if (!products?.length) return products || [];
+  const list = [...products];
+  if (list.length <= 1) return list;
+
+  const rng = mulberry32(hashSeed(`${windowIndex}:${sectionSlug}:sale`));
+  const shuffled = seededShuffle(list, rng);
+  const slots = SALE_FEATURED_SLOTS.filter((i) => i < shuffled.length);
+
+  // Guarantee featured slots differ from the static sales-rank order when possible.
+  const salesRank = list.map((p) => p.id);
+  const featuredSameAsSales = slots.every((slot) => shuffled[slot]?.id === salesRank[slot]);
+  if (featuredSameAsSales && shuffled.length > slots.length) {
+    const swapWith = slots[0];
+    let other = (swapWith + 1) % shuffled.length;
+    while (slots.includes(other) && other !== swapWith) {
+      other = (other + 1) % shuffled.length;
+    }
+    [shuffled[swapWith], shuffled[other]] = [shuffled[other], shuffled[swapWith]];
+  }
+
+  return shuffled;
+}
+
+// @desc    Sale showcase — admin-managed is_on_sale products (flat mixed grid, no categories)
+// @route   GET /api/products/sale
+exports.getSaleProducts = async (req, res, next) => {
+  try {
+    let products = await attachVariants(await fetchOnSaleProducts());
+    products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+    products = forAudience(products, req);
+    const rotation = saleRotationWindow();
+    const mixed = rotateSaleFeaturedSlots(products, rotation.windowIndex, 'sale-all');
+
+    formatResponse(res, 200, true, 'Sale products fetched', {
+      products: mixed,
+      sections: [],
+      rotation: {
+        windowMs: rotation.windowMs,
+        windowStartsAt: rotation.windowStartsAt,
+        nextRotationAt: rotation.nextRotationAt,
+        featuredSlots: [1, 5, 6],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get featured products
 // @route   GET /api/products/featured
 exports.getFeaturedProducts = async (req, res, next) => {
     try {
         const result = await db.query('SELECT * FROM products WHERE is_featured = true AND is_active = true LIMIT 8');
-        formatResponse(res, 200, true, 'Featured products fetched', result.rows);
+        let products = result.rows.map((p) => applyProductImageOptimization(p));
+        products = await attachPosStock(products, { forStaff: isStaffUser(req.user) });
+        products = forAudience(products, req);
+        formatResponse(res, 200, true, 'Featured products fetched', products);
     } catch (error) {
         next(error);
     }
@@ -211,6 +574,7 @@ exports.createProduct = async (req, res, next) => {
             name,
             slug,
             description,
+            focus_description,
             price,
             discount_price,
             pos_sell_price,
@@ -223,21 +587,26 @@ exports.createProduct = async (req, res, next) => {
             thumbnail,
             images,
             variants,
+            set_components,
             sku,
         } = req.body;
         const productSku = generateProductSku({ name, slug, sku });
         const isStaff = req.user?.role === 'staff';
-        const published = isStaff ? false : is_active !== false;
+        const published = is_active === false ? false : true;
+        const setComponents = normalizeSetComponents(set_components);
+        const setTotal = sumSetComponents(setComponents);
+        const finalPrice = setComponents.length ? setTotal : (price || 0);
 
         const result = await db.query(
-            'INSERT INTO products (name, slug, sku, description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images) ' +
-            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *',
+            'INSERT INTO products (name, slug, sku, description, focus_description, price, discount_price, pos_sell_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, set_components) ' +
+            'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *',
             [
                 name,
                 slug,
                 productSku,
                 description || null,
-                price || 0,
+                focus_description || null,
+                finalPrice,
                 discount_price || null,
                 pos_sell_price || null,
                 category_id || null,
@@ -247,6 +616,7 @@ exports.createProduct = async (req, res, next) => {
                 published,
                 thumbnail || null,
                 JSON.stringify(images || []),
+                JSON.stringify(setComponents),
             ]
         );
 
@@ -300,7 +670,7 @@ exports.createProduct = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, slug, description, price, discount_price, pos_sell_price, cost_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, sku } = req.body;
+        const { name, slug, description, focus_description, price, discount_price, pos_sell_price, cost_price, category_id, brand_id, stock_quantity, is_featured, is_active, thumbnail, images, variants, set_components, sku } = req.body;
         const isStaff = req.user?.role === 'staff';
         const productSku = generateProductSku({ name, slug, sku });
 
@@ -308,29 +678,19 @@ exports.updateProduct = async (req, res, next) => {
         if (existingR.rows.length === 0) {
             return formatResponse(res, 404, false, 'Product not found');
         }
-        const nextActive = isStaff ? Boolean(existingR.rows[0].is_active) : (is_active !== undefined ? is_active : true);
+        const nextActive = is_active === false ? false : (is_active !== undefined ? Boolean(is_active) : true);
 
-        if (nextActive === true && !isStaff) {
-            const linkR = await db.query('SELECT pos_stock_product_id FROM products WHERE id = $1', [id]);
-            if (!linkR.rows.length) {
-                return formatResponse(res, 404, false, 'Product not found');
-            }
-            if (!linkR.rows[0].pos_stock_product_id) {
-                return formatResponse(
-                    res,
-                    400,
-                    false,
-                    'Publish from Inventory after the item is recorded in stock. Products tab edits listing details only.'
-                );
-            }
-        }
+        // Website visibility is size/category based — do not block publish on POS stock link.
 
         const parsedCost = cost_price != null && cost_price !== '' ? parseFloat(cost_price) : null;
+        const setComponents = normalizeSetComponents(set_components);
+        const setTotal = sumSetComponents(setComponents);
+        const finalPrice = setComponents.length ? setTotal : (price || 0);
 
         const result = await db.query(
-            'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, price = $5, discount_price = $6, pos_sell_price = $7, cost_price = $8, category_id = $9, brand_id = $10, ' +
-            'stock_quantity = $11, is_featured = $12, is_active = $13, thumbnail = $14, images = $15 WHERE id = $16 RETURNING *',
-            [name, slug, productSku, description || null, price || 0, discount_price || null, pos_sell_price ?? null, parsedCost, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), id]
+            'UPDATE products SET name = $1, slug = $2, sku = $3, description = $4, focus_description = $5, price = $6, discount_price = $7, pos_sell_price = $8, cost_price = $9, category_id = $10, brand_id = $11, ' +
+            'stock_quantity = $12, is_featured = $13, is_active = $14, thumbnail = $15, images = $16, set_components = $17, updated_at = NOW() WHERE id = $18 RETURNING *',
+            [name, slug, productSku, description || null, focus_description || null, finalPrice, discount_price || null, pos_sell_price ?? null, parsedCost, category_id || null, brand_id || null, 0, is_featured || false, nextActive, thumbnail || null, JSON.stringify(images || []), JSON.stringify(setComponents), id]
         );
 
         if (result.rows.length === 0) {
@@ -372,7 +732,7 @@ exports.updateProduct = async (req, res, next) => {
                 'SELECT COALESCE(SUM(stock_quantity), 0)::int AS total FROM product_variants WHERE product_id = $1',
                 [id]
             );
-            await db.query('UPDATE products SET stock_quantity = $1 WHERE id = $2', [sumR.rows[0]?.total || 0, id]);
+            await db.query('UPDATE products SET stock_quantity = $1, updated_at = NOW() WHERE id = $2', [sumR.rows[0]?.total || 0, id]);
         }
 
         const { ensurePosForEcommerceProduct, syncPosMetadataFromEcommerce } = require('../services/inventoryChannel');
@@ -419,7 +779,7 @@ exports.bulkProductAction = async (req, res, next) => {
             publish: async () => {
                 const r = await db.query(
                     `UPDATE products SET is_active = true, updated_at = NOW()
-                     WHERE id = ANY($1::uuid[]) AND pos_stock_product_id IS NOT NULL
+                     WHERE id = ANY($1::uuid[])
                      RETURNING id`,
                     [uuidList]
                 );
@@ -466,20 +826,6 @@ exports.patchProductFlags = async (req, res, next) => {
             values.push(Boolean(is_featured));
         }
         if (is_active !== undefined) {
-            if (Boolean(is_active)) {
-                const linkR = await db.query('SELECT pos_stock_product_id FROM products WHERE id = $1', [id]);
-                if (!linkR.rows.length) {
-                    return formatResponse(res, 404, false, 'Product not found');
-                }
-                if (!linkR.rows[0].pos_stock_product_id) {
-                    return formatResponse(
-                        res,
-                        400,
-                        false,
-                        'Item must exist in inventory before publishing. Use Inventory ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Stock Management.'
-                    );
-                }
-            }
             updates.push(`is_active = $${idx++}`);
             values.push(Boolean(is_active));
         }
@@ -524,17 +870,28 @@ exports.deleteProduct = async (req, res, next) => {
 };
 
 // Placeholders for remaining methods
+const ACTIVE_WITH_IMAGE_SQL = `
+  is_active = true
+  AND thumbnail IS NOT NULL
+  AND TRIM(thumbnail::text) <> ''
+  AND LOWER(TRIM(thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+`;
+
 exports.getNewArrivals = async (req, res, next) => {
     try {
-        const result = await db.query('SELECT * FROM products WHERE is_active = true ORDER BY created_at DESC LIMIT 8');
-        formatResponse(res, 200, true, 'New arrivals fetched', result.rows);
+        const result = await db.query(
+            `SELECT * FROM products WHERE ${ACTIVE_WITH_IMAGE_SQL} ORDER BY created_at DESC LIMIT 8`
+        );
+        formatResponse(res, 200, true, 'New arrivals fetched', result.rows.map(applyProductImageOptimization));
     } catch (error) { next(error); }
 };
 
 exports.getBestSellers = async (req, res, next) => {
     try {
-        const result = await db.query('SELECT * FROM products WHERE is_active = true ORDER BY ratings_count DESC LIMIT 8');
-        formatResponse(res, 200, true, 'Best sellers fetched', result.rows);
+        const result = await db.query(
+            `SELECT * FROM products WHERE ${ACTIVE_WITH_IMAGE_SQL} ORDER BY ratings_count DESC LIMIT 8`
+        );
+        formatResponse(res, 200, true, 'Best sellers fetched', result.rows.map(applyProductImageOptimization));
     } catch (error) { next(error); }
 };
 
@@ -557,7 +914,13 @@ exports.getRelatedProducts = async (req, res, next) => {
         if (product.rows.length === 0) return formatResponse(res, 404, false, 'Product not found');
 
         const result = await db.query(
-            'SELECT * FROM products WHERE category_id = $1 AND id != $2 AND is_active = true ORDER BY created_at DESC LIMIT 12',
+            `SELECT * FROM products
+             WHERE category_id = $1 AND id != $2
+               AND is_active = true
+               AND thumbnail IS NOT NULL
+               AND TRIM(thumbnail::text) <> ''
+               AND LOWER(TRIM(thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+             ORDER BY created_at DESC LIMIT 12`,
             [product.rows[0].category_id, id]
         );
 
@@ -567,7 +930,11 @@ exports.getRelatedProducts = async (req, res, next) => {
             related = related.filter((row) => BELT_RELATED_PRODUCT_SLUGS.has(String(row.slug || '').toLowerCase()));
         }
 
-        formatResponse(res, 200, true, 'Related products fetched', related.slice(0, 4));
+        related = related.slice(0, 4).map((p) => applyProductImageOptimization(p));
+        related = await attachPosStock(related, { forStaff: isStaffUser(req.user) });
+        related = forAudience(related, req);
+
+        formatResponse(res, 200, true, 'Related products fetched', related);
     } catch (error) { next(error); }
 };
 
@@ -582,7 +949,7 @@ exports.adminGetProducts = async (req, res, next) => {
             where = ` WHERE (p.name ILIKE $1 OR p.sku ILIKE $1 OR p.slug ILIKE $1) `;
         }
         const productCols = lite
-            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.cost_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.category_id, p.brand_id, p.created_at`
+            ? `p.id, p.name, p.slug, p.sku, p.price, p.discount_price, p.cost_price, p.stock_quantity, p.is_active, p.is_featured, p.thumbnail, p.images, p.category_id, p.brand_id, p.focus_description, p.description, p.set_components, p.created_at`
             : 'p.*';
         const result = await db.query(
             `SELECT ${productCols}, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.created_at DESC`,

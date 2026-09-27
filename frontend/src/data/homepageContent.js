@@ -1,48 +1,60 @@
-/** Curated homepage content — fallback when live product slides are unavailable */
+/**
+ * Curated homepage content — Prince Esquire, The Man's Shop (Yala Towers, Nairobi).
+ * Optimized WebP images live in /public/hero (generated from the original photography).
+ */
+
+export const BRAND_TAGLINE = "The Man's Shop";
+export const BRAND_LOCATION = 'Yala Towers, Nairobi';
 
 export const HERO_SLIDES = [
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
+    image: '/hero/presidential-1600.webp',
+    imageSm: '/hero/presidential-800.webp',
     subtitle: 'Bespoke Craftsmanship',
     title: 'THE PRESIDENTIAL COLLECTION',
-    desc: 'Presidential shirts cut for clean collars, confident structure, and a polished finish that reads well in boardrooms and formal settings.',
+    desc: 'Presidential shirts cut for clean collars, confident structure, and a polished finish for the boardroom and beyond.',
     cta: 'Discover Collection',
     link: '/products?category=shirts',
   },
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.17 PM.jpeg',
+    image: '/hero/suits-1600.webp',
+    imageSm: '/hero/suits-800.webp',
     subtitle: 'Tailored Excellence',
     title: 'LUXURY SUITS NAIROBI',
-    desc: 'Tailored two piece and three piece suits selected for weddings, boardrooms, and evening occasions where sharp presentation matters.',
+    desc: 'Tailored two piece and three piece suits selected for weddings, boardrooms, and evenings that demand presence.',
     cta: 'Shop Suits',
     link: '/suits',
   },
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.12 PM.jpeg',
+    image: '/hero/santoni-1600.webp',
+    imageSm: '/hero/santoni-800.webp',
     subtitle: 'Luxury Footwear',
     title: 'THE SANTONI EDIT',
-    desc: 'Polished loafers and formal shoes with refined leather, balanced shape, and the kind of finish that lifts the full outfit.',
+    desc: 'Polished loafers and formal shoes in refined leather, with the kind of finish that lifts the whole outfit.',
     cta: 'Shop Footwear',
     link: '/products?category=shoes',
   },
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.21 PM.jpeg',
+    image: '/hero/linen-1600.webp',
+    imageSm: '/hero/linen-800.webp',
     subtitle: 'Summer Elegance',
     title: 'LINEN MASTERY',
-    desc: 'Breathable linen sets and trousers built for warm weather dressing with ease, texture, and a clean silhouette.',
+    desc: 'Breathable linen sets and trousers built for warm-weather dressing with ease, texture, and a clean silhouette.',
     cta: 'View Linen',
     link: '/products?category=linen',
   },
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
+    image: '/hero/tracksuits-1600.webp',
+    imageSm: '/hero/tracksuits-800.webp',
     subtitle: 'Premium Tracksuits',
     title: 'CASUAL LUXURY',
-    desc: 'Relaxed tracksuits in elevated fabrics for relaxed hours, travel days, and polished casual dressing.',
+    desc: 'Relaxed tracksuits in elevated fabrics for off-duty hours, travel days, and polished casual dressing.',
     cta: 'Shop Tracksuits',
     link: '/products?category=track-suits',
   },
   {
-    image: '/WhatsApp Image 2026-05-12 at 8.07.41 PM.jpeg',
+    image: '/hero/polos-1600.webp',
+    imageSm: '/hero/polos-800.webp',
     subtitle: 'Modern Gentlemen',
     title: 'SIGNATURE POLOS',
     desc: 'Signature polos with a neat shape and premium hand feel for smart weekends, lunches, and everyday wear.',
@@ -55,35 +67,35 @@ export const CATEGORY_TILES = [
   {
     title: 'The Shoe Atelier',
     subtitle: 'Premium Italian Craftsmanship',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.37 PM.jpeg',
+    image: '/hero/shoe-atelier-800.webp',
     span: 'md:col-span-1 md:row-span-2',
     category: 'shoes',
   },
   {
     title: 'Luxury Tracksuits',
     subtitle: 'Prada & Zegna Collections',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
+    image: '/hero/tracksuits-800.webp',
     span: 'md:col-span-1 md:row-span-1',
     category: 'track-suits',
   },
   {
     title: 'Executive Shirts',
     subtitle: 'The Presidential Series',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.30 PM.jpeg',
+    image: '/hero/presidential-800.webp',
     span: 'md:col-span-1 md:row-span-1',
     category: 'shirts',
   },
   {
     title: 'Tailored Essentials',
     subtitle: 'Dockers & Smart Trousers',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.20 PM.jpeg',
+    image: '/hero/trousers-800.webp',
     span: 'md:col-span-2 md:row-span-1',
     category: 'trousers',
   },
   {
     title: 'The Polo Salon',
     subtitle: 'Six Shades of Weekend Elegance',
-    image: '/polo light blue.jpeg',
+    image: '/hero/polo-salon-800.webp',
     span: 'md:col-span-2 md:row-span-1',
     category: 'polo-t-shirts',
     path: '/polo-t-shirts',
@@ -91,21 +103,21 @@ export const CATEGORY_TILES = [
   {
     title: 'Outerwear Gallery',
     subtitle: 'Layered Jackets & Half Jackets',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.33 PM.jpeg',
+    image: '/hero/outerwear-800.webp',
     span: 'md:col-span-1 md:row-span-1',
     category: 'jackets',
   },
   {
     title: 'Leisure House',
     subtitle: 'Relaxed Luxury for Off-Duty Hours',
-    image: '/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg',
+    image: '/hero/tracksuits-800.webp',
     span: 'md:col-span-1 md:row-span-1',
     category: 'track-suits',
   },
   {
     title: 'The Finishing Room',
     subtitle: 'Belts, Ties & Final Details',
-    image: '/belt-001.jpeg',
+    image: '/hero/belts-800.webp',
     span: 'md:col-span-2 md:row-span-1',
     category: 'belts-ties',
   },

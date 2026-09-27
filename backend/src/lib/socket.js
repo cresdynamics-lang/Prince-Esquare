@@ -1,4 +1,4 @@
-// NEW — Socket.io instance (initialized in index.js)
+// Socket.io instance (initialized in index.js on production)
 let io = null;
 
 const setIO = (instance) => {

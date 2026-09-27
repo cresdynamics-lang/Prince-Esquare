@@ -5,6 +5,7 @@ export const CONTACT_PHONE = '+254724494089';
 export const CONTACT_EMAIL = 'prince.esquire.staff@gmail.com';
 export const SOCIAL_INSTAGRAM = 'https://www.instagram.com/prince_esquire.1/';
 export const SOCIAL_FACEBOOK = 'https://www.facebook.com/prince.esquire254';
+export const SOCIAL_TIKTOK = 'https://www.tiktok.com/@princeesquire';
 
 export const routeSeo = {
   home: {
@@ -24,6 +25,12 @@ export const routeSeo = {
     description: 'Browse premium clothing, shoes and accessories at Prince Esquire. Curated luxury fashion for discerning Kenyan wardrobes. Shop the edit.',
     path: '/products',
     keywords: ['designer clothing Kenya', 'premium fashion Kenya', 'luxury clothing Nairobi'],
+  },
+  'new-arrivals': {
+    title: 'New Arrivals | Prince Esquire Kenya',
+    description: 'Shop new arrivals at Prince Esquire — the latest products added or updated, newest first. Menswear, shoes and accessories in Nairobi.',
+    path: '/new-arrivals',
+    keywords: ['new arrivals Kenya', 'latest menswear Nairobi', 'new fashion Kenya'],
   },
   'polo-t-shirts': {
     title: 'Luxury Polo Shirts Kenya | Prince Esquire',
@@ -67,6 +74,12 @@ export const routeSeo = {
     introTitle: 'Luxury Linen Kenya',
     introCopy: 'Luxury linen in Kenya belongs in a wardrobe built for climate, comfort and effortless polish. Prince Esquire curates linen shirts, sets, trousers and shorts with a relaxed sophistication suited to Nairobi weekends, coastal escapes and warm weather events. The collection favours breathable textures, calm colour and silhouettes that feel composed without stiffness. Explore linen pieces that make ease look deliberate.',
   },
+  sale: {
+    title: 'Sale — Best Sellers | Prince Esquire Kenya',
+    description: 'Shop best-selling tracksuits, official shoes and official boots at Prince Esquire Kenya. Curated sale picks with Nairobi delivery.',
+    path: '/sale',
+    keywords: ['sale menswear Kenya', 'tracksuits Nairobi', 'formal shoes Kenya', 'luxury fashion sale'],
+  },
   blog: {
     title: 'Prince Esquire Style Journal',
     description: 'Read styling notes, wardrobe guides and fashion editorial from Prince Esquire. Discover practical style advice for premium menswear in Kenya.',
@@ -90,13 +103,14 @@ export const organizationSchema = {
   telephone: CONTACT_PHONE,
   address: {
     '@type': 'PostalAddress',
+    streetAddress: 'Yala Towers',
     addressLocality: 'Nairobi',
     addressCountry: 'KE',
   },
   sameAs: [
     SOCIAL_INSTAGRAM,
     SOCIAL_FACEBOOK,
-    'https://www.tiktok.com/@princeesquire',
+    SOCIAL_TIKTOK,
   ],
 };
 
@@ -111,7 +125,7 @@ export const localBusinessSchema = {
   priceRange: 'KSh',
   address: {
     '@type': 'PostalAddress',
-    streetAddress: 'Prince Esquire Boutique',
+    streetAddress: 'Yala Towers, Nairobi CBD',
     addressLocality: 'Nairobi',
     addressCountry: 'KE',
   },

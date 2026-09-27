@@ -1,7 +1,7 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
 const { normalizeVariantId } = require('../services/orderStock');
-const { createOrderFromItems, cartRowsToItems } = require('../services/orderService');
+const { createOrderFromItems, cartRowsToItems, upsertDraftOrder } = require('../services/orderService');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -61,7 +61,7 @@ const guestNameSql = `COALESCE(
 exports.createOrder = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const { shipping_address, billing_address, payment_method, coupon_id, items } = req.body;
+        const { shipping_address, billing_address, payment_method, coupon_id, items, draft_id } = req.body;
         const couponId = coupon_id || null;
 
         let cartItems = await fetchCartItems(userId);
@@ -89,6 +89,7 @@ exports.createOrder = async (req, res, next) => {
             payment_method,
             couponId,
             clearUserCart: true,
+            draftId: draft_id || null,
         });
 
         formatResponse(res, 201, true, 'Order created successfully', order);
@@ -104,7 +105,7 @@ exports.createOrder = async (req, res, next) => {
 // @route   POST /api/orders/guest
 exports.createGuestOrder = async (req, res, next) => {
     try {
-        const { shipping_address, billing_address, payment_method, items } = req.body;
+        const { shipping_address, billing_address, payment_method, items, draft_id } = req.body;
 
         if (!shipping_address?.phone || !shipping_address?.line1) {
             return formatResponse(res, 400, false, 'Phone and delivery address are required');
@@ -125,9 +126,53 @@ exports.createGuestOrder = async (req, res, next) => {
             billing_address,
             payment_method: method,
             clearUserCart: false,
+            draftId: draft_id || null,
         });
 
         formatResponse(res, 201, true, 'Order created successfully', order);
+    } catch (error) {
+        if (error.statusCode === 400) {
+            return formatResponse(res, 400, false, error.message);
+        }
+        next(error);
+    }
+};
+
+// @desc    Save incomplete order (phone + bag) before Place order
+// @route   POST /api/orders/draft
+exports.saveDraftOrder = async (req, res, next) => {
+    try {
+        const userId = req.user?.id || null;
+        const { shipping_address = {}, billing_address, items, draft_id, payment_method } = req.body || {};
+
+        let payloadItems = Array.isArray(items) ? items : [];
+        if ((!payloadItems.length) && userId) {
+            const cartItems = await fetchCartItems(userId);
+            payloadItems = cartRowsToItems(cartItems.rows);
+        }
+        if (!payloadItems.length) {
+            return formatResponse(res, 400, false, 'Add products to your bag first');
+        }
+        if (!shipping_address.phone) {
+            return formatResponse(res, 400, false, 'Phone number is required');
+        }
+
+        const order = await upsertDraftOrder({
+            userId,
+            items: payloadItems,
+            shipping_address,
+            billing_address,
+            draftId: draft_id || null,
+            payment_method: payment_method || 'draft_capture',
+        });
+
+        formatResponse(res, 200, true, 'Order details saved', {
+            id: order.id,
+            is_draft: true,
+            total_amount: order.total_amount,
+            shipping_address: order.shipping_address,
+            updated_at: order.updated_at || order.created_at,
+        });
     } catch (error) {
         if (error.statusCode === 400) {
             return formatResponse(res, 400, false, error.message);
@@ -179,6 +224,7 @@ exports.getCheckoutOrder = async (req, res, next) => {
             payment_method: order.payment_method,
             payment_status: order.payment_status,
             status: order.status,
+            is_draft: order.is_draft,
             created_at: order.created_at,
             shipping_address: shipping,
             items: itemsResult.rows,
@@ -193,7 +239,12 @@ exports.getCheckoutOrder = async (req, res, next) => {
 exports.getMyOrders = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const result = await db.query('SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+        const result = await db.query(
+            `SELECT * FROM orders
+             WHERE user_id = $1 AND COALESCE(is_draft, false) = false
+             ORDER BY created_at DESC`,
+            [userId]
+        );
         formatResponse(res, 200, true, 'Orders fetched successfully', result.rows);
     } catch (error) {
         next(error);
@@ -212,7 +263,7 @@ exports.getOrderDetail = async (req, res, next) => {
 
         const order = orderResult.rows[0];
         const itemsResult = await db.query(
-            'SELECT oi.*, p.name, p.sku AS product_sku, p.thumbnail, v.name as variant_name, v.value as variant_value, ' +
+            'SELECT oi.*, p.name, p.slug AS product_slug, p.sku AS product_sku, p.thumbnail, v.name as variant_name, v.value as variant_value, ' +
             'COALESCE(v.sku, v.stock_id) AS variant_sku ' +
             'FROM order_items oi JOIN products p ON oi.product_id = p.id ' +
             'LEFT JOIN product_variants v ON oi.variant_id = v.id WHERE oi.order_id = $1',
@@ -250,11 +301,15 @@ exports.adminGetOrders = async (req, res, next) => {
         const result = await db.query(
             `SELECT o.*,
               ${guestNameSql} AS customer_name,
-              COALESCE(u.email, o.shipping_address->>'email') AS customer_email
+              COALESCE(NULLIF(TRIM(u.email), ''), o.shipping_address->>'email') AS customer_email,
+              COALESCE(
+                NULLIF(TRIM(o.shipping_address->>'phone'), ''),
+                NULLIF(TRIM(u.phone), '')
+              ) AS customer_phone
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
              WHERE ${clauses.join(' AND ')}
-             ORDER BY o.created_at DESC`,
+             ORDER BY o.is_draft DESC, o.created_at DESC`,
             params
         );
 
@@ -291,18 +346,23 @@ exports.adminExportOrders = async (req, res, next) => {
         const result = await db.query(
             `SELECT o.id, o.created_at, o.status, o.payment_status, o.payment_method, o.total_amount,
               ${guestNameSql} AS customer_name,
-              COALESCE(u.email, o.shipping_address->>'email') AS customer_email
+              COALESCE(NULLIF(TRIM(u.email), ''), o.shipping_address->>'email') AS customer_email,
+              COALESCE(
+                NULLIF(TRIM(o.shipping_address->>'phone'), ''),
+                NULLIF(TRIM(u.phone), '')
+              ) AS customer_phone
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
              ORDER BY o.created_at DESC`
         );
 
-        const header = 'Order ID,Date,Customer,Email,Total,Status,Payment Status,Payment Method';
+        const header = 'Order ID,Date,Customer,Phone,Email,Total,Status,Payment Status,Payment Method';
         const rows = result.rows.map((o) => {
             const cols = [
                 o.id,
                 new Date(o.created_at).toISOString(),
                 (o.customer_name || 'Guest').replace(/,/g, ' '),
+                (o.customer_phone || '').replace(/,/g, ' '),
                 (o.customer_email || '').replace(/,/g, ' '),
                 o.total_amount,
                 o.status,
@@ -394,7 +454,11 @@ exports.adminGetOrderDetail = async (req, res, next) => {
         const orderResult = await db.query(
             `SELECT o.*,
               ${guestNameSql} AS customer_name,
-              COALESCE(u.email, o.shipping_address->>'email') AS customer_email
+              COALESCE(NULLIF(TRIM(u.email), ''), o.shipping_address->>'email') AS customer_email,
+              COALESCE(
+                NULLIF(TRIM(o.shipping_address->>'phone'), ''),
+                NULLIF(TRIM(u.phone), '')
+              ) AS customer_phone
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
              WHERE o.id = $1`,

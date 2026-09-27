@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Globe, Mail, Phone, MapPin } from 'lucide-react';
 import { SITE_URL, SOCIAL_INSTAGRAM, SOCIAL_FACEBOOK } from '../seo/seoData';
 import { WHATSAPP_NUMBER } from '../lib/storeContact';
+import { trackContact } from '../lib/metaPixel';
+import FloatingSocial from './FloatingSocial';
 
 const Footer = () => {
   return (
@@ -240,12 +242,15 @@ const Footer = () => {
         </div>
       </div>
 
+      <FloatingSocial />
+
       <a
         href={`https://wa.me/${WHATSAPP_NUMBER}`}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat on WhatsApp"
-        className="group fixed bottom-6 right-6 flex h-12 w-12 items-center overflow-hidden rounded-full bg-[#25D366] shadow-lg transition-all duration-300 hover:w-40"
+        onClick={() => trackContact()}
+        className="group fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center overflow-hidden rounded-full bg-[#25D366] shadow-lg transition-all duration-300 hover:w-40"
       >
         <span className="flex h-12 w-12 shrink-0 items-center justify-center">
           <svg viewBox="0 0 448 512" aria-hidden="true" className="h-[22px] w-[22px] fill-white">

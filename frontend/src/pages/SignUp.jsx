@@ -7,6 +7,7 @@ import { useCartStore } from '../store/useCartStore';
 import { Mail, Lock, User, ArrowRight, LogIn } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { trackCompleteRegistration } from '../lib/metaPixel';
 
 const SignUp = () => {
   const [name, setName] = useState('');
@@ -28,6 +29,7 @@ const SignUp = () => {
     try {
       const response = await authAPI.register({ name, email, password });
       if (response.data.success) {
+        trackCompleteRegistration('email');
         login(response.data.data.user, response.data.data.token);
         await useCartStore.getState().mergeGuestCartToServer();
         await useCartStore.getState().loadCart();

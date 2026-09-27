@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 30000,
 });
 
@@ -84,6 +84,7 @@ export const authAPI = {
 export const productAPI = {
   list: (params) => API.get('/products', { params }),
   featured: () => API.get('/products/featured'),
+  sale: () => API.get('/products/sale'),
   getBySlug: (slug) => API.get(`/products/${encodeURIComponent(slug)}`),
   related: (productId) => API.get(`/products/${productId}/related`),
 };
@@ -104,6 +105,7 @@ export const cartAPI = {
 export const orderAPI = {
   create: (body) => API.post('/orders', body),
   createGuest: (body) => API.post('/orders/guest', body),
+  saveDraft: (body) => API.post('/orders/draft', body),
   getCheckout: (id, email) => API.get(`/orders/checkout/${id}`, { params: email ? { email } : {} }),
   getMyOrders: () => API.get('/orders/my-orders'),
   getOne: (id) => API.get(`/orders/${id}`),
@@ -120,6 +122,7 @@ export const adminAuthAPI = {
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ ADMIN Ã¢â‚¬â€œ DASHBOARD / ANALYTICS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 export const adminAnalyticsAPI = {
+  getInsights: () => API.get('/admin/dashboard/insights'),
   getStats: () => API.get('/admin/dashboard/stats'),
   getSalesChart: (params) => API.get('/admin/dashboard/sales-chart', { params }),
   getTopProducts: () => API.get('/admin/dashboard/top-products'),
@@ -146,6 +149,11 @@ export const adminProductAPI = {
   patchFlags: (id, data) => API.patch(`/admin/products/${id}/flags`, data),
   bulkAction: (data) => API.post('/admin/products/bulk', data),
   remove: (id) => API.delete(`/admin/products/${id}`),
+  aiDescribe: (formData) => API.post('/admin/products/ai-describe', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    // Allow multi-model chain + short rate-limit waits
+    timeout: 150000,
+  }),
 };
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ ADMIN Ã¢â‚¬â€œ CATEGORIES (public GET, admin mutate) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -223,7 +231,7 @@ export const adminSettingsAPI = {
 export const adminUploadAPI = {
   upload: (formData) => API.post('/admin/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 120000,
+    timeout: 180000,
   }),
 };
 
@@ -402,6 +410,24 @@ export const onlineSaleAPI = {
     API.post('/pos/online-sale', body, {
       headers: { 'x-internal-key': import.meta.env.VITE_INTERNAL_KEY },
     }),
+};
+
+
+export const searchAPI = {
+  search: (q) => API.get('/search', { params: { q } }),
+  suggestions: (q) => API.get('/search/suggestions', { params: { q } }),
+  restockAlert: (body) => API.post('/search/restock-alert', body),
+};
+
+export const analyticsAPI = {
+  track: (body) => API.post('/analytics/track', body),
+};
+
+export const adminVisitorAPI = {
+  getLive: (windowKey = '24h') => API.get('/admin/visitors/live', { params: { window: windowKey } }),
+  getSaleCatalog: () => API.get('/admin/visitors/sale-catalog'),
+  getSaleCatalogPicker: (params = {}) => API.get('/admin/visitors/sale-catalog/picker', { params }),
+  setSaleCatalog: (body) => API.patch('/admin/visitors/sale-catalog', body),
 };
 
 export default API;

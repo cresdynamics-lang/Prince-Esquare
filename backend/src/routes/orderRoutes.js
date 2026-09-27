@@ -4,6 +4,7 @@ const orderController = require('../controllers/orderController');
 const { protect, optionalAuth } = require('../middleware/auth');
 
 router.post('/guest', orderController.createGuestOrder);
+router.post('/draft', optionalAuth, orderController.saveDraftOrder);
 router.get('/checkout/:id', optionalAuth, orderController.getCheckoutOrder);
 
 router.use(protect);

@@ -1,9 +1,7 @@
 const multer = require('multer');
 
-// Memory storage for file uploads
 const storage = multer.memoryStorage();
 
-// File filter to accept only images
 const fileFilter = (req, file, cb) => {
   const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   if (allowedMimes.includes(file.mimetype)) {
@@ -16,7 +14,10 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: {
+    fileSize: 12 * 1024 * 1024, // 12MB — admin product photos
+    files: 40,
+  },
 });
 
 module.exports = upload;

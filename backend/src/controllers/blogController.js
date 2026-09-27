@@ -287,7 +287,7 @@ exports.uploadBlogImage = async (req, res) => {
     const { Readable } = require('stream');
 
     const stream = cloudinary.uploader.upload_stream(
-      { folder: 'prince-esquare/blog', resource_type: 'auto' },
+      { folder: 'prince-esquare/blog', resource_type: 'image', quality: 'auto:good', fetch_format: 'auto' },
       (error, result) => {
         if (error) {
           console.error('Cloudinary upload error:', error);

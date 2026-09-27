@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ShoppingBag, Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ShoppingBag, Plus, Minus, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import ProductDescription from '../components/product/ProductDescription';
 import StickyAddToCart from '../components/product/StickyAddToCart';
+import StayTipQueue, { PRODUCT_DWELL_TIPS } from '../components/StayTipCards';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
 import { getPremiumImage } from '../utils/productImages';
@@ -15,22 +16,28 @@ import { parseAngleImages, getDefaultAngleImage } from '../utils/angleImages';
 import { buildVariantMeta, buildRichDescription, sortSizes } from '../utils/productDescription';
 import { buildBreadcrumbSchema, buildProductSchema } from '../seo/seoData';
 import { toCartVariantId } from '../utils/ids';
+import { trackViewContent, trackInitiateCheckout, trackCustomizeProduct } from '../lib/metaPixel';
+import { launchWhatsAppOrder } from '../lib/whatsappOrder';
+import { normalizeSetComponents, sumSetComponentsPrice, isSetsCategory } from '../lib/setComponents';
 
-const variantStockQty = (variant) => {
-  if (!variant) return null;
-  const stock = variant.stock_quantity ?? variant.stock;
-  return stock == null ? null : Number(stock);
-};
+// Storefront shows every size/color for an active product. Availability is
+// size-driven (a size exists = it can be ordered); stock counts don't hide sizes.
+const isVariantAvailable = () => true;
 
-const isVariantAvailable = (variant) => {
-  const stock = variantStockQty(variant);
-  return stock == null || stock > 0;
-};
-
-function sizesForCategoryName(name) {
-  const n = (name || '').toLowerCase();
-  if (n.includes('shoe')) return ['38', '39', '40', '41', '42', '43', '44', '45'];
-  if (n.includes('trouser') || n.includes('pant')) return ['30', '32', '34', '36', '38'];
+function sizesForCategoryName(name, parentName = '') {
+  const n = `${parentName || ''} ${name || ''}`.toLowerCase();
+  if (
+    n.includes('shoe') ||
+    n.includes('boot') ||
+    n.includes('sneaker') ||
+    n.includes('loafer') ||
+    n.includes('sandal')
+  ) {
+    return ['38', '39', '40', '41', '42', '43', '44', '45', '46'];
+  }
+  if (n.includes('trouser') || n.includes('pant') || n.includes('khaki') || n.includes('chino')) {
+    return ['28', '30', '32', '34', '36', '38', '40', '42'];
+  }
   if (n.includes('shirt')) return ['M', 'L', 'XL', 'XXL', '3XL'];
   if (n.includes('suit')) return ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
   if (n.includes('track')) return ['M', 'L', 'XL', 'XXL'];
@@ -84,12 +91,18 @@ const buildColorCarouselSlides = (variantMeta, product) => {
     .filter(Boolean);
 };
 
-const enrichShoeVariants = (variants, categoryName) => {
-  const isShoe = (categoryName || '').toLowerCase().includes('shoe');
+const enrichShoeVariants = (variants, categoryName, parentCategoryName = '') => {
+  const label = `${parentCategoryName || ''} ${categoryName || ''}`.toLowerCase();
+  const isShoe =
+    label.includes('shoe') ||
+    label.includes('boot') ||
+    label.includes('sneaker') ||
+    label.includes('loafer') ||
+    label.includes('sandal');
   const hasOnlyGenericSizes = variants.length > 0 && variants.every((v) => !v.size || v.size === 'Standard');
   if (!isShoe || !hasOnlyGenericSizes) return variants;
 
-  const categorySizes = sizesForCategoryName(categoryName);
+  const categorySizes = sizesForCategoryName(categoryName, parentCategoryName);
   const enriched = [];
   variants.forEach((v) => {
     categorySizes.forEach((size) => {
@@ -99,7 +112,7 @@ const enrichShoeVariants = (variants, categoryName) => {
   return enriched;
 };
 
-/** Thumbnail carousel ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â color slides first (multi-color), then gallery + angles for selected color. */
+/** Thumbnail carousel - color slides first (multi-color), then gallery + angles for selected color. */
 const buildThumbnailStrip = (product, currentVariant, colorSelected, colorSlides = []) => {
   if (!product) return [];
 
@@ -230,7 +243,11 @@ const ProductDetail = () => {
         return;
       }
 
-      const enrichedVariants = enrichShoeVariants(found.variants || [], found.category_name);
+      const enrichedVariants = enrichShoeVariants(
+        found.variants || [],
+        found.category_name,
+        found.parent_category_name
+      );
       const metaForDesc = buildVariantMeta(enrichedVariants, found.category_name);
       const richDescription = buildRichDescription(
         { ...found, variants: enrichedVariants },
@@ -322,6 +339,12 @@ const ProductDetail = () => {
     return () => observer.disconnect();
   }, [product, related.length]);
 
+  useEffect(() => {
+    if (product?.id) {
+      trackViewContent(product, product.discount_price ?? product.price);
+    }
+  }, [product?.id]);
+
   const isBelt = `${product?.category_name || ''} ${product?.parent_category_name || ''}`.toLowerCase().includes('belt');
   const currentVariant = (!isBelt && selectedSize && findVariant(selectedColor, selectedSize)) || (selectedColor ? variantMeta.variants.find((v) => v.color === selectedColor) : null) || variantMeta.variants[0];
   const colorCarouselSlides = useMemo(
@@ -350,6 +373,14 @@ const ProductDetail = () => {
   const saleBase = product?.discount_price ? parseFloat(product.discount_price) : null;
   const modifier = parseFloat(currentVariant?.price_modifier || 0);
   const displayPrice = (saleBase ?? basePrice) + modifier;
+  const setComponents = normalizeSetComponents(product?.set_components);
+  const isSetProduct = setComponents.length > 0 || isSetsCategory(
+    product?.category_name,
+    product?.parent_category_name,
+    product?.category_slug,
+    product?.parent_category_slug,
+  );
+  const setTotal = setComponents.length ? sumSetComponentsPrice(setComponents) : displayPrice;
   const compareAtPrice = saleBase != null ? basePrice + modifier : null;
 
   const variantSummary = [selectedColor, isBelt ? '' : selectedSize].filter(Boolean).join(' / ');
@@ -360,9 +391,13 @@ const ProductDetail = () => {
     variantMeta.isShoe
   );
   const sizeLine = variantMeta.isShoe
-    ? `EU ${allSizes[0]} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ ${allSizes[allSizes.length - 1]}`
-    : allSizes.join(' Ãƒâ€šÃ‚Â· ');
-  const parsedSizes = isBelt ? [] : [sizeLine];
+    ? (allSizes.length > 1
+      ? `EU ${allSizes[0]} - ${allSizes[allSizes.length - 1]}`
+      : allSizes[0]
+        ? `EU ${allSizes[0]}`
+        : 'EU sizes available')
+    : allSizes.filter(Boolean).join(' / ');
+  const parsedSizes = isBelt ? [] : (sizeLine ? [sizeLine] : []);
   const buildPayload = () => ({
     productId: product?.id,
     variantId: toCartVariantId(currentVariant?.id),
@@ -400,6 +435,7 @@ const ProductDetail = () => {
   }, [colorCarouselSlides, findVariant, isBelt, product, selectedSize, setSearchParams, sizesForColor, variantMeta.variants]);
 
   const handleColorSelect = (color) => {
+    trackCustomizeProduct(product, { color, size: selectedSize });
     setSelectedColor(color);
     const sizes = sizesForColor(color);
     const inStockSizes = sizes.filter((s) => isVariantAvailable(findVariant(color, s)));
@@ -422,6 +458,7 @@ const ProductDetail = () => {
   };
 
   const handleSizeSelect = (size) => {
+    trackCustomizeProduct(product, { color: selectedColor, size });
     setSelectedSize(size);
     const variant = findVariant(selectedColor, size);
     if (variant) {
@@ -437,16 +474,12 @@ const ProductDetail = () => {
   };
 
   const availableSizes = isBelt ? [] : sizesForColor(selectedColor);
-  const hasVariants = variantMeta.variants.length > 0;
   const showColorPicker = variantMeta.colors.length > 1
     || (variantMeta.colors.length === 1 && variantMeta.colors[0]?.color
       && !['original', 'standard', 'default'].includes(variantMeta.colors[0].color.toLowerCase()));
   const hasMultipleColors = showColorPicker;
-  const shopOutOfStock = product?.is_active === false || (
-    hasVariants
-      ? !currentVariant || !isVariantAvailable(currentVariant)
-      : (product?.stock_quantity ?? 0) <= 0
-  );
+  // Storefront never shows out of stock — all active products are orderable.
+  const shopOutOfStock = false;
 
   const handleAddToCart = async () => {
     if (!product || shopOutOfStock) return;
@@ -457,7 +490,9 @@ const ProductDetail = () => {
 
   const handleBuyNow = async () => {
     if (!product || shopOutOfStock) return;
-    await addToCart(buildPayload());
+    const payload = buildPayload();
+    await addToCart(payload);
+    trackInitiateCheckout([payload], displayPrice * quantity);
     navigate('/checkout');
   };
 
@@ -475,7 +510,7 @@ const ProductDetail = () => {
   if (!product) {
     return (
       <div className="min-h-screen pt-32 text-center text-gold-500 bg-navy-950 font-serif text-[10px]  ">
-        LoadingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
+        Loading...
       </div>
     );
   }
@@ -484,7 +519,10 @@ const ProductDetail = () => {
     <div className="bg-navy-950 min-h-screen">
       <SEO
         title={`${product.name} Kenya`}
-        description={`Shop ${product.name} at Prince Esquire Kenya. Discover premium styling, curated detail and Nairobi delivery for luxury wardrobes. Order today.`}
+        description={`Shop ${product.name} at Prince Esquire Kenya. ${
+          product.focus_description ||
+          'Discover premium styling, curated detail and Nairobi delivery for luxury wardrobes. Order today.'
+        }`}
         path={`/product/${product.slug}`}
         type="product"
         image={currentDisplayImage}
@@ -499,6 +537,7 @@ const ProductDetail = () => {
         ]}
       />
       <Navbar />
+      <StayTipQueue key={slug} tips={PRODUCT_DWELL_TIPS} enabled={Boolean(product)} />
 
       <main className={`pt-24 pb-24 transition-[padding] ${showStickyCart ? 'pb-28 md:pb-32' : ''}`}>
         <div className="container mx-auto px-4 md:px-6 max-w-7xl">
@@ -510,7 +549,7 @@ const ProductDetail = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
-            {/* Gallery ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â pins on desktop until the full right column (incl. description) has scrolled */}
+            {/* Gallery - pins on desktop until the full right column (incl. description) has scrolled */}
             <div className="space-y-4">
               <div className="lg:sticky lg:top-24 lg:self-start">
               <div className="relative aspect-square bg-white overflow-hidden rounded-sm border border-gold-600/10 group">
@@ -642,7 +681,7 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Purchase + description ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â scrolls; image stays pinned until this column ends */}
+            {/* Purchase + description - scrolls; image stays pinned until this column ends */}
             <div className="space-y-6 lg:pt-2 min-h-0">
               <div className="space-y-3">
                 {product.brand_name && !['polo-t-shirts', 'polos', 'knitted-polos'].includes((product.category_name || product.parent_category_name || '').toLowerCase()) && (
@@ -652,14 +691,53 @@ const ProductDetail = () => {
 
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <p className="text-2xl md:text-3xl font-light text-gold-400">
-                    KSh {displayPrice.toLocaleString()}
+                    KSh {(isSetProduct ? setTotal : displayPrice).toLocaleString()}
                   </p>
-                  {compareAtPrice != null && compareAtPrice > displayPrice && (
+                  {compareAtPrice != null && compareAtPrice > displayPrice && !isSetProduct && (
                     <p className="text-lg md:text-xl text-slate-500 line-through font-light">
                       KSh {compareAtPrice.toLocaleString()}
                     </p>
                   )}
+                  {isSetProduct && setComponents.length > 0 && (
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-gold-500/60">
+                      Complete set · {setComponents.length} pieces
+                    </p>
+                  )}
                 </div>
+
+                {isSetProduct && setComponents.length > 0 && (
+                  <div className="mt-4 rounded-2xl border border-gold-500/15 bg-navy-900/40 p-5 space-y-4">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-500">
+                      What&apos;s in this set
+                    </h3>
+                    <ul className="space-y-3">
+                      {setComponents.map((piece) => (
+                        <li
+                          key={piece.id}
+                          className="flex items-start justify-between gap-4 border-b border-gold-500/10 pb-3 last:border-0 last:pb-0"
+                        >
+                          <div>
+                            <p className="text-sm text-white font-medium">{piece.name}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {[piece.category_hint?.replace(/-/g, ' '), piece.size ? `Size ${piece.size}` : null, piece.note]
+                                .filter(Boolean)
+                                .join(' / ')}
+                            </p>
+                          </div>
+                          <p className="text-sm text-gold-400 whitespace-nowrap">
+                            KSh {Number(piece.price || 0).toLocaleString()}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-[10px] uppercase tracking-widest text-gold-500/50">Set total</span>
+                      <span className="text-lg text-gold-300 font-light">
+                        KSh {setTotal.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {variantSummary && (
                   <p className="text-sm md:text-base text-slate-400 font-light tracking-wide max-w-2xl">
@@ -715,9 +793,8 @@ const ProductDetail = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {availableSizes.map((size) => {
-                      const variantForSize = findVariant(selectedColor, size);
-                      const stock = variantStockQty(variantForSize);
-                      const isOutOfStock = stock != null && stock <= 0;
+                      // Every listed size is selectable/orderable for an active product.
+                      const isOutOfStock = false;
 
                       return (
                         <button
@@ -744,7 +821,7 @@ const ProductDetail = () => {
 
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center border border-gold-600/20 px-3 py-2.5 bg-navy-950">
+                  <div className="flex items-center border border-gold-600/20 px-3 py-2.5 bg-navy-950 rounded-full">
                     <button
                       type="button"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -770,7 +847,7 @@ const ProductDetail = () => {
                     type="button"
                     onClick={handleAddToCart}
                     disabled={shopOutOfStock}
-                    className={`flex-1 py-4 px-5 text-[10px] font-bold  tracking-[0.2em] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${
+                    className={`flex-1 py-4 px-5 text-[10px] font-bold  tracking-[0.2em] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed rounded-full ${
                       addedToCart
                         ? 'bg-green-600 text-white border border-green-600'
                         : 'bg-navy-950 border border-gold-600 text-gold-500 hover:bg-gold-600 hover:text-navy-950'
@@ -787,7 +864,7 @@ const ProductDetail = () => {
                   type="button"
                   onClick={handleBuyNow}
                   disabled={shopOutOfStock}
-                  className="w-full bg-gold-600 text-navy-950 py-4 px-6 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full bg-gold-600 text-navy-950 py-4 px-6 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-full"
                 >
                   Buy it now
                 </motion.button>
@@ -810,7 +887,11 @@ const ProductDetail = () => {
                 <ProductDescription
                   productName={product.name}
                   brandName={product.brand_name}
-                  description={product.description}
+                  description={
+                    product.focus_description
+                      ? `${product.focus_description}\n\n${product.description || ''}`.trim()
+                      : product.description
+                  }
                   parsedColors={parsedColorList}
                   parsedSizes={[sizeLine]}
                   isShoe={variantMeta.isShoe}
@@ -824,25 +905,38 @@ const ProductDetail = () => {
               <h2 className="text-xl md:text-2xl font-serif text-white mb-10">You may also like</h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
                 {related.map((p) => (
-                  <Link to={`/product/${p.slug}`} key={p.id} className="group block">
-                    <div className="aspect-square bg-white overflow-hidden mb-4 border border-gold-600/10">
-                      <img
-                        src={getPremiumImage(p)}
-                        alt={p.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
-                      />
-                    </div>
-                    <div className="space-y-1">
+                  <div key={p.id} className="group block">
+                    <Link to={`/product/${p.slug}`} className="block">
+                      <div className="aspect-square bg-white overflow-hidden mb-4 border border-gold-600/10">
+                        <img
+                          src={getPremiumImage(p)}
+                          alt={p.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </div>
                       <h3 className="text-[9px] md:text-[10px] font-bold text-white min-h-[28px] group-hover:text-gold-500 transition-colors line-clamp-2">
                         {p.name}
                       </h3>
-                      <p className="text-xs font-light text-gold-500 italic">
+                    </Link>
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap pt-1">
+                      <p className="text-xs font-light text-gold-500 italic whitespace-nowrap">
                         KSh {parseFloat(p.discount_price || p.price).toLocaleString()}
                       </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          launchWhatsAppOrder(p);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[8px] md:text-[9px] font-bold uppercase tracking-widest bg-green-600 text-white hover:bg-green-500 transition-all shrink-0 rounded-full"
+                      >
+                        <MessageCircle size={11} />
+                        WhatsApp Order
+                      </button>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </div>

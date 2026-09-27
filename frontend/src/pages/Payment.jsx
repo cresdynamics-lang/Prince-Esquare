@@ -7,6 +7,7 @@ import MpesaPaymentGuide from '../components/MpesaPaymentGuide';
 import { useAuthStore } from '../store/useAuthStore';
 import { orderAPI } from '../services/api';
 import { buildOrderTrackUrl } from '../lib/storeContact';
+import { trackPurchase } from '../lib/metaPixel';
 
 const isCustomerSession = () => {
   const { isAuthenticated, token, isSeller, user } = useAuthStore.getState();
@@ -38,8 +39,15 @@ const Payment = () => {
           res = await orderAPI.getCheckout(orderId, checkoutEmail);
         }
         if (cancelled) return;
-        if (res.data?.success) setOrder(res.data.data);
-        else navigate('/cart');
+        if (res.data?.success) {
+          const placed = res.data.data;
+          setOrder(placed);
+          const key = `pe_purchase_${placed?.id}`;
+          if (placed?.id && !localStorage.getItem(key)) {
+            localStorage.setItem(key, '1');
+            trackPurchase(placed, { eventId: `order_${placed.id}` });
+          }
+        } else navigate('/cart');
       } catch {
         if (!cancelled) navigate('/cart');
       }

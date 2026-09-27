@@ -1,17 +1,12 @@
 import { CONTACT_PHONE, SITE_URL } from '../seo/seoData';
 
-/** E.164 without + — default Prince Esquire WhatsApp */
+/** E.164 without + — Prince Esquire WhatsApp Business */
 export const WHATSAPP_NUMBER = (
   import.meta.env.VITE_WHATSAPP_NUMBER || CONTACT_PHONE.replace(/\D/g, '')
 ).replace(/\D/g, '');
 
-/** M-Pesa Pay Bill business number — Prince Esquire: 303030 */
 export const MPESA_PAYBILL = (import.meta.env.VITE_MPESA_PAYBILL || '303030').trim();
-
-/** M-Pesa Pay Bill account number — Prince Esquire: PSXQ# */
 export const MPESA_ACCOUNT = (import.meta.env.VITE_MPESA_ACCOUNT || 'PSXQ#').trim();
-
-/** Lipa na M-Pesa till (Buy Goods) — optional; pay bill takes priority when set */
 export const MPESA_TILL = (import.meta.env.VITE_MPESA_TILL || '').trim();
 
 export const getMpesaPaymentType = () => {
@@ -19,6 +14,50 @@ export const getMpesaPaymentType = () => {
   if (MPESA_TILL) return 'till';
   return 'none';
 };
+
+function absoluteImageUrl(thumbnail) {
+  if (!thumbnail) return `${SITE_URL}/LOGO.jpeg`;
+  if (String(thumbnail).startsWith('http')) return String(thumbnail);
+  return `${SITE_URL}${String(thumbnail).startsWith('/') ? '' : '/'}${thumbnail}`;
+}
+
+/** One-tap WhatsApp order from any product card — no checkout form. */
+export function buildWhatsAppProductInquiryUrl({
+  product,
+  sizeLabel = '',
+  variantValue = '',
+  quantity = 1,
+}) {
+  const basePrice = parseFloat(product.price || 0);
+  const discount = product.discount_price != null ? parseFloat(product.discount_price) : null;
+  const modifier = parseFloat(product.variantPriceModifier || 0);
+  const price = (discount ?? basePrice) + modifier;
+  const productUrl = `${SITE_URL}/product/${product.slug}`;
+  const imageUrl = absoluteImageUrl(product.thumbnail);
+
+  const lines = [
+    'Hello Prince Esquire, I would like to order this item:',
+    '',
+    'View this exact product:',
+    productUrl,
+    '',
+    `Product: ${product.name}`,
+  ];
+
+  if (product.brand_name) lines.push(`Brand: ${product.brand_name}`);
+  lines.push(`Price: KSh ${Math.round(price).toLocaleString()}`);
+  if (sizeLabel) lines.push(`Size: ${sizeLabel}`);
+  if (variantValue) lines.push(`Color / variant: ${variantValue}`);
+  if (quantity > 1) lines.push(`Quantity: ${quantity}`);
+  lines.push(`Product photo: ${imageUrl}`);
+  lines.push('');
+  lines.push('Please confirm availability and delivery.');
+  lines.push('Kindly share your M-Pesa payment details (Pay Bill / Till and account number) so I can complete payment.');
+  lines.push('');
+  lines.push('Thank you!');
+
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
 
 export const buildOrderTrackUrl = (orderId, email = '') => {
   const url = new URL(`${SITE_URL}/payment/${orderId}`);
@@ -35,14 +74,24 @@ export const buildWhatsAppOrderUrl = ({ order, items = [], trackUrl }) => {
   const shortId = String(order.id || '').slice(0, 8).toUpperCase();
   const total = Math.round(Number(order.total_amount || 0));
 
-  const itemLines = items.length
-    ? items.map((item) => {
-        const qty = Number(item.quantity || 1);
-        const lineTotal = Math.round(Number(item.price || 0) * qty);
-        const size = item.size_label ? ` · ${item.size_label}` : '';
-        return `- ${item.name}${size} × ${qty} — KSh ${lineTotal.toLocaleString()}`;
-      })
-    : ['- (see order link)'];
+  const itemLines = [];
+  if (items.length) {
+    for (const item of items) {
+      const qty = Number(item.quantity || 1);
+      const lineTotal = Math.round(Number(item.price || 0) * qty);
+      const size = item.size_label || item.sizeLabel;
+      const sizePart = size ? ` · ${size}` : '';
+      const slug = item.slug || item.product_slug;
+      const productUrl = slug ? `${SITE_URL}/product/${slug}` : null;
+      const imageUrl = absoluteImageUrl(item.thumbnail || item.image || item.product_image);
+
+      itemLines.push(`- ${item.name}${sizePart} × ${qty} — KSh ${lineTotal.toLocaleString()}`);
+      if (productUrl) itemLines.push(`  View product: ${productUrl}`);
+      itemLines.push(`  Product photo: ${imageUrl}`);
+    }
+  } else {
+    itemLines.push('- (see order link)');
+  }
 
   const lines = [
     'Hello Prince Esquire, I would like to confirm my order:',

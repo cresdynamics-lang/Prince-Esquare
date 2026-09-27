@@ -8,6 +8,9 @@ const baseStyle = {
   fontWeight: 600,
 };
 
+export const AI_RETRY_MESSAGE =
+  'We could not finish reading that photo just now. Please wait about a minute, then try again.';
+
 export const adminToast = {
   success: (message) =>
     toast.success(message, {
@@ -26,5 +29,41 @@ export const adminToast = {
     }),
 };
 
-export const apiErrorMessage = (error, fallback = 'Something went wrong') =>
-  error?.response?.data?.message || error?.userMessage || error?.message || fallback;
+const isTransientNetworkError = (error) => {
+  const status = error?.response?.status;
+  const code = error?.code || '';
+  const msg = String(error?.message || error?.response?.statusText || '');
+  return (
+    status === 502 ||
+    status === 503 ||
+    status === 504 ||
+    code === 'ECONNABORTED' ||
+    code === 'ERR_NETWORK' ||
+    /timeout|timed out|aborted|network|gateway|504|502|503|ECONNRESET/i.test(msg)
+  );
+};
+
+export const apiErrorMessage = (error, fallback = 'Something went wrong') => {
+  if (isTransientNetworkError(error)) return AI_RETRY_MESSAGE;
+
+  const rawMsg = String(error?.message || '');
+  // Axios generic "Network Error" (often CORS/timeouts) → same friendly retry copy
+  if (/^network error$/i.test(rawMsg.trim())) return AI_RETRY_MESSAGE;
+
+  const fromApi =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.userMessage ||
+    '';
+
+  if (fromApi && !/timeout|gateway|504|502|html|nginx|<html|network error/i.test(String(fromApi))) {
+    return fromApi;
+  }
+
+  // Raw axios/html noise → friendly AI message when it looks gateway-related
+  if (/timeout|gateway|504|502|html|nginx|network error/i.test(rawMsg)) {
+    return AI_RETRY_MESSAGE;
+  }
+
+  return fromApi || (rawMsg && !/^network error$/i.test(rawMsg) ? rawMsg : '') || fallback;
+};

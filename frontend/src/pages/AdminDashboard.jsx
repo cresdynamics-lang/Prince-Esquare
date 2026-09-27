@@ -25,6 +25,16 @@ import {
   adminUploadAPI,
 } from '../services/api';
 import { useEffect } from 'react';
+import AdminDashboardCharts from '../components/admin/AdminDashboardCharts';
+import {
+  formatPaymentLabel,
+  parseOrderAddress,
+  formatOrderContact,
+  orderCustomerPhone,
+  orderCustomerEmail,
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+} from '../lib/adminOrderHelpers';
 import {
   getUploadUrl,
   getPersistImageUrl,
@@ -32,7 +42,9 @@ import {
   resolveDisplayImageUrl,
 } from '../utils/cloudinary';
 import { ensureSocket, disconnectSocket } from '../lib/socket';
+import SaleCatalogView, { LiveVisitorsView } from '../components/admin/StoreAnalyticsViews';
 import { ConfirmProvider, useConfirm } from '../components/admin/ConfirmDialog';
+import AdminSectionErrorBoundary from '../components/admin/AdminSectionErrorBoundary';
 import {
   canAccessProducts,
   canViewCustomers,
@@ -94,9 +106,11 @@ const AdminDashboard = () => {
 
   const allSidebarItems = useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
+    { id: 'live-visitors', label: 'Live Visitors', icon: Eye, section: 'Overview' },
+    { id: 'blogs', label: 'Blogs', icon: BookOpen, section: 'Content' },
     { id: 'orders', label: 'Orders', icon: Package, section: 'Store' },
+    { id: 'sale-catalog', label: 'Sale Catalog', icon: ShoppingBag, section: 'Store' },
     { id: 'products', label: 'Products', icon: ShoppingBag, section: 'Catalogue' },
-    { id: 'blogs', label: 'Blog', icon: BookOpen, section: 'Store' },
     { id: 'users', label: 'Users', icon: Users, section: 'People' },
     { id: 'reviews', label: 'Reviews', icon: Star, section: 'Marketing', badge: '5' },
     { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
@@ -107,6 +121,7 @@ const AdminDashboard = () => {
     return items.filter((item) => {
       if (user?.role === 'admin') return true;
       if (user?.role === 'staff') {
+        if (item.id === 'sale-catalog' || item.id === 'live-visitors') return true;
         if (item.id === 'users') return canViewCustomers(user);
         if (item.id === 'products') return canAccessProducts(user);
         return hasPermission(user, item.id) || (item.id === 'users' && hasPermission(user, 'customers'));
@@ -149,33 +164,44 @@ const AdminDashboard = () => {
         hasPermission(user, activeSection) ||
         (activeSection === 'users' && canViewCustomers(user)) ||
         (activeSection === 'products' && canAccessProducts(user)) ||
-        (activeSection === 'blogs' && hasPermission(user, 'blogs'));
+        (activeSection === 'blogs' && hasPermission(user, 'blogs')) ||
+        activeSection === 'sale-catalog' ||
+        activeSection === 'live-visitors';
       if (!allowed) {
         return <div className="p-8 text-center text-red-400">Unauthorized Access</div>;
       }
     }
 
     const heavySection = (
-      <Suspense fallback={<SectionLoader />}>
-        {(() => {
-          switch (activeSection) {
-            case 'products':
-              return <ProductsView />;
-            default:
-              return null;
-          }
-        })()}
-      </Suspense>
+      <AdminSectionErrorBoundary label="Products">
+        <Suspense fallback={<SectionLoader />}>
+          {(() => {
+            switch (activeSection) {
+              case 'products':
+                return <ProductsView />;
+              default:
+                return null;
+            }
+          })()}
+        </Suspense>
+      </AdminSectionErrorBoundary>
     );
 
     switch (activeSection) {
       case 'dashboard':
         if (isSeller) return null;
         return <DashboardView />;
+      case 'sale-catalog': return <SaleCatalogView />;
+      case 'live-visitors': return <LiveVisitorsView />;
       case 'orders': return <OrdersView readOnly={isSeller} />;
       case 'products':
         return heavySection;
-      case 'blogs': return <BlogsView />;
+      case 'blogs':
+        return (
+          <Suspense fallback={<SectionLoader />}>
+            <BlogsView />
+          </Suspense>
+        );
       case 'users': return <UsersView />;
       case 'reviews': return <ReviewsView />;
       case 'settings': return <SettingsView />;
@@ -352,121 +378,25 @@ const AdminDashboard = () => {
 // --- Sub-views ---
 
 const DashboardView = () => {
-  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
-  const [stats, setStats] = useState(null);
-  const [salesData, setSalesData] = useState([]);
+  const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        const [statsRes, chartRes] = await Promise.all([
-          adminAnalyticsAPI.getStats(),
-          adminAnalyticsAPI.getSalesChart(),
-        ]);
-
-        setStats(statsRes.data.data);
-        setSalesData(chartRes.data.data);
+        const res = await adminAnalyticsAPI.getInsights();
+        if (!cancelled && res.data?.success) setInsights(res.data.data);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-
-    fetchDashboardData();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500"></div>
-      </div>
-    );
-  }
-
-  const statCards = [
-    { label: 'Total Revenue', value: `KSh ${stats?.revenue?.toLocaleString()}`, icon: CreditCard },
-    { label: 'Total Profit', value: `KSh ${stats?.profit?.toLocaleString()}`, icon: Tag },
-    { label: 'Total Sales', value: stats?.orders || 0, icon: Package },
-    { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock },
-  ];
-
-  return (
-    <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, i) => (
-          <div key={i} className="bg-navy-900/40 border border-gold-500/10 p-6 rounded-2xl hover:border-gold-500/20 transition-all group backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-navy-800/50 rounded-xl group-hover:bg-gold-600 group-hover:text-navy-950 transition-all">
-                <stat.icon size={22} className="text-gold-500 group-hover:text-navy-950" />
-              </div>
-              {stat.change && (stat.up ? (
-                <span className="flex items-center text-xs font-bold text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">
-                  <ArrowUpRight size={14} className="mr-1" /> {stat.change}
-                </span>
-              ) : (
-                <span className="flex items-center text-xs font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg">
-                  <ArrowDownRight size={14} className="mr-1" /> {stat.change}
-                </span>
-              ))}
-            </div>
-            <div className="text-[10px] font-bold text-gold-500/40   mb-1">{stat.label}</div>
-            <div className="text-2xl font-serif font-bold text-gold-100">{stat.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-navy-900/40 border border-gold-500/10 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="px-6 py-5 border-b border-gold-500/10 flex items-center justify-between">
-          <h3 className="font-serif font-bold text-lg text-gold-100">Monthly Sales</h3>
-          <div className="text-[10px] font-bold text-gold-500/40  ">Current Year</div>
-        </div>
-        <div className="p-8 h-64 flex items-end justify-between gap-2">
-          {salesData.length > 0 ? salesData.map((d, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-              <div className="relative w-full flex justify-center">
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: `${(d.total / Math.max(...salesData.map(s => s.total || 1))) * 100}%` }}
-                  className="w-8 bg-gradient-to-t from-gold-600 to-gold-400 rounded-t-lg group-hover:from-gold-500 group-hover:to-gold-300 transition-all shadow-lg shadow-gold-600/10"
-                />
-                <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-gold-600 text-navy-950 text-[10px] font-bold px-2 py-1 rounded pointer-events-none">
-                  KSh {parseInt(d.total).toLocaleString()}
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-gold-500/30  ">{d.label}</span>
-            </div>
-          )) : (
-            <div className="w-full h-full flex items-center justify-center text-gold-500/20 text-xs  ">No sales data yet</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-const PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'refunded'];
-
-const parseOrderAddress = (value) => {
-  if (!value) return {};
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return {};
-    }
-  }
-  return value;
-};
-
-const formatPaymentLabel = (method) => {
-  if (method === 'whatsapp_mpesa') return 'WhatsApp + M-Pesa';
-  if (method === 'mpesa') return 'M-Pesa';
-  return method || '—';
+  return <AdminDashboardCharts data={insights} loading={loading} />;
 };
 
 const OrdersView = ({ readOnly = false }) => {
@@ -488,7 +418,8 @@ const OrdersView = ({ readOnly = false }) => {
     setError('');
     try {
       const res = await adminOrderAPI.getAll();
-      setOrders(Array.isArray(res.data.data) ? res.data.data : []);
+      const rows = res.data?.data ?? res.data?.orders ?? [];
+      setOrders(Array.isArray(rows) ? rows : []);
     } catch (err) {
       console.error('Error fetching orders:', err);
       setError(err.response?.data?.message || 'Could not load orders. Try again.');
@@ -504,7 +435,7 @@ const OrdersView = ({ readOnly = false }) => {
 
   const filteredOrders = filter === 'All'
     ? orders
-    : orders.filter((o) => o.status.toLowerCase() === filter.toLowerCase());
+    : orders.filter((o) => (o.status || '').toLowerCase() === filter.toLowerCase());
 
   const openOrderDetail = async (orderId) => {
     setDetailOrder(null);
@@ -690,7 +621,19 @@ const OrdersView = ({ readOnly = false }) => {
               {filteredOrders.map((o) => (
                 <tr key={o.id} className="hover:bg-navy-800/30 transition-colors">
                   <td className="px-6 py-4 font-bold text-gold-500">#{o.id.substring(0, 8).toUpperCase()}</td>
-                  <td className="px-6 py-4 text-sm text-gold-100">{o.customer_name}</td>
+                  <td className="px-6 py-4 text-sm text-gold-100">
+                    <div className="font-medium">{o.customer_name || 'Guest'}</div>
+                    {formatOrderContact(o) ? (
+                      <div className="text-[11px] text-gold-500/65 mt-0.5 leading-snug">
+                        {formatOrderContact(o)}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-gold-500/35 mt-0.5">No phone or email</div>
+                    )}
+                    {o.is_draft && (
+                      <div className="text-[9px] text-amber-400/80 mt-0.5">Open lead · not submitted</div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 font-bold text-gold-100">KSh {parseFloat(o.total_amount).toLocaleString()}</td>
                   <td className="px-6 py-4 text-xs">
                     <span className={`px-2 py-1 rounded border border-gold-500/10 ${o.payment_status === 'paid' ? 'text-green-400 bg-green-400/5' : 'text-gold-500/60 bg-navy-800'}`}>
@@ -704,7 +647,7 @@ const OrdersView = ({ readOnly = false }) => {
                       o.status === 'cancelled' ? 'bg-red-400/10 text-red-400' :
                       'bg-blue-400/10 text-blue-400'
                     }`}>
-                      {o.status}
+                      {o.is_draft ? 'open lead' : o.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-xs text-gold-500/40">
@@ -745,8 +688,9 @@ const OrdersView = ({ readOnly = false }) => {
       </div>
 
       {(detailLoading || detailOrder || actionError) && !editOrder && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <button type="button" aria-label="Close order details" className="absolute inset-0 bg-navy-950/85 backdrop-blur-sm" onClick={closeDetail} />
+          <div className="relative bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-serif text-gold-100">Order Details</h3>
@@ -771,9 +715,21 @@ const OrdersView = ({ readOnly = false }) => {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-[10px]   text-gold-500/40 mb-1">Customer</p>
-                    <p className="text-gold-100">{detailOrder.customer_name}</p>
-                    <p className="text-gold-500/60 text-xs">{detailOrder.customer_email}</p>
+                    <p className="text-[10px] text-gold-500/40 mb-1">Customer</p>
+                    <p className="text-gold-100">{detailOrder.customer_name || 'Guest'}</p>
+                    {orderCustomerPhone(detailOrder) && (
+                      <p className="text-gold-300/90 text-xs mt-1">
+                        Phone: {orderCustomerPhone(detailOrder)}
+                      </p>
+                    )}
+                    {orderCustomerEmail(detailOrder) && (
+                      <p className="text-gold-500/70 text-xs mt-0.5">
+                        Email: {orderCustomerEmail(detailOrder)}
+                      </p>
+                    )}
+                    {!orderCustomerPhone(detailOrder) && !orderCustomerEmail(detailOrder) && (
+                      <p className="text-gold-500/40 text-xs mt-0.5">No phone or email on file</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-[10px]   text-gold-500/40 mb-1">Placed</p>
@@ -793,13 +749,17 @@ const OrdersView = ({ readOnly = false }) => {
 
                 <div className="bg-navy-950/60 border border-gold-500/10 rounded-xl p-4 text-sm">
                   <p className="text-[10px]   text-gold-500/40 mb-2">Shipping</p>
-                  <p className="text-gold-100">
-                    {[detailAddress.first_name, detailAddress.last_name].filter(Boolean).join(' ')}
-                  </p>
-                  <p className="text-gold-500/70 text-xs mt-1">{detailAddress.line1}</p>
-                  <p className="text-gold-500/70 text-xs">{detailAddress.city}, {detailAddress.country || 'Kenya'}</p>
-                  <p className="text-gold-500/70 text-xs mt-1">{detailAddress.phone}</p>
-                  <p className="text-gold-500/70 text-xs">{detailAddress.email}</p>
+                  {detailAddress ? (
+                    <>
+                      <p className="text-gold-100">{[detailAddress.first_name, detailAddress.last_name].filter(Boolean).join(' ')}</p>
+                      <p className="text-gold-500/70 text-xs mt-1">{detailAddress.line1 || '—'}</p>
+                      <p className="text-gold-500/70 text-xs">{detailAddress.city || '—'}, {detailAddress.country || 'Kenya'}</p>
+                      <p className="text-gold-500/70 text-xs mt-1">{detailAddress.phone || '—'}</p>
+                      <p className="text-gold-500/70 text-xs">{detailAddress.email || '—'}</p>
+                    </>
+                  ) : (
+                    <p className="text-gold-500/50 text-xs">No shipping address on file.</p>
+                  )}
                 </div>
 
                 <div>
@@ -850,13 +810,15 @@ const OrdersView = ({ readOnly = false }) => {
       )}
 
       {editOrder && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <button type="button" aria-label="Close edit order" className="absolute inset-0 bg-navy-950/85 backdrop-blur-sm" onClick={closeEdit} />
+          <div className="relative bg-navy-900 border border-gold-500/20 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-serif text-gold-100">Edit Order</h3>
                 <p className="text-gold-500/50 text-xs mt-1  ">
                   #{editOrder.id.substring(0, 8).toUpperCase()} · {editOrder.customer_name}
+                  {formatOrderContact(editOrder) ? ` · ${formatOrderContact(editOrder)}` : ''}
                 </p>
               </div>
               <button type="button" onClick={closeEdit} className="text-gold-500/40 hover:text-gold-500">
@@ -1592,6 +1554,25 @@ const CustomersView = ({ embedded = false }) => {
     }
   };
 
+
+  const handleDeleteCustomer = async (customer) => {
+    const ok = await confirm({
+      title: 'Delete customer',
+      message: `Permanently delete ${customer.name || customer.email}? Their order history will be kept but unlinked.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCustomerAPI.deleteCustomer(customer.id);
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+      if (selectedCustomer?.id === customer.id) setSelectedCustomer(null);
+      adminToast.success('Customer deleted');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not delete customer'));
+    }
+  };
+
   const closeModal = () => setSelectedCustomer(null);
 
   return (
@@ -1691,6 +1672,7 @@ const CustomersView = ({ embedded = false }) => {
                       >
                         {c.is_active !== false ? <UserMinus size={16} /> : <UserPlus size={16} />}
                       </button>
+                      <button type="button" onClick={() => handleDeleteCustomer(c)} className="rounded-lg p-2 text-red-400/50 transition-all hover:bg-red-400/10 hover:text-red-400" title="Delete customer"><Trash2 size={16} /></button>
                       <button
                         type="button"
                         onClick={() => handleViewCustomer(c.id)}
@@ -1847,7 +1829,7 @@ const AdminsView = ({ roleFilter = null }) => {
         adminCustomerAPI.getStaff(),
         adminCustomerAPI.getAdmins(),
       ]);
-      const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])].filter(u => u.email !== 'jones@gmail.com');
+      const combined = [...(resAdmin.data.data || []), ...(resStaff.data.data || [])].filter(u => u.email !== 'charles@prince-esquire.co.ke');
       setUsers(combined);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -1930,6 +1912,24 @@ const AdminsView = ({ roleFilter = null }) => {
     }
   };
 
+
+  const handleDeleteStaff = async (member) => {
+    const ok = await confirm({
+      title: 'Remove staff member',
+      message: `Remove ${member.name || member.email} from staff?`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await adminCustomerAPI.deleteStaff(member.id);
+      await fetchAdmins();
+      adminToast.success('Staff member removed');
+    } catch (error) {
+      adminToast.error(apiErrorMessage(error, 'Could not remove staff'));
+    }
+  };
+
   const filteredAdmins = roleFilter ? users.filter(a => a.role === roleFilter) : users;
 
   return (
@@ -1981,7 +1981,10 @@ const AdminsView = ({ roleFilter = null }) => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      {currentUser?.email === 'jones@gmail.com' && (
+                      {admin.role === 'staff' && (
+                        <button type="button" onClick={() => handleDeleteStaff(admin)} className="rounded-lg p-2 text-red-400/50 transition-all hover:bg-red-400/10 hover:text-red-400" title="Remove staff"><Trash2 size={16} /></button>
+                      )}
+                      {currentUser?.email === 'charles@prince-esquire.co.ke' && (
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(admin)}

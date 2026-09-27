@@ -1,176 +1,81 @@
-import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { HERO_SLIDES } from '../data/homepageContent';
-import { heroImageUrl, isCloudinaryUrl } from '../utils/cloudinary';
+import { BRAND_TAGLINE, BRAND_LOCATION } from '../data/homepageContent';
 
-const getSlideImage = (slide) => {
-  const src = slide?.image;
-  if (!src) return '';
-  return isCloudinaryUrl(src) ? heroImageUrl(src) : src;
-};
-
-const normalizeSlides = (rows = []) =>
-  rows
-    .filter((slide) => slide?.image)
-    .map((slide) => ({
-      ...slide,
-      image: getSlideImage(slide),
-      link: slide.link || slide.fallbackLink || '/products',
-      cta: slide.cta || 'View Product',
-      desc: slide.desc || slide.description || slide.subtitle || '',
-    }));
-
-const HeroSlider = ({ heroSlides }) => {
-  const fallbackSlides = useMemo(() => normalizeSlides(HERO_SLIDES), []);
-  const liveSlides = useMemo(
-    () => (heroSlides?.length ? normalizeSlides(heroSlides) : null),
-    [heroSlides]
-  );
-  const slides = liveSlides?.length ? liveSlides : fallbackSlides;
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => {
-    setCurrent(0);
-  }, [slides]);
-
-  useEffect(() => {
-    if (!slides.length) return undefined;
-
-    const preload = (idx) => {
-      const slide = slides[idx];
-      if (!slide?.image) return;
-      const img = new Image();
-      img.src = slide.image;
-    };
-
-    preload(0);
-    preload(1);
-
-    const timer = setInterval(() => {
-      setCurrent((prev) => {
-        const next = prev === slides.length - 1 ? 0 : prev + 1;
-        preload((next + 1) % slides.length);
-        return next;
-      });
-    }, 6000);
-
-    return () => clearInterval(timer);
-  }, [slides]);
-
-  const nextSlide = () => setCurrent((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
-  const prevSlide = () => setCurrent((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
-
-  if (!slides.length) return null;
-
-  const slide = slides[current];
-
+/**
+ * Single static hero — no carousel.
+ * One line that lands: Come. We dress you.
+ */
+export default function HeroSlider() {
   return (
-    <section className="hero-section relative min-h-[95vh] bg-navy-950 overflow-hidden">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${slide.link}-${current}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-          className="absolute inset-0"
-        >
-          {slide.image && (
-            <img
-              src={slide.image}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover object-center"
-              decoding="async"
-              fetchPriority={current === 0 ? 'high' : 'auto'}
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/55 to-navy-950/15" />
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="absolute inset-x-0 bottom-0 z-10">
-        <div className="container mx-auto px-6 pb-8 md:pb-10 lg:pb-12 w-full max-w-7xl space-y-10 text-left pl-0 md:pl-4 lg:pl-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`content-${slide.link}-${current}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.45 }}
-              className="space-y-8 max-w-5xl"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="h-px w-12 bg-gold-600" />
-                <p className="text-gold-500 tracking-[0.4em] text-[11px] font-bold">
-                  {slide.subtitle}
-                </p>
-              </div>
-
-              <h1 className="text-8xl md:text-[8.75rem] lg:text-[10rem] font-serif text-white leading-[0.88] tracking-tighter max-w-4xl">
-                {slide.title.split(' ').map((word, i) => (
-                  <span key={i} className={i % 2 === 1 ? 'text-gold-500 italic' : ''}>
-                    {word}{' '}
-                  </span>
-                ))}
-              </h1>
-
-              <p className="text-3xl md:text-4xl text-slate-300 max-w-2xl font-light leading-relaxed line-clamp-3">
-                {slide.desc}
-              </p>
-
-              <div className="pt-4 md:pt-6">
-                <Link
-                  to={slide.link}
-                  className="bg-gold-600 text-navy-950 px-12 py-5 text-[11px] font-bold tracking-[0.2em] hover:bg-gold-500 transition-all flex items-center space-x-4 w-fit group"
-                >
-                  <span>{slide.cta}</span>
-                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
+    <section className="hero-section relative overflow-hidden bg-navy-950">
+      {/* Atmospheric plane — one still, not a carousel */}
+      <div className="absolute inset-0" aria-hidden="true">
+        <img
+          src="/hero/presidential-1600.webp"
+          srcSet="/hero/presidential-800.webp 800w, /hero/presidential-1600.webp 1600w"
+          sizes="100vw"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[center_18%] md:object-center scale-105"
+          decoding="async"
+          loading="eager"
+          fetchPriority="high"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-navy-950/75 via-navy-950/55 to-navy-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(201,162,39,0.12),transparent_55%)]" />
       </div>
 
-      {slides.length > 1 && (
-        <div className="absolute bottom-12 right-12 flex items-center space-x-6 z-20">
-          <div className="flex items-center space-x-2 mr-8">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setCurrent(i)}
-                className={`h-1 transition-all duration-500 ${current === i ? 'w-12 bg-gold-500' : 'w-4 bg-gold-500/20'}`}
-                aria-label={`Go to slide ${i + 1}`}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={prevSlide}
-            className="w-12 h-12 border border-gold-500/30 flex items-center justify-center text-gold-500 hover:bg-gold-500 hover:text-navy-950 transition-all"
-            aria-label="Previous slide"
+      <div className="relative z-10 flex min-h-[min(88svh,720px)] flex-col justify-end px-5 pb-10 pt-28 sm:px-6 sm:pb-14 md:min-h-[min(90vh,820px)] md:justify-center md:pb-20 md:pt-36">
+        <div className="container mx-auto max-w-3xl">
+          <motion.div
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-6 sm:space-y-8"
           >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            type="button"
-            onClick={nextSlide}
-            className="w-12 h-12 border border-gold-500/30 flex items-center justify-center text-gold-500 hover:bg-gold-500 hover:text-navy-950 transition-all"
-            aria-label="Next slide"
-          >
-            <ChevronRight size={20} />
-          </button>
+            <div className="flex items-center gap-3">
+              <div className="h-px w-8 bg-gold-600" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold-500">
+                {BRAND_TAGLINE}
+              </p>
+            </div>
+
+            <h1 className="font-serif text-[2.65rem] leading-[0.98] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
+              Come.
+              <br />
+              <span className="italic text-gold-400">We dress you.</span>
+            </h1>
+
+            <p className="max-w-md text-[15px] font-light leading-relaxed text-navy-100/90 sm:text-lg md:max-w-lg">
+              Not another outfit — the version of you you&apos;ve been waiting to meet.
+              Walk in uncertain. Walk out himself.
+            </p>
+
+            <div className="pt-1">
+              <Link
+                to="/new-arrivals"
+                className="group inline-flex items-center gap-3 rounded-full bg-gold-600 px-8 py-4 text-[10px] font-bold uppercase tracking-[0.28em] text-navy-950 shadow-lg shadow-navy-950/40 transition-all hover:bg-gold-500 sm:px-10 sm:py-4.5"
+              >
+                <span>New Arrivals</span>
+                <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+              </Link>
+            </div>
+
+            <div className="space-y-2 border-t border-gold-500/15 pt-6">
+              <div className="flex items-center gap-2 text-gold-500/85">
+                <MapPin size={13} className="shrink-0" strokeWidth={1.75} />
+                <span className="text-[10px] font-medium uppercase tracking-[0.28em]">
+                  {BRAND_LOCATION}
+                </span>
+              </div>
+              <p className="max-w-sm pl-5 text-[12px] font-light leading-snug text-navy-200/80 sm:text-[13px]">
+                Come visit us at Yala Towers. We dress the man you are becoming.
+              </p>
+            </div>
+          </motion.div>
         </div>
-      )}
+      </div>
     </section>
   );
-};
-
-export default HeroSlider;
-
-
-
+}

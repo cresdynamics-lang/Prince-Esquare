@@ -4,10 +4,10 @@ const { applyProductImageOptimization, optimizeCloudinaryUrl } = require('../uti
 
 const toImage = (row) => row?.thumbnail || row?.image_url || row?.image || null;
 
-/** Carousel picks â€” full-product shots that read clearly at hero size (not tight close-ups). */
+/** Carousel picks — full-product shots that read clearly at hero size (not tight close-ups). */
 const HERO_CATEGORY_PRODUCT_SLUGS = {
   'belts-ties': 'black-leather-belt-set',
-  'track-suits': 'blue-white-nike-tracksuit-set-f54cbfb3',
+  'track-suits': 'prada-black-tracksuit-753',
 };
 
 const fetchHeroProductRow = async (slug) => {
@@ -100,8 +100,8 @@ const DEDICATED_CATEGORY_ROUTES = {
 /** Subcategories hidden from homepage product rows, tiles, and hero carousel. */
 const HOMEPAGE_HIDDEN_CATEGORY_SLUGS = new Set(['casual', 'caps-hats']);
 
-/** Homepage category rows shown first (replaces hidden categories in prominence). */
-const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['knitted-polos'];
+/** Category tiles shown first (used by buildCategoryTiles). */
+const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['track-suits', 'knitted-polos'];
 
 const categoryViewAllPath = (row) => {
   const parentSlug = row.parent_slug;
@@ -117,10 +117,15 @@ const categoryViewAllPath = (row) => {
   return `/products?category=${slug}`;
 };
 
+const HOMEPAGE_ROW_MIN = 4;
+const HOMEPAGE_ROW_MAX = 14;
+
 const buildCategoryProductRows = async () => {
+  // Newest-updated products first; each category rail needs at least 7 for horizontal scroll.
   const result = await db.query(
     `SELECT
-       p.id, p.slug, p.name, p.price, p.thumbnail, p.stock_quantity, p.is_featured,
+       p.id, p.slug, p.name, p.price, p.discount_price, p.thumbnail, p.stock_quantity, p.is_featured,
+       p.updated_at, p.created_at, p.is_on_sale,
        b.name AS brand_name,
        c.id AS category_id, c.name AS category_name, c.slug AS category_slug,
        parent.name AS parent_category_name, parent.slug AS parent_category_slug
@@ -130,65 +135,111 @@ const buildCategoryProductRows = async () => {
      LEFT JOIN brands b ON p.brand_id = b.id
      WHERE p.is_active = true
        AND p.thumbnail IS NOT NULL
-       AND COALESCE(p.stock_quantity, 0) > 0
-     ORDER BY c.name ASC, p.is_featured DESC, p.created_at DESC`
+       AND TRIM(p.thumbnail::text) <> ''
+       AND LOWER(TRIM(p.thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+     ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC`
   );
 
   const groups = new Map();
 
   for (const row of result.rows) {
-    if (HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(row.category_slug)) continue;
-    if ((row.category_slug === 'belts-ties' || row.parent_category_slug === 'belts-ties') && !isBeltContent(row.slug) && !isBeltContent(row.name)) {
+    const key = row.category_slug;
+    if (HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(key) || HOMEPAGE_HIDDEN_CATEGORY_SLUGS.has(row.parent_category_slug || '')) {
+      continue;
+    }
+    if ((key === 'belts-ties' || row.parent_category_slug === 'belts-ties') && !isBeltContent(row.slug) && !isBeltContent(row.name)) {
       continue;
     }
 
-    const key = row.category_slug;
     if (!groups.has(key)) {
       groups.set(key, {
         title: row.category_name,
-        slug: row.category_slug,
+        slug: key,
         parent_slug: row.parent_category_slug || null,
         parent_name: row.parent_category_name || null,
         name: row.category_name,
+        latestUpdate: 0,
         products: [],
       });
     }
     const group = groups.get(key);
-    if (group.products.length < 6) {
+    const updatedTs = row.updated_at
+      ? new Date(row.updated_at).getTime()
+      : (row.created_at ? new Date(row.created_at).getTime() : 0);
+    if (updatedTs > group.latestUpdate) group.latestUpdate = updatedTs;
+    if (group.products.length < HOMEPAGE_ROW_MAX) {
       const thumb = row.thumbnail;
       group.products.push({
         id: row.id,
         slug: row.slug,
         name: row.name,
         price: row.price,
+        discount_price: row.discount_price,
+        is_on_sale: row.is_on_sale,
         brand_name: row.brand_name,
         category_name: row.category_name,
         category_slug: row.category_slug,
         parent_category_name: row.parent_category_name,
         parent_category_slug: row.parent_category_slug,
-        image_url: thumb ? optimizeCloudinaryUrl(thumb, { width: 400 }) : thumb,
+        updated_at: row.updated_at,
+        created_at: row.created_at,
+        thumbnail: thumb,
+        thumbnail_optimized: thumb
+          ? optimizeCloudinaryUrl(thumb, { width: 400, quality: 'auto:eco' })
+          : null,
+        image_url: thumb ? optimizeCloudinaryUrl(thumb, { width: 400, quality: 'auto:eco' }) : thumb,
       });
     }
   }
 
+  const presidentialRows = result.rows.filter(
+    (row) =>
+      row.category_slug === 'presidential' ||
+      /presidential/i.test(String(row.name || ''))
+  );
+  if (presidentialRows.length) {
+    groups.set('presidential', {
+      title: 'Presidential Shirts',
+      slug: 'presidential',
+      parent_slug: 'shirts',
+      parent_name: 'Shirts',
+      name: 'presidential',
+      latestUpdate: presidentialRows.reduce((max, row) => {
+        const ts = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+        return ts > max ? ts : max;
+      }, Date.now()),
+      products: presidentialRows.slice(0, HOMEPAGE_ROW_MAX).map((row) => {
+        const thumb = row.thumbnail;
+        return {
+          id: row.id,
+          slug: row.slug,
+          name: row.name,
+          price: row.price,
+          discount_price: row.discount_price,
+          is_on_sale: true,
+          brand_name: row.brand_name,
+          category_name: row.category_name,
+          category_slug: 'presidential',
+          parent_category_name: 'Shirts',
+          parent_category_slug: 'shirts',
+          updated_at: row.updated_at,
+          created_at: row.created_at,
+          thumbnail: thumb,
+          thumbnail_optimized: thumb
+            ? optimizeCloudinaryUrl(thumb, { width: 400, quality: 'auto:eco' })
+            : null,
+          image_url: thumb ? optimizeCloudinaryUrl(thumb, { width: 400, quality: 'auto:eco' }) : thumb,
+        };
+      }),
+    });
+  }
+
   return [...groups.values()]
-    .filter((group) => group.products.length > 0)
-    .sort((a, b) => {
-      const aPri = HOMEPAGE_PRIORITY_CATEGORY_SLUGS.indexOf(a.slug);
-      const bPri = HOMEPAGE_PRIORITY_CATEGORY_SLUGS.indexOf(b.slug);
-      if (aPri !== -1 || bPri !== -1) {
-        if (aPri === -1) return 1;
-        if (bPri === -1) return -1;
-        return aPri - bPri;
-      }
-      const aFeatured = a.products.some((p) => p.is_featured);
-      const bFeatured = b.products.some((p) => p.is_featured);
-      if (aFeatured !== bFeatured) return bFeatured ? 1 : -1;
-      return a.title.localeCompare(b.title);
-    })
-    .slice(0, 14)
+    .filter((group) => group.products.length >= HOMEPAGE_ROW_MIN)
+    .sort((a, b) => b.latestUpdate - a.latestUpdate || a.title.localeCompare(b.title))
+    .slice(0, 16)
     .map((group) => ({
-      title: group.parent_name ? group.title : group.title,
+      title: group.title,
       slug: group.slug,
       parentSlug: group.parent_slug,
       path: categoryViewAllPath(group),
@@ -221,15 +272,14 @@ const applyHeroCategoryOverrides = async (rows, slides) => {
 const buildHeroSlidesFromProducts = async () => {
   let result = await db.query(
     `${HERO_PRODUCT_SELECT}
-       AND p.is_featured = true
-     ORDER BY COALESCE(parent.id, c.id), p.created_at DESC
+     ORDER BY COALESCE(parent.id, c.id), p.updated_at DESC NULLS LAST, p.created_at DESC
      LIMIT 6`
   );
 
   if (result.rows.length < 3) {
     result = await db.query(
       `${HERO_PRODUCT_SELECT}
-       ORDER BY COALESCE(parent.id, c.id), p.is_featured DESC, p.created_at DESC
+       ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC
        LIMIT 6`
     );
   }
@@ -253,12 +303,12 @@ const buildCategoryTiles = async () => {
                 AND (p.category_id = c.id OR p.category_id IN (
                   SELECT id FROM categories WHERE parent_id = c.id
                 ))
-              ORDER BY p.is_featured DESC, p.created_at DESC
+              ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC
               LIMIT 1
             ) AS image
      FROM categories c
      LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
-     ORDER BY c.is_featured DESC NULLS LAST, c.name ASC
+     ORDER BY c.name ASC
      LIMIT 8`
   );
 
@@ -310,8 +360,8 @@ exports.getHomepageData = async (req, res, next) => {
     const [banners, categories, newArrivals, bestSellers, heroSlides, categoryTiles, categoryRows] = await Promise.all([
       db.query('SELECT * FROM banners WHERE is_active = true ORDER BY position, created_at DESC'),
       db.query('SELECT * FROM categories WHERE is_featured = true ORDER BY name LIMIT 6'),
-      db.query('SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.is_active = true ORDER BY p.created_at DESC LIMIT 8'),
-      db.query('SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.is_active = true ORDER BY p.ratings_count DESC NULLS LAST LIMIT 8'),
+      db.query('SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.is_active = true ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC LIMIT 8'),
+      db.query('SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.is_active = true ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC LIMIT 8'),
       (async () => {
         const bannerR = await db.query('SELECT * FROM banners WHERE is_active = true ORDER BY position, created_at DESC');
         if (bannerR.rows.length) return buildHeroSlidesFromBanners(bannerR.rows);
