@@ -5,7 +5,7 @@ import { HOME_CATEGORY_CARDS } from '../../data/homepageContent';
 
 /**
  * Section 3 — primary navigation surface.
- * 2 columns per row (9 cards → 5 rows).
+ * Mobile: 2 columns · Desktop: 4 columns per row.
  */
 export default function HomeCategoryRail() {
   return (
@@ -20,7 +20,7 @@ export default function HomeCategoryRail() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 md:gap-5 lg:gap-6">
           {HOME_CATEGORY_CARDS.map((card, i) => (
             <motion.div
               key={card.href}
@@ -36,7 +36,7 @@ export default function HomeCategoryRail() {
                 <img
                   src={card.imageSm || card.image}
                   srcSet={card.imageSm ? `${card.imageSm} 800w, ${card.image} 1600w` : undefined}
-                  sizes="(max-width: 768px) 50vw, 45vw"
+                  sizes="(max-width: 767px) 50vw, 25vw"
                   alt=""
                   loading={i < 2 ? 'eager' : 'lazy'}
                   decoding="async"
