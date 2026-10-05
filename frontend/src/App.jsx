@@ -22,6 +22,12 @@ const SignUp = lazy(() => import('./pages/SignUp'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const Payment = lazy(() => import('./pages/Payment'));
 const ContactUs = lazy(() => import('./pages/ContactUs'));
+const Blog = lazy(() => import('./pages/Blog'));
+const BlogArticle = lazy(() => import('./pages/BlogArticle'));
+const ShippingReturns = lazy(() => import('./pages/ShippingReturns'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const SizeGuide = lazy(() => import('./pages/SizeGuide'));
+const Profile = lazy(() => import('./pages/Profile'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 
@@ -163,6 +169,54 @@ function App() {
           <Route
             path="/contact"
             element={<Navigate to="/contact-us" replace />}
+          />
+          <Route
+            path="/blog"
+            element={
+              <IsolatedRoute label="Style Journal">
+                <Blog />
+              </IsolatedRoute>
+            }
+          />
+          <Route
+            path="/blog/:slug"
+            element={
+              <IsolatedRoute label="Journal article">
+                <BlogArticle />
+              </IsolatedRoute>
+            }
+          />
+          <Route
+            path="/shipping-returns"
+            element={
+              <IsolatedRoute label="Shipping">
+                <ShippingReturns />
+              </IsolatedRoute>
+            }
+          />
+          <Route
+            path="/privacy-policy"
+            element={
+              <IsolatedRoute label="Privacy">
+                <PrivacyPolicy />
+              </IsolatedRoute>
+            }
+          />
+          <Route
+            path="/size-guide"
+            element={
+              <IsolatedRoute label="Size guide">
+                <SizeGuide />
+              </IsolatedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <IsolatedRoute label="Profile">
+                <Profile />
+              </IsolatedRoute>
+            }
           />
 
           {/* Legacy flat category URLs → taxonomy landings */}

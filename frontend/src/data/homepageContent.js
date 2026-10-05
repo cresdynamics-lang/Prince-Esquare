@@ -13,8 +13,8 @@ export const HOME_HERO = {
     "Curated suits, shoes and tailoring for men who've stopped asking permission to stand out.",
   primaryCta: { label: 'Shop New Arrivals', href: '/new-arrivals' },
   secondaryCta: { label: 'Explore the Collection', href: '#shop-by-category' },
-  image: '/hero/presidential-1600.webp',
-  imageSm: '/hero/presidential-800.webp',
+  image: '/hero/entrance-1600.jpg',
+  imageSm: '/hero/entrance-800.jpg',
 };
 
 /**
@@ -25,32 +25,32 @@ export const HOME_CATEGORY_CARDS = [
   {
     name: 'Shirts',
     href: '/shop/shirts',
-    image: '/hero/presidential-1600.webp',
-    imageSm: '/hero/presidential-800.webp',
+    image: '/models/categories/shirts.jpg',
+    imageSm: '/models/categories/shirts.jpg',
   },
   {
     name: 'Shoes',
     href: '/shop/shoes',
-    image: '/hero/santoni-1600.webp',
-    imageSm: '/hero/shoe-atelier-800.webp',
+    image: '/models/categories/shoes.jpg',
+    imageSm: '/models/categories/shoes.jpg',
   },
   {
     name: 'Trousers',
     href: '/shop/trousers',
-    image: '/hero/trousers-1600.webp',
-    imageSm: '/hero/trousers-800.webp',
+    image: '/models/categories/jeans.jpg',
+    imageSm: '/models/categories/jeans.jpg',
   },
   {
     name: 'Suits',
     href: '/shop/suits',
-    image: '/hero/suits-1600.webp',
-    imageSm: '/hero/suits-800.webp',
+    image: '/models/categories/suits.jpg',
+    imageSm: '/models/categories/suits.jpg',
   },
   {
     name: 'Jackets & Outerwear',
     href: '/shop/jackets',
-    image: '/hero/outerwear-1600.webp',
-    imageSm: '/hero/outerwear-800.webp',
+    image: '/models/categories/jackets.jpg',
+    imageSm: '/models/categories/jackets.jpg',
   },
   {
     name: 'Accessories',

@@ -7,10 +7,14 @@ import { trackViewContent, trackAddToCart, trackInitiateCheckout, trackContact, 
  * Fires the full Meta funnel (ViewContent -> AddToCart -> Purchase, deduped
  * per product per session) plus internal analytics, then opens WhatsApp.
  */
-export function launchWhatsAppOrder(product) {
+export function launchWhatsAppOrder(
+  product,
+  { sizeLabel = '', variantValue = '', quantity = 1 } = {}
+) {
   const unitPrice = parseFloat(product.discount_price ?? product.price ?? 0);
+  const qty = Math.max(1, Number(quantity) || 1);
 
-  trackWhatsAppOrderClick(product, {});
+  trackWhatsAppOrderClick(product, { sizeLabel });
   trackViewContent(product, unitPrice);
   trackContact();
 
@@ -22,17 +26,17 @@ export function launchWhatsAppOrder(product) {
       id: product.id,
       name: product.name,
       price: unitPrice,
-      quantity: 1,
+      quantity: qty,
     });
     trackInitiateCheckout(
-      [{ slug: product.slug, quantity: 1, price: unitPrice }],
-      unitPrice
+      [{ slug: product.slug, quantity: qty, price: unitPrice }],
+      unitPrice * qty
     );
     trackPurchase(
       {
         id: evtKey,
-        total_amount: unitPrice,
-        items: [{ product_slug: product.slug, quantity: 1, price: unitPrice, name: product.name }],
+        total_amount: unitPrice * qty,
+        items: [{ product_slug: product.slug, quantity: qty, price: unitPrice, name: product.name }],
       },
       { eventId: evtKey }
     );
@@ -40,6 +44,9 @@ export function launchWhatsAppOrder(product) {
 
   const url = buildWhatsAppProductInquiryUrl({
     product: { ...product, price: unitPrice },
+    sizeLabel,
+    variantValue,
+    quantity: qty,
   });
   window.open(url, '_blank', 'noopener,noreferrer');
 }

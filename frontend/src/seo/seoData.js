@@ -82,9 +82,15 @@ export const routeSeo = {
   },
   blog: {
     title: 'Prince Esquire Style Journal',
-    description: 'Read styling notes, wardrobe guides and fashion editorial from Prince Esquire. Discover practical style advice for premium menswear in Kenya.',
+    description: 'Style Journal from Prince Esquire — wedding guest outfits, quality shirts, office wear and power dressing guides for men in Kenya.',
     path: '/blog',
-    keywords: ['fashion blog Kenya', 'menswear style tips', 'wardrobe guide Nairobi', 'Prince Esquire blog'],
+    keywords: [
+      'Prince Esquire journal',
+      'menswear blog Kenya',
+      'wedding guest outfit Kenya',
+      'quality men shirts Nairobi',
+      'office wear Kenya',
+    ],
   },
 };
 
@@ -172,8 +178,12 @@ export const buildProductSchema = (product, image, price) => ({
   '@type': 'Product',
   name: product.name,
   image: image ? [image.startsWith('http') ? image : `${SITE_URL}${image}`] : [DEFAULT_IMAGE],
-  description: product.description || `Luxury ${product.name} from Prince Esquire Kenya.`,
+  description:
+    product.focus_description ||
+    product.description ||
+    `${product.name} from Prince Esquire — The Man's Shop in Nairobi, Kenya. Curated menswear with delivery across Kenya.`,
   sku: String(product.sku || product.slug || product.name),
+  category: product.category_name || product.parent_category_name || undefined,
   brand: {
     '@type': 'Brand',
     name: product.brand_name || product.brand || SITE_NAME,
@@ -185,13 +195,32 @@ export const buildProductSchema = (product, image, price) => ({
     price: String(price || product.price || ''),
     availability: 'https://schema.org/InStock',
     itemCondition: 'https://schema.org/NewCondition',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '4.8',
-    reviewCount: '24',
+    seller: {
+      '@type': 'Organization',
+      name: SITE_NAME,
+    },
   },
 });
+
+/** Visible FAQ blocks — helps AEO/snippets even when FAQ rich results are limited */
+export const buildFaqSchema = (faqs = []) => {
+  const entities = (Array.isArray(faqs) ? faqs : [])
+    .filter((f) => f?.question && f?.answer)
+    .map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: f.answer,
+      },
+    }));
+  if (!entities.length) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: entities,
+  };
+};
 
 export const buildBlogPostingSchema = (post) => ({
   '@context': 'https://schema.org',

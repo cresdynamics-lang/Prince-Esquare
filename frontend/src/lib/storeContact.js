@@ -21,6 +21,31 @@ function absoluteImageUrl(thumbnail) {
   return `${SITE_URL}${String(thumbnail).startsWith('/') ? '' : '/'}${thumbnail}`;
 }
 
+function resolveProductImage(product) {
+  const candidates = [
+    product?.thumbnail,
+    product?.thumbnail_optimized,
+    product?.image_url,
+  ];
+  const images = product?.images;
+  if (Array.isArray(images) && images.length) {
+    const first = images[0];
+    candidates.push(typeof first === 'string' ? first : first?.url || first?.secure_url || first?.optimized);
+  } else if (typeof images === 'string') {
+    try {
+      const parsed = JSON.parse(images);
+      if (Array.isArray(parsed) && parsed[0]) {
+        const first = parsed[0];
+        candidates.push(typeof first === 'string' ? first : first?.url || first?.secure_url);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const hit = candidates.find((c) => typeof c === 'string' && c.trim().length > 4);
+  return absoluteImageUrl(hit);
+}
+
 /** One-tap WhatsApp order from any product card — no checkout form. */
 export function buildWhatsAppProductInquiryUrl({
   product,
@@ -33,7 +58,7 @@ export function buildWhatsAppProductInquiryUrl({
   const modifier = parseFloat(product.variantPriceModifier || 0);
   const price = (discount ?? basePrice) + modifier;
   const productUrl = `${SITE_URL}/product/${product.slug}`;
-  const imageUrl = absoluteImageUrl(product.thumbnail);
+  const imageUrl = resolveProductImage(product);
 
   const lines = [
     'Hello Prince Esquire, I would like to order this item:',

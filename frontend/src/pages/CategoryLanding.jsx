@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
+import { buildBreadcrumbSchema, organizationSchema } from '../seo/seoData';
 import HomeSignupBand from '../components/home/HomeSignupBand';
 import CategorySubTiles from '../components/category/CategorySubTiles';
 import CategoryFilterBar from '../components/category/CategoryFilterBar';
@@ -357,7 +358,27 @@ const CategoryLanding = () => {
 
   return (
     <div className="min-h-screen bg-navy-950">
-      <SEO title={seo.title} description={seo.description} path={shopHref(...pathParts)} />
+      <SEO
+        title={seo.title}
+        description={seo.description}
+        path={shopHref(...pathParts)}
+        keywords={[
+          category?.name,
+          eyebrow,
+          'Prince Esquire',
+          'menswear Kenya',
+          'Nairobi',
+        ].filter(Boolean)}
+        schema={[
+          organizationSchema,
+          buildBreadcrumbSchema(
+            (breadcrumbs || []).map((c) => ({
+              name: c.name,
+              path: c.href || c.path || '/',
+            }))
+          ),
+        ]}
+      />
       <Navbar />
 
       {/* 1–2 Breadcrumb + Category hero */}

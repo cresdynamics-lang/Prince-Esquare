@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { trackProductClick } from './VisitorTracker';
 import { launchWhatsAppOrder } from '../lib/whatsappOrder';
-import { productCardSrcSet, hasProductImage } from '../utils/cloudinary';
+import { productCardSrcSet, hasProductImage, parseProductImages } from '../utils/cloudinary';
+import { productImageObjectClass } from '../utils/productImages';
 import { getProductMerchBadges, bespokeLeadCopy } from '../utils/merchTags';
 import { formatSetContentsLine } from '../lib/setComponents';
 
@@ -22,6 +23,16 @@ function availableSizesAndColors(product) {
   );
   const colors = uniqueSorted(variants.map((v) => v.color));
   return { sizes, colors };
+}
+
+/** Badge when a product has more colours or gallery angles to choose from. */
+function multiOptionLabel(product, colors) {
+  if (colors.length > 1) return `${colors.length}+ colours`;
+  const gallery = parseProductImages(product?.images);
+  const extra = Math.max(0, gallery.length - 1);
+  if (extra === 1) return '1 more';
+  if (extra > 1) return `${extra} more`;
+  return null;
 }
 
 /**
@@ -52,12 +63,14 @@ export default function ProductCard({
 
   const raw = product.thumbnail_optimized || product.thumbnail || product.image_url || '';
   const { src, srcSet } = productCardSrcSet(raw);
+  const objectPos = productImageObjectClass(src || raw);
 
   if (!src) return null;
 
   const { primary, secondary } = getProductMerchBadges(product);
   const bespokeLead = bespokeLeadCopy(product);
   const { sizes: availSizes, colors: availColors } = availableSizesAndColors(product);
+  const multiLabel = multiOptionLabel(product, availColors);
   const setContentsLine = formatSetContentsLine(product.set_components);
   const isBestseller =
     primary?.id === 'bestseller' ||
@@ -87,6 +100,18 @@ export default function ProductCard({
     launchWhatsAppOrder(product);
   };
 
+  const handleMultiOptionOrder = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Open WhatsApp so the customer can ask for the other colour / angle
+    launchWhatsAppOrder({
+      ...product,
+      name: availColors.length > 1
+        ? `${product.name} (${availColors.length} colours available)`
+        : product.name,
+    });
+  };
+
   return (
     <Wrapper
       {...wrapProps}
@@ -108,11 +133,11 @@ export default function ProductCard({
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             fetchPriority={priority ? 'high' : 'auto'}
-            className="absolute inset-0 h-full w-full bg-navy-900 object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+            className={`absolute inset-0 h-full w-full bg-navy-900 object-cover ${objectPos} transition-transform duration-700 ease-out group-hover:scale-[1.04]`}
           />
         </Link>
 
-        {(showPrimary || showSecondary || saleRailBadge) ? (
+        {(showPrimary || showSecondary || saleRailBadge || multiLabel) ? (
           <div className="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-start justify-between gap-2">
             <div className="flex max-w-[70%] flex-col items-start gap-1.5">
               {saleRailBadge ? (
@@ -135,11 +160,23 @@ export default function ProductCard({
                 )
               ) : null}
             </div>
-            {showSecondary ? (
-              <span className="bg-gold-500/15 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-gold-200 ring-1 ring-gold-500/25">
-                {showSecondary.label}
-              </span>
-            ) : null}
+            <div className="flex flex-col items-end gap-1.5">
+              {showSecondary ? (
+                <span className="bg-gold-500/15 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-gold-200 ring-1 ring-gold-500/25">
+                  {showSecondary.label}
+                </span>
+              ) : null}
+              {multiLabel ? (
+                <button
+                  type="button"
+                  onClick={handleMultiOptionOrder}
+                  className="pointer-events-auto bg-navy-950/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-white ring-1 ring-white/25 backdrop-blur-sm transition-colors hover:bg-gold-500 hover:text-navy-950 hover:ring-gold-400"
+                  aria-label={`${multiLabel} — order via WhatsApp`}
+                >
+                  {multiLabel}
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>

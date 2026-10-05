@@ -149,6 +149,38 @@ const ProductDescription = ({
         </ul>
       </Section>
 
+      <Section title="Quick answers" icon="*">
+        <div className="space-y-4 text-[14px] font-light leading-relaxed text-slate-300/90">
+          <div>
+            <h4 className="text-[12px] font-semibold tracking-wide text-gold-200 mb-1">
+              Where is Prince Esquire based?
+            </h4>
+            <p>
+              Prince Esquire — The Man&apos;s Shop — is a Nairobi menswear house at Yala Towers,
+              serving Kenya with shirts, suits, blazers, trousers, shoes and accessories.
+            </p>
+          </div>
+          <div>
+            <h4 className="text-[12px] font-semibold tracking-wide text-gold-200 mb-1">
+              How do I confirm size before ordering?
+            </h4>
+            <p>
+              Message us on WhatsApp with your usual size and the product name. We confirm fit and
+              colour before dispatch whenever possible.
+            </p>
+          </div>
+          <div>
+            <h4 className="text-[12px] font-semibold tracking-wide text-gold-200 mb-1">
+              Do you deliver outside Nairobi?
+            </h4>
+            <p>
+              Yes. Nairobi may use rider delivery; prepaid orders ship nationwide via courier after
+              confirmation.
+            </p>
+          </div>
+        </div>
+      </Section>
+
       {otherFooter.map((para) => (
         <p key={para.slice(0, 48)} className="text-[14px] font-light leading-relaxed text-slate-400/80">{para}</p>
       ))}

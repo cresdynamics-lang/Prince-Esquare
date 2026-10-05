@@ -80,6 +80,19 @@ export const PREMIUM_IMAGES = {
   'wallet': '/WhatsApp Image 2026-05-12 at 8.07.25 PM.jpeg',
 };
 
+/**
+ * Full-body /models photos (blazers, shirts, etc.) need object-top in 4:5 cards
+ * so the garment torso stays in frame instead of legs/shoes.
+ * Shoe lifestyle shots keep center focus.
+ */
+export const productImageObjectClass = (src = '') => {
+  const path = String(src || '').toLowerCase();
+  if (!path.includes('/models/')) return 'object-center';
+  if (path.includes('/models/shoes/')) return 'object-center';
+  if (path.includes('/models/categories/')) return 'object-center';
+  return 'object-top';
+};
+
 export const getPremiumImage = (product, { width = 400 } = {}) => {
   if (!product) return LOCAL_IMAGES[0];
   

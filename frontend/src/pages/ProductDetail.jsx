@@ -6,15 +6,21 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import ProductDescription from '../components/product/ProductDescription';
+import FitItWith from '../components/product/FitItWith';
 import StickyAddToCart from '../components/product/StickyAddToCart';
 import StayTipQueue, { PRODUCT_DWELL_TIPS } from '../components/StayTipCards';
 import { useCartStore } from '../store/useCartStore';
 import { productAPI } from '../services/api';
-import { getPremiumImage } from '../utils/productImages';
+import { getPremiumImage, productImageObjectClass } from '../utils/productImages';
 import { getImageSrc, parseProductImages } from '../utils/cloudinary';
 import { parseAngleImages, getDefaultAngleImage } from '../utils/angleImages';
 import { buildVariantMeta, buildRichDescription, sortSizes } from '../utils/productDescription';
-import { buildBreadcrumbSchema, buildProductSchema } from '../seo/seoData';
+import {
+  buildBreadcrumbSchema,
+  buildProductSchema,
+  buildFaqSchema,
+  organizationSchema,
+} from '../seo/seoData';
 import { toCartVariantId } from '../utils/ids';
 import { trackViewContent, trackInitiateCheckout, trackCustomizeProduct } from '../lib/metaPixel';
 import { launchWhatsAppOrder } from '../lib/whatsappOrder';
@@ -235,6 +241,8 @@ const ProductDetail = () => {
   const [colorCarouselIndex, setColorCarouselIndex] = useState(0);
 
   const touchStartX = useRef(null);
+  const scrollTickCount = useRef(0);
+  const lastScrollY = useRef(0);
 
   const relatedSectionRef = useRef(null);
 
@@ -359,21 +367,43 @@ const ProductDetail = () => {
     fetchProduct();
   }, [slug]);
 
+  // Show sticky purchase bar after two downward scroll gestures on the PDP.
   useEffect(() => {
-    const relatedEl = relatedSectionRef.current;
-    if (!relatedEl || related.length === 0) {
+    if (!product) {
       setShowStickyCart(false);
+      scrollTickCount.current = 0;
+      lastScrollY.current = 0;
       return undefined;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => setShowStickyCart(entry.isIntersecting),
-      { threshold: 0, rootMargin: '0px 0px 0px 0px' }
-    );
+    scrollTickCount.current = 0;
+    lastScrollY.current = typeof window !== 'undefined' ? window.scrollY : 0;
+    setShowStickyCart(false);
 
-    observer.observe(relatedEl);
-    return () => observer.disconnect();
-  }, [product, related.length]);
+    const onScroll = () => {
+      const y = window.scrollY || 0;
+      const delta = y - lastScrollY.current;
+
+      if (y < 96) {
+        scrollTickCount.current = 0;
+        setShowStickyCart(false);
+        lastScrollY.current = y;
+        return;
+      }
+
+      // Count a "scroll" when the user moves down ~half a phone screen / one gesture chunk
+      if (delta > 70) {
+        scrollTickCount.current += 1;
+        lastScrollY.current = y;
+        if (scrollTickCount.current >= 2) setShowStickyCart(true);
+      } else if (delta < -40) {
+        lastScrollY.current = y;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [product?.id]);
 
   useEffect(() => {
     if (product?.id) {
@@ -532,6 +562,23 @@ const ProductDetail = () => {
     navigate('/checkout');
   };
 
+  const handleWhatsAppOrder = () => {
+    if (!product || shopOutOfStock) return;
+    launchWhatsAppOrder(
+      {
+        ...product,
+        discount_price: displayPrice,
+        price: product.price,
+        thumbnail: currentDisplayImage || product.thumbnail,
+      },
+      {
+        sizeLabel: isBelt ? '' : selectedSize,
+        variantValue: selectedColor,
+        quantity,
+      }
+    );
+  };
+
   if (loadError) {
     return (
       <div className="min-h-screen pt-32 text-center text-white bg-navy-950 font-serif">
@@ -564,18 +611,44 @@ const ProductDetail = () => {
         path={`/product/${product.slug}`}
         type="product"
         image={currentDisplayImage}
-        keywords={[product.name, product.brand_name, product.category_name, 'luxury fashion Kenya'].filter(Boolean)}
+        keywords={[
+          product.name,
+          product.brand_name,
+          product.category_name,
+          product.parent_category_name,
+          'Prince Esquire',
+          'luxury fashion Kenya',
+          'menswear Nairobi',
+        ].filter(Boolean)}
         schema={[
+          organizationSchema,
           buildBreadcrumbSchema(
             crumbs.map((c) => ({ name: c.name, path: c.href }))
           ),
           buildProductSchema(product, currentDisplayImage, displayPrice),
+          buildFaqSchema([
+            {
+              question: 'Where is Prince Esquire based?',
+              answer:
+                "Prince Esquire — The Man's Shop — is a Nairobi menswear house at Yala Towers, serving Kenya with shirts, suits, blazers, trousers, shoes and accessories.",
+            },
+            {
+              question: 'How do I confirm size before ordering?',
+              answer:
+                'Message Prince Esquire on WhatsApp with your usual size and the product name. Fit and colour are confirmed before dispatch whenever possible.',
+            },
+            {
+              question: 'Do you deliver outside Nairobi?',
+              answer:
+                'Yes. Nairobi may use rider delivery; prepaid orders ship nationwide via courier after confirmation.',
+            },
+          ]),
         ]}
       />
       <Navbar />
       <StayTipQueue key={slug} tips={PRODUCT_DWELL_TIPS} enabled={Boolean(product)} />
 
-      <main className={`pt-24 pb-24 transition-[padding] ${showStickyCart ? 'pb-28 md:pb-32' : ''}`}>
+      <main className={`pt-24 pb-24 transition-[padding] ${showStickyCart ? 'pb-40 md:pb-44' : ''}`}>
         <div className="container mx-auto px-4 md:px-6 max-w-7xl">
           <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] tracking-wide text-gold-600/50">
             {crumbs.map((crumb, i) => (
@@ -603,7 +676,7 @@ const ProductDetail = () => {
             {/* Gallery - pins on desktop until the full right column (incl. description) has scrolled */}
             <div className="space-y-4">
               <div className="lg:sticky lg:top-24 lg:self-start">
-              <div className="relative aspect-square bg-white overflow-hidden rounded-sm border border-gold-600/10 group">
+              <div className="relative aspect-[4/5] bg-navy-900 overflow-hidden rounded-sm border border-gold-600/10 group">
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={currentDisplayImage}
@@ -615,7 +688,7 @@ const ProductDetail = () => {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="w-full h-full object-contain p-6 md:p-10"
+                    className={`w-full h-full object-cover ${productImageObjectClass(currentDisplayImage)}`}
                     onTouchStart={(e) => {
                       touchStartX.current = e.touches[0]?.clientX ?? null;
                     }}
@@ -699,7 +772,7 @@ const ProductDetail = () => {
                         }}
                         aria-label={`View ${thumb.label}`}
                         title={thumb.label}
-                        className={`relative shrink-0 snap-start rounded-sm overflow-hidden bg-white border-2 transition-all ${
+                        className={`relative shrink-0 snap-start rounded-sm overflow-hidden bg-navy-900 border-2 transition-all ${
                           isColorThumb ? 'w-16 h-16 sm:w-20 sm:h-20' : 'w-16 h-16 sm:w-20 sm:h-20'
                         } ${
                           isSelected
@@ -712,7 +785,7 @@ const ProductDetail = () => {
                           alt={thumb.label}
                           loading="lazy"
                           decoding="async"
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full object-cover ${productImageObjectClass(thumb.thumb || thumb.src)}`}
                         />
                         {isColorThumb && (
                           <span className="absolute inset-x-0 bottom-0 bg-navy-950/80 text-[8px] font-bold  tracking-wider text-gold-200 py-0.5 truncate px-1">
@@ -954,7 +1027,19 @@ const ProductDetail = () => {
                   disabled={shopOutOfStock}
                   className="w-full bg-gold-600 text-navy-950 py-4 px-6 text-[10px] font-bold  tracking-[0.2em] hover:bg-gold-500 transition-all shadow-xl shadow-gold-600/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-full"
                 >
-                  Buy it now
+                  Buy Now
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  type="button"
+                  onClick={handleWhatsAppOrder}
+                  disabled={shopOutOfStock}
+                  className="w-full bg-[#25D366] text-white py-4 px-6 text-[10px] font-bold tracking-[0.2em] hover:bg-[#1ebe57] transition-all disabled:opacity-40 disabled:cursor-not-allowed rounded-full flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={15} />
+                  Order via WhatsApp
                 </motion.button>
 
                 <AnimatePresence>
@@ -985,20 +1070,24 @@ const ProductDetail = () => {
             </div>
           </div>
 
+          <FitItWith product={product} />
+
           {related.length > 0 && (
-            <div ref={relatedSectionRef} className="mt-24 pt-16 border-t border-gold-600/10">
+            <div ref={relatedSectionRef} className="mt-16 pt-12 border-t border-gold-600/10 md:mt-20 md:pt-16">
               <h2 className="text-xl md:text-2xl font-serif text-white mb-10">You may also like</h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                {related.map((p) => (
+                {related.map((p) => {
+                  const relatedSrc = getPremiumImage(p);
+                  return (
                   <div key={p.id} className="group block">
                     <Link to={`/product/${p.slug}`} className="block">
-                      <div className="aspect-square bg-white overflow-hidden mb-4 border border-gold-600/10">
+                      <div className="aspect-[4/5] bg-navy-900 overflow-hidden mb-4 border border-gold-600/10">
                         <img
-                          src={getPremiumImage(p)}
+                          src={relatedSrc}
                           alt={p.name}
                           loading="lazy"
                           decoding="async"
-                          className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
+                          className={`w-full h-full object-cover ${productImageObjectClass(relatedSrc)} transition-transform duration-700 group-hover:scale-105`}
                         />
                       </div>
                       <h3 className="text-[9px] md:text-[10px] font-bold text-white min-h-[28px] group-hover:text-gold-500 transition-colors line-clamp-2">
@@ -1022,7 +1111,8 @@ const ProductDetail = () => {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1039,6 +1129,8 @@ const ProductDetail = () => {
         addedToCart={addedToCart}
         disabled={shopOutOfStock}
         onAddToCart={handleAddToCart}
+        onBuyNow={handleBuyNow}
+        onWhatsAppOrder={handleWhatsAppOrder}
         ctaLabel={isBespokeProduct(product) ? 'Order Bespoke' : 'Add to cart'}
       />
 

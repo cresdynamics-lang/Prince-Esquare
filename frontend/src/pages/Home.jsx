@@ -26,11 +26,12 @@ const Home = () => {
 
     setLoadingNew(true);
     productAPI
-      .newArrivals({ limit: 16 })
+      .newArrivals({ limit: 8 })
       .then((res) => {
         if (!cancelled) {
           const payload = res.data?.data;
-          setNewArrivals(Array.isArray(payload) ? payload : payload?.products || []);
+          const list = Array.isArray(payload) ? payload : payload?.products || [];
+          setNewArrivals(list.slice(0, 8));
         }
       })
       .catch(() => {
@@ -56,7 +57,7 @@ const Home = () => {
           seen.add(p.id);
           merged.push(p);
         }
-        setSaleRail(merged.slice(0, 16));
+        setSaleRail(merged.slice(0, 8));
       })
       .catch(() => {
         if (!cancelled) setSaleRail([]);
@@ -70,7 +71,7 @@ const Home = () => {
       .then((res) => {
         if (cancelled) return;
         const data = res.data?.data || {};
-        setEditorial(data.products || []);
+        setEditorial((data.products || []).slice(0, 6));
         if (data.bespokeLeadDays) setBespokeLeadDays(data.bespokeLeadDays);
       })
       .catch(() => {

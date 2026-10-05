@@ -170,7 +170,10 @@ exports.getBlogPostById = async (req, res) => {
 
 exports.createBlogPost = async (req, res) => {
   try {
-    const { title, slug, excerpt, content, category, author_name, featured_image_url, is_published } = req.body;
+    const {
+      title, slug, excerpt, content, category, author_name, featured_image_url,
+      is_published, meta_title, meta_description,
+    } = req.body;
 
     if (!title || !slug || !excerpt || !content || !category || !author_name) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -183,9 +186,13 @@ exports.createBlogPost = async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO blog_posts (title, slug, excerpt, content, category, author_name, featured_image_url, is_published, published_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [title, slug, excerpt, content, category, author_name, featured_image_url || null, is_published || false, is_published ? new Date() : null]
+      `INSERT INTO blog_posts (title, slug, excerpt, content, category, author_name, featured_image_url, is_published, published_date, meta_title, meta_description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        title, slug, excerpt, content, category, author_name, featured_image_url || null,
+        is_published || false, is_published ? new Date() : null,
+        meta_title || null, meta_description || null,
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -198,7 +205,10 @@ exports.createBlogPost = async (req, res) => {
 exports.updateBlogPost = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, slug, excerpt, content, category, author_name, featured_image_url, is_published } = req.body;
+    const {
+      title, slug, excerpt, content, category, author_name, featured_image_url,
+      is_published, meta_title, meta_description,
+    } = req.body;
 
     const updates = [];
     const params = [];
@@ -231,6 +241,14 @@ exports.updateBlogPost = async (req, res) => {
     if (featured_image_url !== undefined) {
       params.push(featured_image_url);
       updates.push(`featured_image_url = $${paramIndex++}`);
+    }
+    if (meta_title !== undefined) {
+      params.push(meta_title);
+      updates.push(`meta_title = $${paramIndex++}`);
+    }
+    if (meta_description !== undefined) {
+      params.push(meta_description);
+      updates.push(`meta_description = $${paramIndex++}`);
     }
     if (is_published !== undefined) {
       params.push(is_published);

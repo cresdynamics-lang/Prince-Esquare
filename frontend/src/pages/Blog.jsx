@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import BlogShowcase from '../components/BlogShowcase';
 import SEO from '../components/SEO';
 import { buildBreadcrumbSchema, buildBlogPostingSchema, routeSeo } from '../seo/seoData';
@@ -77,6 +79,7 @@ export default function Blog() {
 
   return (
     <div className="min-h-screen bg-navy-950 text-white">
+      <Navbar />
       <SEO
         title={routeSeo.blog.title}
         description={routeSeo.blog.description}
@@ -85,7 +88,7 @@ export default function Blog() {
         schema={[
           buildBreadcrumbSchema([
             { name: 'Home', path: '/' },
-            { name: 'Blog', path: '/blog' },
+            { name: 'Style Journal', path: '/blog' },
           ]),
           blogs[0] ? buildBlogPostingSchema(blogs[0]) : null,
         ]}
@@ -94,7 +97,7 @@ export default function Blog() {
       <section className="relative border-b border-gold-600/10 overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: 'url("/WhatsApp Image 2026-05-12 at 8.07.18 PM.jpeg")' }}
+          style={{ backgroundImage: 'url("/models/blazers/burgundy-lifestyle.jpg")' }}
         />
         <div className="absolute inset-0 bg-navy-950/80" />
         <div className="relative max-w-7xl mx-auto px-4 py-16 md:py-20">
@@ -103,10 +106,10 @@ export default function Blog() {
               Prince Esquire Journal
             </span>
             <h1 className="text-3xl md:text-4xl font-serif leading-tight text-white">
-              Style notes, wardrobe ideas, and editorial stories from the brand
+              Style Journal — wardrobe guides for Kenya
             </h1>
             <p className="text-navy-200 text-sm md:text-base max-w-3xl leading-relaxed">
-              A tighter, more useful blog built around the products, categories, and styling language already on the site.
+              Journals are our blog: practical menswear guides for weddings, shirts, office dress codes and power dressing — written for Nairobi search and real WhatsApp advice.
             </p>
             <div className="pt-3">
               <Link
@@ -229,6 +232,7 @@ export default function Blog() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }
