@@ -61,8 +61,8 @@ export const HOME_CATEGORY_CARDS = [
   {
     name: 'The Linen Edit',
     href: '/shop/linen-edit',
-    image: '/hero/linen-1600.webp',
-    imageSm: '/hero/linen-800.webp',
+    image: '/models/categories/linen-edit-1600.jpg',
+    imageSm: '/models/categories/linen-edit-800.jpg',
   },
   {
     name: 'Gift Sets & Boxes',
@@ -98,8 +98,8 @@ export const HOME_LINEN_BANNER = {
   eyebrow: 'Season Edit',
   title: "Nairobi heat doesn't have to mean compromise.",
   cta: { label: 'Shop the Linen Edit', href: '/shop/linen-edit' },
-  image: '/hero/linen-1600.webp',
-  imageSm: '/hero/linen-800.webp',
+  image: '/models/categories/linen-edit-1600.jpg',
+  imageSm: '/models/categories/linen-edit-800.jpg',
 };
 
 export const HOME_GIFT_BANNER = {

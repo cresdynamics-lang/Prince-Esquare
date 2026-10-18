@@ -240,8 +240,8 @@ const TAXONOMY_TREE = [
     name: "Gift Sets & Boxes",
     slug: "gift-sets",
     copy: "The gift that arrives already decided — curated, boxed, ready to impress.",
-    tileImage: ph("gift-sets"),
-    heroImage: ph("gift-sets"),
+    tileImage: "/models/categories/gift-sets-800.jpg",
+    heroImage: "/models/categories/gift-sets-1600.jpg",
     children: [],
   },
   {
@@ -249,8 +249,8 @@ const TAXONOMY_TREE = [
     slug: "linen-edit",
     isNavPrimary: false,
     copy: "Nairobi heat doesn't have to mean compromise. This is what composure looks like at 30 degrees.",
-    tileImage: ph("linen-edit"),
-    heroImage: ph("linen-edit"),
+    tileImage: "/models/categories/linen-edit-800.jpg",
+    heroImage: "/models/categories/linen-edit-1600.jpg",
     children: [
       {
         name: "Linen Trousers",
@@ -289,7 +289,8 @@ const LEGACY_SLUG_ALIASES = {
   'knitted-polos': 'polo-t-shirts',
   'round-neck-t-shirts': 't-shirts',
   'v-neck-t-shirts': 't-shirts',
-  sets: 'suit-sets',
+  // Legacy root "Sets" was curated gift boxes — not suit outfits (those live under suit-sets)
+  sets: 'gift-sets',
   gurkha: 'trousers',
   formal: 'trousers',
   'linen-shorts': 'linen-edit',

@@ -634,12 +634,15 @@ const ProductsView = () => {
 
   const PARENT_CATEGORY_ORDER = [
     'polo-t-shirts', 'shoes', 'shirts', 'suits', 'blazers', 'track-suits',
-    'jackets', 'vests', 'boxers', 'trousers', 'linen', 'sets', 'caps-hats',
+    'jackets', 'vests', 'boxers', 'trousers', 'linen-edit', 'gift-sets', 'caps-hats',
     'belts-ties', 'sweaters', 't-shirts',
   ];
 
+  // Hide legacy root "Sets" — curated boxes live under Gift Sets & Boxes
+  const HIDDEN_ROOT_SLUGS = new Set(['sets', 'linen']);
+
   const parentCategories = (Array.isArray(categories) ? categories : [])
-    .filter((category) => !category.parent_id)
+    .filter((category) => !category.parent_id && !HIDDEN_ROOT_SLUGS.has(category.slug))
     .sort((a, b) => {
       const ai = PARENT_CATEGORY_ORDER.indexOf(a.slug);
       const bi = PARENT_CATEGORY_ORDER.indexOf(b.slug);

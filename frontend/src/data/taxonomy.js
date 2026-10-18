@@ -138,8 +138,8 @@ export const TAXONOMY_TREE = [
     slug: 'linen-edit',
     isNavPrimary: false,
     copy: "Nairobi heat doesn't have to mean compromise. This is what composure looks like at 30 degrees.",
-    tileImage: ph('linen-edit'),
-    heroImage: ph('linen-edit'),
+    tileImage: '/models/categories/linen-edit-800.jpg',
+    heroImage: '/models/categories/linen-edit-1600.jpg',
     children: [
       { name: 'Linen Trousers', slug: 'linen-trousers', copy: 'Breath that holds its crease.', tileImage: ph('linen-trousers'), crossSurfaces: ['linen-edit'] },
       { name: 'Linen Shirts', slug: 'linen-shirts', copy: 'Open weave. Closed impression.', tileImage: ph('linen-shirts'), crossSurfaces: ['linen-edit'] },

@@ -234,15 +234,26 @@ async function reparentKnownChildren() {
   // Gift Sets = primary #7 (not under Accessories)
   await db.query(
     `UPDATE categories
-     SET parent_id = NULL, is_nav_primary = true, depth = 0
+     SET parent_id = NULL, is_nav_primary = true, depth = 0,
+         tile_image = '/models/categories/gift-sets-800.jpg',
+         hero_image = '/models/categories/gift-sets-1600.jpg'
      WHERE slug = 'gift-sets'`
   );
 
   // Linen Edit = special landing (anchor), not a top-nav primary
   await db.query(
     `UPDATE categories
-     SET parent_id = NULL, is_nav_primary = false, depth = 0
+     SET parent_id = NULL, is_nav_primary = false, depth = 0,
+         tile_image = '/models/categories/linen-edit-800.jpg',
+         hero_image = '/models/categories/linen-edit-1600.jpg'
      WHERE slug = 'linen-edit'`
+  );
+
+  // Legacy root "Sets" — products remapped via LEGACY_SLUG_ALIASES; keep out of admin/nav
+  await db.query(
+    `UPDATE categories
+     SET is_nav_primary = false, is_featured = false
+     WHERE slug = 'sets'`
   );
 }
 
