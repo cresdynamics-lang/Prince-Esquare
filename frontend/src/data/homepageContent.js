@@ -67,8 +67,8 @@ export const HOME_CATEGORY_CARDS = [
   {
     name: 'Gift Sets & Boxes',
     href: '/shop/gift-sets',
-    image: '/hero/polo-salon-1600.webp',
-    imageSm: '/hero/polo-salon-800.webp',
+    image: '/models/categories/gift-sets-1600.jpg',
+    imageSm: '/models/categories/gift-sets-800.jpg',
   },
   {
     name: 'Track Suits',
@@ -106,8 +106,8 @@ export const HOME_GIFT_BANNER = {
   eyebrow: 'Gifting',
   title: 'Some gifts get worn once. This is the kind that gets remembered.',
   cta: { label: 'Shop Gift Sets', href: '/shop/gift-sets' },
-  image: '/hero/polo-salon-1600.webp',
-  imageSm: '/hero/polo-salon-800.webp',
+  image: '/models/categories/gift-sets-1600.jpg',
+  imageSm: '/models/categories/gift-sets-800.jpg',
 };
 
 export const HOME_SIGNUP = {

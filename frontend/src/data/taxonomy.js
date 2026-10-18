@@ -125,8 +125,8 @@ export const TAXONOMY_TREE = [
     name: 'Gift Sets & Boxes',
     slug: 'gift-sets',
     copy: 'The gift that arrives already decided — curated, boxed, ready to impress.',
-    tileImage: ph('gift-sets'),
-    heroImage: ph('gift-sets'),
+    tileImage: '/models/categories/gift-sets-800.jpg',
+    heroImage: '/models/categories/gift-sets-1600.jpg',
     children: [],
   },
   /**

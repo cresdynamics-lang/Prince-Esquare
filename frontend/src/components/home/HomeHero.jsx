@@ -5,9 +5,9 @@ import { Link } from 'react-router-dom';
 import { BRAND_TAGLINE, HOME_HERO } from '../../data/homepageContent';
 
 /**
- * Full-bleed hero with scroll-reveal portrait:
- * first viewport = brand + copy on the face crop;
- * scroll moves focus down the body so the full image reads before categories.
+ * Full-bleed hero with a short scroll-reveal portrait.
+ * Keep the pin short on mobile so the page feels responsive;
+ * desktop gets a slightly longer reveal without locking the scroll.
  */
 export default function HomeHero() {
   const hero = HOME_HERO;
@@ -18,15 +18,14 @@ export default function HomeHero() {
     offset: ['start start', 'end start'],
   });
 
-  // Face (top) → feet. Y starts at top so the head stays visible on wide desktop crops.
-  const objectPosY = useTransform(scrollYProgress, [0, 0.72], [0, 92]);
+  // Face → torso/feet — finish early so scroll feels responsive
+  const objectPosY = useTransform(scrollYProgress, [0, 0.55], [0, 78]);
   const objectPosition = useTransform(objectPosY, (y) => `58% ${y}%`);
 
-  // Copy sits on the first screen, then yields to the portrait
-  const copyOpacity = useTransform(scrollYProgress, [0, 0.22, 0.42], [1, 0.55, 0]);
-  const copyY = useTransform(scrollYProgress, [0, 0.42], [0, 48]);
-  const scrimOpacity = useTransform(scrollYProgress, [0, 0.35, 0.65], [1, 0.55, 0.2]);
-  const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.12], [1, 0]);
+  const copyOpacity = useTransform(scrollYProgress, [0, 0.18, 0.38], [1, 0.45, 0]);
+  const copyY = useTransform(scrollYProgress, [0, 0.38], [0, 28]);
+  const scrimOpacity = useTransform(scrollYProgress, [0, 0.28, 0.55], [1, 0.5, 0.18]);
+  const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.1], [1, 0]);
 
   const scrollToCategories = (e) => {
     e.preventDefault();
@@ -35,7 +34,10 @@ export default function HomeHero() {
   };
 
   return (
-    <section ref={sectionRef} className="relative h-[240vh] bg-navy-950">
+    <section
+      ref={sectionRef}
+      className="relative h-[130vh] bg-navy-950 sm:h-[145vh] md:h-[155vh]"
+    >
       <div className="sticky top-0 h-[100svh] overflow-hidden md:h-screen">
         <div className="absolute inset-0" aria-hidden="true">
           <motion.img

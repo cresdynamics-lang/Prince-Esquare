@@ -225,8 +225,8 @@ export const CATEGORY_PAGE_CONFIG = {
     eyebrow: 'Gifting',
     h1: "Some gifts get worn once. This is the kind that gets remembered every time he reaches for it.",
     subhead: "Curated boxed sets — put together so you don't have to guess.",
-    heroImage: giftSetsCard?.image || '/hero/polo-salon-1600.webp',
-    heroImageSm: giftSetsCard?.imageSm || '/hero/polo-salon-800.webp',
+    heroImage: giftSetsCard?.image || '/models/categories/gift-sets-1600.jpg',
+    heroImageSm: giftSetsCard?.imageSm || '/models/categories/gift-sets-800.jpg',
     // No subcategory tiles — children empty; Section 3 skips
     subTilesLayout: 'grid',
     showFabricFilter: false,
