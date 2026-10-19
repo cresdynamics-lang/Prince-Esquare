@@ -424,25 +424,62 @@ exports.getSitemap = async (_req, res, next) => {
       ),
     ];
 
-    const [productsResult, blogsResult] = await Promise.all([
-      db.query(`SELECT slug, updated_at FROM products WHERE is_active = true ORDER BY updated_at DESC`),
+    const [productsResult, blogsResult, categoriesResult] = await Promise.all([
       db.query(
-        `SELECT slug, updated_at FROM blog_posts WHERE is_published = true ORDER BY COALESCE(updated_at, published_date) DESC`
+        `SELECT slug, updated_at FROM products
+         WHERE is_active = true
+           AND thumbnail IS NOT NULL
+           AND TRIM(thumbnail::text) <> ''
+           AND LOWER(TRIM(thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
+         ORDER BY updated_at DESC`
+      ),
+      db.query(
+        `SELECT slug, COALESCE(updated_at, published_date) AS updated_at
+         FROM blog_posts
+         WHERE is_published = true
+         ORDER BY COALESCE(updated_at, published_date) DESC`
+      ).catch(() => ({ rows: [] })),
+      db.query(
+        `SELECT slug FROM categories ORDER BY sort_order NULLS LAST, name`
       ).catch(() => ({ rows: [] })),
     ]);
 
+    const categoryShopPaths = categoriesResult.rows
+      .map((row) => {
+        try {
+          return canonicalShopPath(row.slug);
+        } catch {
+          return `/shop/${row.slug}`;
+        }
+      })
+      .filter(Boolean);
+
+    const freqFor = (p) => {
+      if (p === '/' || p === '/products' || p === '/sale' || p === '/new-arrivals') return 'daily';
+      if (String(p).startsWith('/shop') || String(p).startsWith('/blog')) return 'weekly';
+      if (String(p).startsWith('/product/')) return 'weekly';
+      return 'monthly';
+    };
+
     const urls = [
-      ...staticPaths.map((p) => ({ loc: `${SITE_URL}${p === '/' ? '' : p}`, priority: p === '/' ? '1.0' : '0.8' })),
-      ...shopPaths.map((p) => ({ loc: `${SITE_URL}${p}`, priority: '0.8' })),
+      ...staticPaths.map((p) => ({
+        loc: `${SITE_URL}${p === '/' ? '' : p}`,
+        priority: p === '/' ? '1.0' : p === '/products' ? '0.9' : '0.8',
+        changefreq: freqFor(p),
+      })),
+      ...shopPaths.map((p) => ({ loc: `${SITE_URL}${p}`, priority: '0.85', changefreq: 'weekly' })),
+      ...categoryShopPaths.map((p) => ({ loc: `${SITE_URL}${p}`, priority: '0.8', changefreq: 'weekly' })),
       ...productsResult.rows.map((row) => ({
-        loc: `${SITE_URL}/product/${row.slug}`,
+        loc: `${SITE_URL}/product/${encodeURI(row.slug)}`,
         lastmod: row.updated_at,
         priority: '0.7',
+        changefreq: 'weekly',
       })),
       ...blogsResult.rows.map((row) => ({
-        loc: `${SITE_URL}/blog/${row.slug}`,
+        loc: `${SITE_URL}/blog/${encodeURI(row.slug)}`,
         lastmod: row.updated_at,
-        priority: '0.6',
+        priority: '0.65',
+        changefreq: 'weekly',
       })),
     ];
 
@@ -453,6 +490,13 @@ exports.getSitemap = async (_req, res, next) => {
       return true;
     });
 
+    const escapeXml = (value) =>
+      String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${deduped
@@ -461,18 +505,19 @@ ${deduped
       ? `<lastmod>${new Date(entry.lastmod).toISOString().slice(0, 10)}</lastmod>`
       : '';
     return `  <url>
-    <loc>${entry.loc}</loc>
+    <loc>${escapeXml(entry.loc)}</loc>
     ${lastmod}
-    <changefreq>weekly</changefreq>
+    <changefreq>${entry.changefreq || 'weekly'}</changefreq>
     <priority>${entry.priority || '0.5'}</priority>
   </url>`;
   })
   .join('\n')}
 </urlset>`;
 
-    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Cache-Control', 'public, max-age=1800');
     res.type('application/xml').send(xml);
   } catch (error) {
     next(error);
   }
 };
+
