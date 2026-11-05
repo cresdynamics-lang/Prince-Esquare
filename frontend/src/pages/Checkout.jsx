@@ -9,6 +9,7 @@ import { useCartStore } from '../store/useCartStore';
 import { orderAPI } from '../services/api';
 import { toCartVariantId } from '../utils/ids';
 import { buildOrderTrackUrl, buildWhatsAppOrderUrl } from '../lib/storeContact';
+import PlaceOrderOnWhatsApp from '../components/PlaceOrderOnWhatsApp';
 import { trackInitiateCheckout, trackAddPaymentInfo } from '../lib/metaPixel';
 
 const DRAFT_KEY = 'prince-esquire-draft-order-id';
@@ -211,6 +212,7 @@ const Checkout = () => {
           quantity: it.quantity,
           price: it.price,
           size_label: it.sizeLabel || null,
+          slug: it.slug,
         })),
         trackUrl,
       });
@@ -256,6 +258,15 @@ const Checkout = () => {
           ) : (
             <p className="mb-6 text-gold-500/50 text-[10px] uppercase tracking-widest">Signed in as {user?.email}</p>
           )}
+
+          {items.length > 0 ? (
+            <section className="mb-6 space-y-3 border border-[#25D366]/40 bg-navy-900/50 p-5 sm:mb-8 sm:p-6">
+              <PlaceOrderOnWhatsApp />
+              <p className="text-center font-sans text-xs font-light leading-relaxed text-navy-200">
+                Fastest way: we confirm your order, delivery and payment in the chat. Or fill in the form below.
+              </p>
+            </section>
+          ) : null}
 
           <form onSubmit={handlePlaceOrder} className="space-y-6 sm:space-y-8">
             <section className="bg-navy-950/30 border border-gold-500/10 p-5 sm:p-8 space-y-6">
@@ -462,7 +473,7 @@ const Checkout = () => {
                 className="w-full bg-[#00A651] hover:bg-[#009648] text-white py-4 text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 disabled:bg-gray-600 disabled:text-gray-300 disabled:cursor-not-allowed"
               >
                 <ShoppingBag size={18} />
-                <span>{submitting ? 'Placing order…' : 'Place order'}</span>
+                <span>{submitting ? 'Placing order…' : 'Save details and continue on WhatsApp'}</span>
               </button>
             </section>
           </form>

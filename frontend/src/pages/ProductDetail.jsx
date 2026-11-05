@@ -24,7 +24,7 @@ import {
 } from '../seo/seoData';
 import { toCartVariantId } from '../utils/ids';
 import { trackViewContent, trackInitiateCheckout, trackCustomizeProduct } from '../lib/metaPixel';
-import { launchWhatsAppOrder } from '../lib/whatsappOrder';
+import { launchWhatsAppCartOrder, launchWhatsAppOrder } from '../lib/whatsappOrder';
 import { normalizeSetComponents, sumSetComponentsPrice, isSetsCategory } from '../lib/setComponents';
 import { getAllProductMerchBadges, bespokeLeadCopy, isBespokeProduct } from '../utils/merchTags';
 import { productBreadcrumbs } from '../data/taxonomy';
@@ -238,6 +238,7 @@ const ProductDetail = () => {
 
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [bagReady, setBagReady] = useState(false);
   const [showStickyCart, setShowStickyCart] = useState(false);
   const [colorCarouselIndex, setColorCarouselIndex] = useState(0);
 
@@ -552,6 +553,7 @@ const ProductDetail = () => {
     if (!product || shopOutOfStock) return;
     await addToCart(buildPayload());
     setAddedToCart(true);
+    setBagReady(true);
     setTimeout(() => setAddedToCart(false), 3000);
   };
 
@@ -564,6 +566,12 @@ const ProductDetail = () => {
   };
 
   const handleWhatsAppOrder = () => {
+    // Once something is in the bag, this button sends the whole bag.
+    if (bagReady) {
+      const cart = useCartStore.getState();
+      launchWhatsAppCartOrder(cart.items, cart.getTotal());
+      return;
+    }
     if (!product || shopOutOfStock) return;
     launchWhatsAppOrder(
       {
@@ -1030,7 +1038,7 @@ const ProductDetail = () => {
                   className="w-full bg-[#25D366] text-white py-4 px-6 text-[10px] font-bold tracking-[0.2em] hover:bg-[#1ebe57] transition-all disabled:opacity-40 disabled:cursor-not-allowed rounded-full flex items-center justify-center gap-2"
                 >
                   <MessageCircle size={15} />
-                  Order via WhatsApp
+                  Place Order on WhatsApp
                 </motion.button>
 
                 <AnimatePresence>
@@ -1041,7 +1049,7 @@ const ProductDetail = () => {
                       exit={{ opacity: 0 }}
                       className="text-[10px] text-green-500 font-bold   text-center"
                     >
-                      Excellent choice. Item added to your curation.
+                      Added to your bag. Tap Place Order on WhatsApp to finish, or keep shopping.
                     </motion.p>
                   )}
                 </AnimatePresence>

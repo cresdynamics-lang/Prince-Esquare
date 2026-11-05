@@ -4,6 +4,7 @@ import { useCartStore } from '../store/useCartStore';
 import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, Phone } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import PlaceOrderOnWhatsApp from '../components/PlaceOrderOnWhatsApp';
 import Footer from '../components/Footer';
 import { orderAPI } from '../services/api';
 import { toCartVariantId } from '../utils/ids';
@@ -237,6 +238,7 @@ const Cart = () => {
                       )}
                     </div>
                   )}
+                  <PlaceOrderOnWhatsApp />
                   <button
                     type="button"
                     disabled={items.length === 0}

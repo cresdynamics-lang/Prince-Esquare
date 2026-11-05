@@ -137,6 +137,7 @@ export const useCartStore = create(
                 image: payload.image,
                 slug: payload.slug,
                 brandName: payload.brandName,
+                variantValue: payload.variantValue,
               },
             ],
           });

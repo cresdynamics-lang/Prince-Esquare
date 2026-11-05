@@ -15,35 +15,10 @@ export const getMpesaPaymentType = () => {
   return 'none';
 };
 
-function absoluteImageUrl(thumbnail) {
-  if (!thumbnail) return `${SITE_URL}/LOGO.jpeg`;
-  if (String(thumbnail).startsWith('http')) return String(thumbnail);
-  return `${SITE_URL}${String(thumbnail).startsWith('/') ? '' : '/'}${thumbnail}`;
-}
-
-function resolveProductImage(product) {
-  const candidates = [
-    product?.thumbnail,
-    product?.thumbnail_optimized,
-    product?.image_url,
-  ];
-  const images = product?.images;
-  if (Array.isArray(images) && images.length) {
-    const first = images[0];
-    candidates.push(typeof first === 'string' ? first : first?.url || first?.secure_url || first?.optimized);
-  } else if (typeof images === 'string') {
-    try {
-      const parsed = JSON.parse(images);
-      if (Array.isArray(parsed) && parsed[0]) {
-        const first = parsed[0];
-        candidates.push(typeof first === 'string' ? first : first?.url || first?.secure_url);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  const hit = candidates.find((c) => typeof c === 'string' && c.trim().length > 4);
-  return absoluteImageUrl(hit);
+/** A link to the exact product. Encoded, so WhatsApp keeps the whole address clickable. */
+function productLink(slug) {
+  if (!slug) return null;
+  return `${SITE_URL}/product/${encodeURIComponent(slug).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16)}`)}`;
 }
 
 /** One-tap WhatsApp order from any product card — no checkout form. */
@@ -57,8 +32,7 @@ export function buildWhatsAppProductInquiryUrl({
   const discount = product.discount_price != null ? parseFloat(product.discount_price) : null;
   const modifier = parseFloat(product.variantPriceModifier || 0);
   const price = (discount ?? basePrice) + modifier;
-  const productUrl = `${SITE_URL}/product/${product.slug}`;
-  const imageUrl = resolveProductImage(product);
+  const productUrl = productLink(product.slug);
 
   const lines = [
     'Hello Prince Esquire, I would like to order this item:',
@@ -74,12 +48,37 @@ export function buildWhatsAppProductInquiryUrl({
   if (sizeLabel) lines.push(`Size: ${sizeLabel}`);
   if (variantValue) lines.push(`Color / variant: ${variantValue}`);
   if (quantity > 1) lines.push(`Quantity: ${quantity}`);
-  lines.push(`Product photo: ${imageUrl}`);
   lines.push('');
   lines.push('Please confirm availability and delivery.');
   lines.push('Kindly share your M-Pesa payment details (Pay Bill / Till and account number) so I can complete payment.');
   lines.push('');
   lines.push('Thank you!');
+
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
+
+/** The whole bag as one WhatsApp order, starting with a link to the first product. */
+export function buildWhatsAppCartUrl(items = [], total = 0) {
+  const lines = ['Hello Prince Esquire, I would like to place this order:', ''];
+
+  items.forEach((item, index) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    const lineTotal = Math.round(Number(item.price || 0) * qty);
+    const link = productLink(item.slug || item.product_slug);
+    lines.push(`${index + 1}. ${item.name}`);
+    if (link) lines.push(link);
+    if (item.sizeLabel) lines.push(`Size: ${item.sizeLabel}`);
+    const colour = String(item.variantValue || '')
+      .replace(` / ${item.sizeLabel}`, '')
+      .trim();
+    if (colour && colour !== item.sizeLabel) lines.push(`Colour: ${colour}`);
+    lines.push(`Qty: ${qty} — KSh ${lineTotal.toLocaleString()}`);
+    lines.push('');
+  });
+
+  lines.push(`Total: KSh ${Math.round(Number(total) || 0).toLocaleString()}`);
+  lines.push('');
+  lines.push('Please confirm availability and delivery, and share your M-Pesa payment details. Thank you!');
 
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
 }
@@ -107,12 +106,10 @@ export const buildWhatsAppOrderUrl = ({ order, items = [], trackUrl }) => {
       const size = item.size_label || item.sizeLabel;
       const sizePart = size ? ` · ${size}` : '';
       const slug = item.slug || item.product_slug;
-      const productUrl = slug ? `${SITE_URL}/product/${slug}` : null;
-      const imageUrl = absoluteImageUrl(item.thumbnail || item.image || item.product_image);
+      const productUrl = productLink(slug);
 
       itemLines.push(`- ${item.name}${sizePart} × ${qty} — KSh ${lineTotal.toLocaleString()}`);
       if (productUrl) itemLines.push(`  View product: ${productUrl}`);
-      itemLines.push(`  Product photo: ${imageUrl}`);
     }
   } else {
     itemLines.push('- (see order link)');
