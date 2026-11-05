@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, Search, User, LogOut, ChevronDown, MapPin } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Menu, X, ShoppingBag, Search, User, ChevronDown, MapPin } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import SearchOverlay from './SearchOverlay';
 import MegaMenu, { shopPath, buildProductsPath } from './MegaMenu';
+import { tileImageFor } from '../data/categoryLooks';
 import { taxonomyAPI } from '../services/api';
 import { TAXONOMY_TREE, NAV_ANCHORS } from '../data/taxonomy';
 
@@ -39,7 +41,7 @@ const SECTION_SHOP_LINKS = {
   accessories: '/shop/accessories',
   'gift-sets': '/shop/gift-sets',
   'linen-edit': '/shop/linen-edit',
-  'track-suits': '/shop/jackets/track-tops',
+  'track-suits': '/shop/tracksuits',
   khaki: '/shop/trousers/khaki',
   'formal-shoes': '/shop/shoes/formal-shoes',
   'casual-shoes': '/shop/shoes/casual',
@@ -57,12 +59,24 @@ const Navbar = () => {
   const [tree, setTree] = useState(staticTree);
   const [anchors, setAnchors] = useState(NAV_ANCHORS);
   const navRef = useRef(null);
-  const navigate = useNavigate();
+  const menuTriggerRef = useRef(null);
+  const menuCloseRef = useRef(null);
+  const reduceMotion = useReducedMotion();
+  const { pathname } = useLocation();
+  const isHome = pathname === '/';
+
+  // Back and forward change the page without a menu link being tapped.
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
+    setIsOpen(false);
+    setOpenSection(null);
+  }
 
   const cartItemCount = useCartStore((state) =>
     state.items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0)
   );
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -108,19 +122,44 @@ const Navbar = () => {
     return () => document.removeEventListener('pointerdown', handleOutside);
   }, [openDropdown]);
 
+  // While the menu is open: the page behind stays still, Escape closes it, and focus moves in and back.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const { documentElement: html, body } = document;
+    const previous = [html.style.overflow, body.style.overflow];
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    const trigger = menuTriggerRef.current;
+    menuCloseRef.current?.focus({ preventScroll: true });
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        setOpenSection(null);
+      }
+    };
+    // Rotating a tablet to desktop width hides the menu, so it must not leave the page locked.
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const onResize = () => {
+      if (desktop.matches) {
+        setIsOpen(false);
+        setOpenSection(null);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    desktop.addEventListener('change', onResize);
+    return () => {
+      [html.style.overflow, body.style.overflow] = previous;
+      document.removeEventListener('keydown', onKey);
+      desktop.removeEventListener('change', onResize);
+      trigger?.focus({ preventScroll: true });
+    };
+  }, [isOpen]);
+
   const closeAll = () => {
     setIsOpen(false);
     setOpenDropdown(null);
     setOpenSection(null);
-  };
-
-  const goShop = (category, sub, tier) => {
-    navigate(shopPath(category, sub, tier));
-    closeAll();
-  };
-
-  const toggleDropdown = (slug) => {
-    setOpenDropdown((prev) => (prev === slug ? null : slug));
   };
 
   const toggleSection = (slug) => {
@@ -132,358 +171,346 @@ const Navbar = () => {
   const newArrivalsHref = anchors.find((a) => a.id === 'new-arrivals')?.href || '/new-arrivals';
   const linenEditHref = anchors.find((a) => a.id === 'linen-edit')?.href || '/shop/linen-edit';
   /** Spec: Gift Sets sits in secondary cluster, not primary mega-nav. */
-  const primaryNav = tree.filter((p) => p.slug !== 'gift-sets');
+  const primaryNav = tree.filter((p) => p.slug !== 'gift-sets' && p.productCount !== 0);
   const giftSetsHref = '/shop/gift-sets';
+
+  const navLinkClass =
+    'whitespace-nowrap py-3 font-sans text-[11px] font-medium uppercase tracking-[0.16em] transition-colors duration-200 xl:text-xs';
 
   return (
     <nav
       ref={navRef}
-      className={`fixed z-50 w-full transition-all duration-500 ${
-        scrolled ? 'glass py-4 shadow-2xl' : 'bg-transparent py-6 lg:py-8'
+      aria-label="Main"
+      onMouseLeave={() => setOpenDropdown(null)}
+      className={`fixed z-50 w-full transition-colors duration-300 ${
+        isHome && !scrolled && !openDropdown
+          ? 'bg-gradient-to-b from-navy-950/85 to-transparent'
+          : 'border-b border-gold-500/15 bg-navy-950/97 shadow-xl backdrop-blur-md'
       }`}
     >
-      <div className="container mx-auto flex items-center justify-between px-6">
-        <Link to="/" onClick={closeAll} className="min-w-0 shrink">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex max-w-[min(58vw,14rem)] flex-col sm:max-w-none"
+      {!scrolled ? (
+        <p className="hidden bg-gold-500 py-1 text-center font-sans text-[11px] font-medium tracking-[0.06em] text-navy-950 sm:block">
+          Same-day delivery in Nairobi, 1-2 hours · Countrywide in 1-2 days · Yala Towers · WhatsApp +254 724 494089
+        </p>
+      ) : null}
+
+      <div className="container mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-4 py-2 sm:gap-3 sm:px-6 sm:py-3">
+        {/* Left: menu on phones, search field on desktop */}
+        <div className="flex items-center gap-3 text-gold-300">
+          <button
+            ref={menuTriggerRef}
+            type="button"
+            id="prince-menu-trigger"
+            onClick={() => setIsOpen(true)}
+            className={`-ml-2.5 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-md transition-[color,transform] duration-150 hover:text-gold-100 active:scale-90 lg:hidden ${
+              menuHighlight && !isOpen
+                ? 'animate-pulse ring-2 ring-gold-400/80 ring-offset-2 ring-offset-navy-950'
+                : ''
+            }`}
+            aria-label="Open menu"
+            aria-expanded={isOpen}
+            aria-controls="prince-mobile-menu"
           >
-            <span className="text-gradient-gold block whitespace-nowrap font-serif text-[clamp(0.95rem,3.8vw,1.85rem)] font-semibold leading-none tracking-[0.14em] sm:tracking-[0.18em]">
-              PRINCE ESQUIRE
-            </span>
-            <span className="mt-1.5 block whitespace-nowrap font-sans text-[clamp(6px,1.8vw,9px)] font-medium uppercase tracking-[0.35em] text-gold-500/70 sm:tracking-[0.45em]">
-              The Man&apos;s Shop
-            </span>
-          </motion.div>
-        </Link>
-
-        {/* Desktop primary nav */}
-        <div className="relative hidden max-w-[72vw] flex-wrap items-center justify-end gap-2 xl:gap-3 2xl:gap-4 lg:flex">
-          <Link
-            to={newArrivalsHref}
-            onClick={closeAll}
-            className="whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.14em] text-gold-400 transition-colors hover:text-gold-200 xl:text-[9px] 2xl:text-[10px] xl:tracking-[0.18em]"
-          >
-            New Arrivals
-          </Link>
-
-          {primaryNav.map((item) => (
-            <div key={item.slug} className="relative">
-              <button
-                type="button"
-                onClick={() => toggleDropdown(item.slug)}
-                onMouseEnter={() => setOpenDropdown(item.slug)}
-                aria-expanded={openDropdown === item.slug}
-                className={`flex items-center gap-0.5 whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.14em] transition-colors duration-300 xl:text-[9px] 2xl:text-[10px] xl:tracking-[0.18em] ${
-                  openDropdown === item.slug ? 'text-gold-400' : 'text-white hover:text-gold-400'
-                }`}
-              >
-                {item.name}
-                <ChevronDown
-                  size={11}
-                  className={`shrink-0 transition-transform duration-300 ${
-                    openDropdown === item.slug ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-            </div>
-          ))}
-
-          <span className="mx-1 hidden h-3 w-px bg-gold-500/25 2xl:inline-block" aria-hidden />
-
-          <Link
-            to={linenEditHref}
-            onClick={closeAll}
-            className="whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.14em] text-gold-400/90 transition-colors hover:text-gold-200 xl:text-[9px] xl:tracking-[0.18em]"
-          >
-            The Linen Edit
-          </Link>
-          <Link
-            to={giftSetsHref}
-            onClick={closeAll}
-            className="whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.14em] text-gold-400/90 transition-colors hover:text-gold-200 xl:text-[9px] xl:tracking-[0.18em]"
-          >
-            Gift Sets
-          </Link>
-          <Link
-            to={bestsellersHref}
-            onClick={closeAll}
-            className="whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.14em] text-red-400 transition-colors hover:text-red-300 xl:text-[9px] xl:tracking-[0.18em]"
-          >
-            Sale
-          </Link>
-
-          <AnimatePresence>
-            {activePrimary && activePrimary.slug !== 'gift-sets' ? (
-              <MegaMenu
-                primary={activePrimary}
-                onNavigate={goShop}
-                onClose={() => setOpenDropdown(null)}
-              />
-            ) : null}
-          </AnimatePresence>
-        </div>
-
-        <div className="flex items-center space-x-3 text-gold-400 sm:space-x-5">
-          <Link
-            to={isAuthenticated ? '/profile' : '/login'}
-            onClick={closeAll}
-            className="hidden whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.16em] text-gold-400/90 transition-colors hover:text-gold-200 xl:inline xl:text-[9px]"
-          >
-            {isAuthenticated ? 'Account' : 'Sign In'}
-          </Link>
-          {!isAuthenticated ? (
-            <Link
-              to="/signup"
-              onClick={closeAll}
-              className="hidden whitespace-nowrap rounded-full border border-gold-500/40 px-3 py-1.5 font-sans text-[8px] font-bold uppercase tracking-[0.16em] text-gold-400 transition-colors hover:border-gold-400 hover:bg-gold-600 hover:text-navy-950 xl:inline xl:text-[9px]"
-            >
-              Get Started
-            </Link>
-          ) : null}
-
+            <Menu size={24} />
+          </button>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="transition-colors hover:text-gold-200"
+            className="hidden w-full max-w-xs items-center gap-2.5 border border-gold-500/30 bg-navy-900/40 px-3.5 py-2 text-left font-sans text-[13px] text-navy-100 transition-colors hover:border-gold-400 lg:flex"
             aria-label="Search products"
           >
-            <Search size={18} />
+            <Search size={16} className="shrink-0 text-gold-400" />
+            Search suits, shirts, shoes…
           </button>
+        </div>
 
-          <div className="group relative hidden sm:block xl:hidden">
-            <Link to={isAuthenticated ? '/profile' : '/login'}>
-              <User size={18} className="cursor-pointer transition-colors hover:text-gold-200" />
-            </Link>
-            {isAuthenticated && (
-              <div className="invisible absolute right-0 top-full mt-6 translate-y-2 opacity-0 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="min-w-[180px] border border-gold-500/20 bg-navy-950/95 p-6 shadow-2xl">
-                  <p className="mb-4 border-b border-gold-500/10 pb-2 font-sans text-[10px] font-bold uppercase tracking-[0.2em] text-gold-500">
-                    {user?.name}
-                  </p>
-                  <div className="space-y-3">
-                    <Link
-                      to="/profile"
-                      className="block text-[10px] font-bold uppercase tracking-widest text-navy-200 hover:text-gold-400"
-                    >
-                      My Account
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={logout}
-                      className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-red-400/70 transition-colors hover:text-red-400"
-                    >
-                      <LogOut size={12} />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* Centre: brand */}
+        <Link to="/" onClick={closeAll} className="flex flex-col items-center text-center" aria-label="Prince Esquire home">
+          <span className="text-gradient-gold whitespace-nowrap font-serif text-[1.15rem] font-semibold leading-none tracking-[0.14em] sm:text-2xl sm:tracking-[0.18em] lg:text-[1.85rem]">
+            PRINCE ESQUIRE
+          </span>
+          {!scrolled ? (
+            <span className="mt-1 whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.4em] text-gold-300 sm:text-[9px]">
+              The Man&apos;s Shop
+            </span>
+          ) : null}
+        </Link>
 
-          <Link to="/cart" className="group relative cursor-pointer">
-            <ShoppingBag size={18} className="transition-colors group-hover:text-gold-200" />
+        {/* Right: account + bag */}
+        <div className="flex items-center justify-end text-gold-300 sm:gap-2 lg:gap-5">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="flex h-11 w-9 touch-manipulation items-center justify-center transition-colors hover:text-gold-100 active:scale-90 sm:w-11 lg:hidden"
+            aria-label="Search products"
+          >
+            <Search size={21} />
+          </button>
+          <Link
+            to={isAuthenticated ? '/profile' : '/login'}
+            onClick={closeAll}
+            className="hidden items-center gap-2 font-sans text-xs font-medium uppercase tracking-[0.14em] transition-colors hover:text-gold-100 sm:flex"
+            aria-label={isAuthenticated ? 'My account' : 'Sign in'}
+          >
+            <User size={19} />
+            <span className="hidden xl:inline">{isAuthenticated ? 'Account' : 'Sign in'}</span>
+          </Link>
+          <Link to="/cart" className="group relative -mr-2 flex h-11 w-11 touch-manipulation items-center justify-center" aria-label={`Shopping bag, ${cartItemCount} items`}>
+            <ShoppingBag size={21} className="transition-colors group-hover:text-gold-100" />
             <span
               key={cartItemCount}
-              className={`absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold-600 px-1 font-sans text-[9px] font-bold tabular-nums text-navy-950 shadow-sm ${
-                cartItemCount > 0 ? 'animate-[cart-pop_0.35s_ease-out]' : 'opacity-90'
+              className={`absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold-500 px-1 font-sans text-[10px] font-bold tabular-nums text-navy-950 ${
+                cartItemCount > 0 ? 'animate-[cart-pop_0.35s_ease-out]' : ''
               }`}
             >
               {cartItemCount}
             </span>
           </Link>
-
-          <button
-            type="button"
-            id="prince-menu-trigger"
-            onClick={() => setIsOpen(!isOpen)}
-            className={`relative rounded-md p-1 text-gold-400 transition-colors hover:text-gold-200 lg:hidden ${
-              menuHighlight && !isOpen
-                ? 'animate-pulse ring-2 ring-gold-400/80 ring-offset-2 ring-offset-navy-950'
-                : ''
-            }`}
-            aria-label={isOpen ? 'Close menu' : 'Open menu'}
-          >
-            {isOpen ? <X size={26} /> : <Menu size={26} />}
-          </button>
         </div>
       </div>
 
-      {/* Mobile drawer */}
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+      {/* Desktop department row: real links, so they can be crawled and opened in a new tab */}
+      <div className="relative hidden border-t border-gold-500/10 lg:block">
+        <div className="container mx-auto flex items-center justify-center gap-5 px-6 xl:gap-8">
+          <Link to={newArrivalsHref} onClick={closeAll} onMouseEnter={() => setOpenDropdown(null)} className={`${navLinkClass} text-gold-300 hover:text-gold-100`}>
+            New Arrivals
+          </Link>
+
+          {primaryNav.map((item) => (
+            <Link
+              key={item.slug}
+              to={shopPath(item.slug)}
               onClick={closeAll}
-              className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
-            />
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-              className="fixed inset-y-0 right-0 z-40 w-[88%] max-w-sm overflow-y-auto border-l border-gold-500/10 bg-navy-950 font-sans lg:hidden"
+              onMouseEnter={() => setOpenDropdown(item.slug)}
+              onFocus={() => setOpenDropdown(item.slug)}
+              aria-expanded={openDropdown === item.slug}
+              aria-haspopup="true"
+              className={`${navLinkClass} flex items-center gap-1 ${
+                openDropdown === item.slug ? 'text-gold-300' : 'text-white hover:text-gold-300'
+              }`}
             >
-              <div className="p-6 pb-12 pt-24">
-                <div className="mb-8 border-b border-gold-500/10 pb-6">
-                  <p className="text-gradient-gold whitespace-nowrap font-serif text-[clamp(1.1rem,5vw,1.5rem)] font-semibold tracking-[0.16em]">
-                    PRINCE ESQUIRE
-                  </p>
-                  <p className="mt-2 whitespace-nowrap font-sans text-[10px] font-medium uppercase tracking-[0.42em] text-gold-500/80">
-                    The Man&apos;s Shop
-                  </p>
-                  <p className="mt-3 flex items-center gap-1.5 font-sans text-[11px] font-light tracking-wide text-navy-300">
-                    <MapPin size={11} className="text-gold-500/70" />
+              {item.name}
+              <ChevronDown
+                size={12}
+                className={`shrink-0 transition-transform duration-200 ${openDropdown === item.slug ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </Link>
+          ))}
+
+          <Link to={linenEditHref} onClick={closeAll} onMouseEnter={() => setOpenDropdown(null)} className={`${navLinkClass} text-white hover:text-gold-300`}>
+            Linen Edit
+          </Link>
+          <Link to={giftSetsHref} onClick={closeAll} onMouseEnter={() => setOpenDropdown(null)} className={`${navLinkClass} text-white hover:text-gold-300`}>
+            Gift Sets
+          </Link>
+          <Link to={bestsellersHref} onClick={closeAll} onMouseEnter={() => setOpenDropdown(null)} className={`${navLinkClass} text-red-300 hover:text-red-200`}>
+            Sale
+          </Link>
+        </div>
+
+        <AnimatePresence>
+          {activePrimary && activePrimary.slug !== 'gift-sets' && (activePrimary.children || []).length > 0 ? (
+            <MegaMenu primary={activePrimary} onNavigate={closeAll} />
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      {/* Mobile menu. Rendered on <body>: the header's backdrop blur would otherwise trap it inside the header. */}
+      {createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <div key="prince-mobile-menu" className="lg:hidden">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2 }}
+                onClick={closeAll}
+                className="fixed inset-0 z-[60] bg-black/60"
+                aria-hidden="true"
+              />
+              <motion.div
+                id="prince-mobile-menu"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Menu"
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ duration: reduceMotion ? 0 : 0.26, ease: [0.22, 1, 0.36, 1] }}
+                className="fixed inset-y-0 left-0 z-[70] flex h-dvh w-[min(88vw,24rem)] flex-col border-r border-gold-500/15 bg-navy-950 font-sans shadow-2xl"
+              >
+                <div className="grid shrink-0 grid-cols-[2.75rem_1fr_2.75rem] items-center border-b border-gold-500/15 px-4 py-2 sm:px-6 sm:py-3">
+                  <button
+                    ref={menuCloseRef}
+                    type="button"
+                    onClick={closeAll}
+                    className="-ml-2.5 flex h-11 w-11 touch-manipulation items-center justify-center rounded-md text-gold-300 transition-[color,transform] duration-150 hover:text-gold-100 active:scale-90"
+                    aria-label="Close menu"
+                  >
+                    <X size={24} />
+                  </button>
+                  <div className="min-w-0 text-center">
+                    <p className="text-gradient-gold whitespace-nowrap font-serif text-[1.05rem] font-semibold leading-none tracking-[0.14em]">
+                      PRINCE ESQUIRE
+                    </p>
+                    <p className="mt-1 whitespace-nowrap font-sans text-[8px] font-medium uppercase tracking-[0.4em] text-gold-300">
+                      The Man&apos;s Shop
+                    </p>
+                  </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6">
+                    <div className="flex flex-col">
+                      <Link
+                        to={newArrivalsHref}
+                        onClick={closeAll}
+                        className="border-b border-gold-500/10 flex min-h-14 items-center py-3 font-serif text-[1.15rem] tracking-[0.04em] text-gold-400"
+                      >
+                        New Arrivals
+                      </Link>
+                      {primaryNav.map((item) => (
+                        <div key={item.slug} className="border-b border-gold-500/10">
+                          <div className="flex w-full items-center">
+                            <Link
+                              to={shopPath(item.slug)}
+                              onClick={closeAll}
+                              className="flex min-h-14 min-w-0 flex-1 items-center py-3 text-left font-serif text-[1.15rem] tracking-[0.04em] text-white transition-colors hover:text-gold-400"
+                            >
+                              {item.name}
+                            </Link>
+                            {(item.children || []).length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleSection(item.slug)}
+                                aria-expanded={openSection === item.slug}
+                                aria-label={`Show ${item.name} subcategories`}
+                                className="-mr-3 flex h-14 w-12 shrink-0 touch-manipulation items-center justify-center text-gold-500"
+                              >
+                                <ChevronDown
+                                  size={18}
+                                  className={`transition-transform duration-300 ${
+                                    openSection === item.slug ? 'rotate-180' : ''
+                                  }`}
+                                />
+                              </button>
+                            )}
+                          </div>
+                          <AnimatePresence initial={false}>
+                            {openSection === item.slug && (item.children || []).length > 0 && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="flex flex-col gap-1 pb-4">
+                                  {(item.children || [])
+                                    .filter((link) => link.productCount !== 0)
+                                    .map((link) => {
+                                      const image = tileImageFor(link.slug, link.tileImage || link.image);
+                                      return (
+                                        <Link
+                                          key={link.slug}
+                                          to={shopPath(item.slug, link.slug)}
+                                          onClick={closeAll}
+                                          className="flex min-h-12 items-center gap-3 rounded-md py-1.5 text-left hover:bg-gold-500/5"
+                                        >
+                                          {image && !image.endsWith('.svg') ? (
+                                            <img
+                                              src={image}
+                                              alt=""
+                                              className="h-14 w-11 shrink-0 object-cover object-top ring-1 ring-gold-500/20"
+                                              loading="lazy"
+                                            />
+                                          ) : null}
+                                          <span className="font-sans text-[13px] font-medium uppercase tracking-[0.12em] text-navy-100">
+                                            {link.name}
+                                          </span>
+                                        </Link>
+                                      );
+                                    })}
+                                  <Link
+                                    to={shopPath(item.slug)}
+                                    onClick={closeAll}
+                                    className="flex min-h-11 items-center text-left font-sans text-xs font-semibold uppercase tracking-[0.16em] text-gold-300"
+                                  >
+                                    Shop all {item.name}
+                                  </Link>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      ))}
+
+                      <Link
+                        to={linenEditHref}
+                        onClick={closeAll}
+                        className="border-b border-gold-500/10 flex min-h-14 items-center py-3 font-serif text-[1.15rem] tracking-[0.04em] text-gold-200"
+                      >
+                        The Linen Edit
+                      </Link>
+
+                      <Link
+                        to={giftSetsHref}
+                        onClick={closeAll}
+                        className="border-b border-gold-500/10 flex min-h-14 items-center py-3 font-serif text-[1.15rem] tracking-[0.04em] text-gold-200"
+                      >
+                        Gift Sets
+                      </Link>
+
+                      <Link
+                        to={bestsellersHref}
+                        onClick={closeAll}
+                        className="border-b border-gold-500/10 flex min-h-14 items-center py-3 font-serif text-[1.15rem] tracking-[0.04em] text-red-400"
+                      >
+                        Sale
+                      </Link>
+
+                      <Link
+                        to="/signup"
+                        onClick={closeAll}
+                        className="border-b border-gold-500/10 flex min-h-14 items-center py-3 font-serif text-[1.15rem] tracking-[0.04em] text-gold-500"
+                      >
+                        Get Started
+                      </Link>
+                    </div>
+
+                    <div className="pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchOpen(true);
+                          closeAll();
+                        }}
+                        className="flex min-h-12 w-full items-center gap-3 font-sans text-[12px] font-medium uppercase tracking-[0.22em] text-gold-400"
+                      >
+                        <Search size={18} />
+                        Search
+                      </button>
+                      <Link
+                        to={isAuthenticated ? '/profile' : '/login'}
+                        onClick={closeAll}
+                        className="flex min-h-12 w-full items-center gap-3 font-sans text-[12px] font-medium uppercase tracking-[0.22em] text-gold-400"
+                      >
+                        <User size={18} />
+                        {isAuthenticated ? 'My Account' : 'Sign In'}
+                      </Link>
+                    </div>
+                  <p className="flex min-h-12 items-center gap-3 font-sans text-[11px] font-light tracking-wide text-navy-300">
+                    <MapPin size={18} className="text-gold-500/70" />
                     Yala Towers, Nairobi
                   </p>
                 </div>
-
-                <div className="flex flex-col">
-                  <Link
-                    to={newArrivalsHref}
-                    onClick={closeAll}
-                    className="border-b border-gold-500/10 py-5 font-serif text-[1.25rem] tracking-[0.04em] text-gold-400"
-                  >
-                    New Arrivals
-                  </Link>
-                  {primaryNav.map((item) => (
-                    <div key={item.slug} className="border-b border-gold-500/10">
-                      <div className="flex w-full items-center">
-                        <button
-                          type="button"
-                          onClick={() => goShop(item.slug)}
-                          className="flex-1 py-5 text-left font-serif text-[1.25rem] tracking-[0.04em] text-white transition-colors hover:text-gold-400"
-                        >
-                          {item.name}
-                        </button>
-                        {(item.children || []).length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => toggleSection(item.slug)}
-                            aria-expanded={openSection === item.slug}
-                            aria-label={`Show ${item.name} subcategories`}
-                            className="p-3 text-gold-500"
-                          >
-                            <ChevronDown
-                              size={18}
-                              className={`transition-transform duration-300 ${
-                                openSection === item.slug ? 'rotate-180' : ''
-                              }`}
-                            />
-                          </button>
-                        )}
-                      </div>
-                      <AnimatePresence initial={false}>
-                        {openSection === item.slug && (item.children || []).length > 0 && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="flex flex-col space-y-3 pb-5 pl-1">
-                              {(item.children || []).map((link) => (
-                                <div key={link.slug} className="flex gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => goShop(item.slug, link.slug)}
-                                    className="flex flex-1 items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-gold-500/5"
-                                  >
-                                    <img
-                                      src={
-                                        link.tileImage ||
-                                        link.image ||
-                                        `/placeholders/taxonomy/${link.slug}.svg`
-                                      }
-                                      alt=""
-                                      className="h-14 w-11 object-cover ring-1 ring-gold-500/20"
-                                      loading="lazy"
-                                    />
-                                    <span className="font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-navy-200">
-                                      {link.name}
-                                    </span>
-                                  </button>
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => goShop(item.slug)}
-                                className="px-2 py-2 text-left font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-500"
-                              >
-                                Shop all {item.name}
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ))}
-
-                  <Link
-                    to={linenEditHref}
-                    onClick={closeAll}
-                    className="border-b border-gold-500/10 py-5 font-serif text-[1.25rem] tracking-[0.04em] text-gold-200"
-                  >
-                    The Linen Edit
-                  </Link>
-
-                  <Link
-                    to={giftSetsHref}
-                    onClick={closeAll}
-                    className="border-b border-gold-500/10 py-5 font-serif text-[1.25rem] tracking-[0.04em] text-gold-200"
-                  >
-                    Gift Sets
-                  </Link>
-
-                  <Link
-                    to={bestsellersHref}
-                    onClick={closeAll}
-                    className="border-b border-gold-500/10 py-5 font-serif text-[1.25rem] tracking-[0.04em] text-red-400"
-                  >
-                    Sale
-                  </Link>
-
-                  <Link
-                    to="/signup"
-                    onClick={closeAll}
-                    className="border-b border-gold-500/10 py-5 font-serif text-[1.25rem] tracking-[0.04em] text-gold-500"
-                  >
-                    Get Started
-                  </Link>
-                </div>
-
-                <div className="space-y-5 pt-8">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchOpen(true);
-                      closeAll();
-                    }}
-                    className="flex items-center gap-3 font-sans text-[12px] font-medium uppercase tracking-[0.22em] text-gold-400"
-                  >
-                    <Search size={18} />
-                    Search
-                  </button>
-                  <Link
-                    to={isAuthenticated ? '/profile' : '/login'}
-                    onClick={closeAll}
-                    className="flex items-center gap-3 font-sans text-[12px] font-medium uppercase tracking-[0.22em] text-gold-400"
-                  >
-                    <User size={18} />
-                    {isAuthenticated ? 'My Account' : 'Sign In'}
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </nav>

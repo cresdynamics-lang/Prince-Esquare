@@ -18,6 +18,7 @@ import { buildVariantMeta, buildRichDescription, sortSizes } from '../utils/prod
 import {
   buildBreadcrumbSchema,
   buildProductSchema,
+  displayProductName,
   buildFaqSchema,
   organizationSchema,
 } from '../seo/seoData';
@@ -603,23 +604,13 @@ const ProductDetail = () => {
   return (
     <div className="bg-navy-950 min-h-screen">
       <SEO
-        title={`${product.name} Kenya`}
-        description={`Shop ${product.name} at Prince Esquire Kenya. ${
-          product.focus_description ||
-          'Discover premium styling, curated detail and Nairobi delivery for luxury wardrobes. Order today.'
-        }`}
+        title={`${displayProductName(product.name)} in Kenya`}
+        description={`${displayProductName(product.name)}, KSh ${Number(displayPrice || 0).toLocaleString('en-KE')}. ${
+          product.focus_description || product.description || 'Shop at Prince Esquire, Yala Towers, Nairobi.'
+        } Delivery across Kenya.`}
         path={`/product/${product.slug}`}
         type="product"
         image={currentDisplayImage}
-        keywords={[
-          product.name,
-          product.brand_name,
-          product.category_name,
-          product.parent_category_name,
-          'Prince Esquire',
-          'luxury fashion Kenya',
-          'menswear Nairobi',
-        ].filter(Boolean)}
         schema={[
           organizationSchema,
           buildBreadcrumbSchema(
@@ -640,7 +631,7 @@ const ProductDetail = () => {
             {
               question: 'Do you deliver outside Nairobi?',
               answer:
-                'Yes. Nairobi may use rider delivery; prepaid orders ship nationwide via courier after confirmation.',
+                'Yes. Delivery within Nairobi is same day, in just 1-2 hours, and countrywide delivery takes 1-2 days after confirmation.',
             },
           ]),
         ]}

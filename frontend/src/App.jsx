@@ -30,6 +30,8 @@ const SizeGuide = lazy(() => import('./pages/SizeGuide'));
 const Profile = lazy(() => import('./pages/Profile'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const BespokeServices = lazy(() => import('./pages/BespokeServices'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function RedirectJacketsOuterwearSub() {
   const { sub } = useParams();
@@ -211,6 +213,14 @@ function App() {
             }
           />
           <Route
+            path="/bespoke-services"
+            element={
+              <IsolatedRoute label="Bespoke services">
+                <BespokeServices />
+              </IsolatedRoute>
+            }
+          />
+          <Route
             path="/profile"
             element={
               <IsolatedRoute label="Profile">
@@ -242,7 +252,9 @@ function App() {
           <Route path="/jackets-outerwear" element={<Navigate to="/shop/jackets" replace />} />
           <Route path="/jackets-outerwear/full-jackets" element={<Navigate to="/shop/jackets/full-jackets" replace />} />
           <Route path="/jackets-outerwear/half-jackets" element={<Navigate to="/shop/jackets/half-jackets" replace />} />
-          <Route path="/jackets-outerwear/track-tops" element={<Navigate to="/shop/jackets/track-tops" replace />} />
+          <Route path="/jackets-outerwear/track-tops" element={<Navigate to="/shop/tracksuits" replace />} />
+          <Route path="/shop/jackets/track-tops" element={<Navigate to="/shop/tracksuits" replace />} />
+          <Route path="/track-suits" element={<Navigate to="/shop/tracksuits" replace />} />
           <Route path="/shop/jackets-outerwear" element={<Navigate to="/shop/jackets" replace />} />
           <Route path="/shop/jackets-outerwear/:sub" element={<RedirectJacketsOuterwearSub />} />
           <Route path="/accessories" element={<Navigate to="/shop/accessories" replace />} />
@@ -271,6 +283,14 @@ function App() {
             }
           />
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+          <Route
+            path="*"
+            element={
+              <IsolatedRoute label="Page">
+                <NotFound />
+              </IsolatedRoute>
+            }
+          />
         </Routes>
       </PageErrorBoundary>
     </Router>

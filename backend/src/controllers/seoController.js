@@ -1,517 +1,613 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../config/db');
 const {
   SITE_URL,
   SITE_NAME,
   DEFAULT_IMAGE,
   routeSeo,
-  categoryFilters,
   organizationSchema,
   localBusinessSchema,
   websiteSchema,
   staticPaths,
+  LEGACY_REDIRECTS,
+  PRIVATE_ROUTES,
 } = require('../seo/siteSeo');
+const {
+  TAXONOMY_TREE,
+  LEGACY_SLUG_ALIASES,
+  flattenTaxonomy,
+  findTaxonBySlug,
+  canonicalShopPath,
+} = require('../data/taxonomy');
+const { buildCategorySeo, clip, money } = require('../seo/categorySeo');
+const { renderDocument, escapeHtml } = require('../seo/pageRenderer');
+const data = require('../seo/pageData');
+const { GUIDES } = require('../seo/categoryGuides');
+const { MAP_URL } = require('../seo/siteSeo');
 const { toMetaSquareImageUrl } = require('../utils/cloudinaryImage');
 
 const DIST_INDEX = path.join(__dirname, '../../../frontend/dist/index.html');
+const PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+const PAGE_CACHE_MAX = 300;
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+/* ---------- template + page cache ---------- */
 
-function normalizePath(rawPath) {
-  const pathOnly = String(rawPath || '/').split('?')[0].split('#')[0] || '/';
-  if (pathOnly !== '/' && pathOnly.endsWith('/')) return pathOnly.slice(0, -1);
-  return pathOnly || '/';
-}
+let templateCache = { mtimeMs: 0, html: '' };
+const pageCache = new Map();
 
-function resolveRouteMeta(urlPath) {
-  if (urlPath === '/') return routeSeo.home;
-  const key = urlPath.slice(1);
-  return routeSeo[key] || routeSeo.products;
-}
-
-async function fetchProductsForPath(urlPath, limit = 48) {
-  const filter = categoryFilters[urlPath];
-  let query = `
-    SELECT p.name, p.slug, p.price, p.thumbnail, p.description, b.name AS brand_name,
-           c.slug AS category_slug, p_cat.slug AS parent_category_slug
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
-    LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.is_active = true   `;
-  const params = [];
-
-  if (filter?.parentSlug) {
-    query += ` AND (c.slug = $1 OR p_cat.slug = $1 OR LOWER(c.name) = LOWER($2) OR LOWER(p_cat.name) = LOWER($2))`;
-    params.push(filter.parentSlug, filter.parentSlug.replace(/-/g, ' '));
+function loadTemplate() {
+  const { mtimeMs } = fs.statSync(DIST_INDEX);
+  if (mtimeMs !== templateCache.mtimeMs) {
+    templateCache = { mtimeMs, html: fs.readFileSync(DIST_INDEX, 'utf8') };
+    pageCache.clear(); // new deploy → new asset hashes
   }
-
-  query += ` ORDER BY p.is_featured DESC, p.created_at DESC LIMIT $${params.length + 1}`;
-  params.push(limit);
-
-  const result = await db.query(query, params);
-  return result.rows;
+  return templateCache.html;
 }
 
-async function fetchProductBySlug(slug) {
-  const result = await db.query(
-    `SELECT p.*, b.name AS brand_name, c.name AS category_name
-     FROM products p
-     LEFT JOIN brands b ON p.brand_id = b.id
-     LEFT JOIN categories c ON p.category_id = c.id
-     WHERE p.slug = $1 AND p.is_active = true
-     LIMIT 1`,
-    [slug]
-  );
-  return result.rows[0] || null;
+/* ---------- small helpers ---------- */
+
+const titleCase = (value) => {
+  const text = String(value || '').trim();
+  if (text !== text.toUpperCase()) return text;
+  return text.toLowerCase().replace(/(^|[\s-])([a-z])/g, (m, sep, ch) => sep + ch.toUpperCase());
+};
+
+function absoluteUrl(url) {
+  if (!url) return DEFAULT_IMAGE;
+  const value = String(url).trim();
+  if (!value) return DEFAULT_IMAGE;
+  const abs = /^https?:\/\//i.test(value) ? value : `${SITE_URL}${value.startsWith('/') ? '' : '/'}${value}`;
+  return abs.replace(/^http:\/\//i, 'https://').replace(/ /g, '%20');
 }
 
-async function fetchBlogBySlug(slug) {
-  const result = await db.query(
-    `SELECT title, slug, excerpt, content, featured_image_url, published_date, updated_at, meta_title, meta_description
-     FROM blog_posts
-     WHERE slug = $1 AND is_published = true
-     LIMIT 1`,
-    [slug]
-  );
-  return result.rows[0] || null;
+/** Sized CDN version for the lightweight HTML list. */
+function cardImage(url) {
+  const abs = absoluteUrl(url);
+  return abs.includes('/upload/') ? abs.replace('/upload/', '/upload/f_auto,q_auto,w_480/') : abs;
 }
 
-async function fetchSaleSections() {
-  const result = await db.query(
-    `SELECT p.name, p.slug, p.price, p.thumbnail,
-            c.name AS category_name, c.slug AS category_slug,
-            p_cat.name AS parent_category_name, p_cat.slug AS parent_category_slug
-     FROM products p
-     LEFT JOIN categories c ON p.category_id = c.id
-     LEFT JOIN categories p_cat ON c.parent_id = p_cat.id
-     WHERE p.is_active = true  AND p.is_on_sale = true
-     ORDER BY p.is_featured DESC, p.name ASC
-     LIMIT 80`
-  );
+function socialImage(url) {
+  const abs = absoluteUrl(url);
+  return toMetaSquareImageUrl(abs) || abs;
+}
 
-  const sectionMap = new Map();
-  for (const product of result.rows) {
-    const cat = product.category_slug || '';
-    const parent = product.parent_category_slug || '';
-    let title = product.category_name || product.parent_category_name || 'Sale Picks';
-    let slug = cat || parent || 'sale';
-    if (cat === 'track-suits') {
-      title = 'Track Suits';
-      slug = 'track-suits';
-    } else if (cat === 'khaki') {
-      title = 'Khaki Trousers';
-      slug = 'khaki';
-    } else if (cat === 'boots' || /boot/i.test(product.name || '')) {
-      title = 'Official Boots';
-      slug = 'boots';
-    } else if (cat === 'formal-shoes') {
-      title = 'Official Shoes';
-      slug = 'formal-shoes';
+function parseImages(product) {
+  let list = product.images;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = [];
     }
-    if (!sectionMap.has(slug)) sectionMap.set(slug, { title, products: [] });
-    sectionMap.get(slug).products.push(product);
   }
-  return Array.from(sectionMap.values());
+  const urls = (Array.isArray(list) ? list : [])
+    .map((item) => (typeof item === 'string' ? item : item?.url || item?.secure_url))
+    .filter((u) => typeof u === 'string' && u.trim().length > 4)
+    .map(absoluteUrl);
+  const all = [absoluteUrl(product.thumbnail), ...urls];
+  return [...new Set(all)].slice(0, 6);
 }
 
-function productSchema(product) {
-  const image = product.thumbnail?.startsWith('http')
-    ? product.thumbnail
-    : `${SITE_URL}${product.thumbnail || '/LOGO.jpeg'}`;
-  return {
+const unitPrice = (product) => {
+  const sale = Number(product.discount_price);
+  return Number.isFinite(sale) && sale > 0 ? sale : Number(product.price) || 0;
+};
+
+function productSchema(product, images) {
+  const description = product.description || product.focus_description;
+  const schema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: product.name,
-    image: [image],
-    description: product.description || `${product.name} — luxury fashion at Prince Esquire Kenya.`,
-    sku: String(product.slug || product.name),
+    name: titleCase(product.name),
+    image: images,
+    description: description || `${titleCase(product.name)} from Prince Esquire, The Man's Shop in Nairobi, Kenya.`,
+    sku: String(product.sku || product.slug),
+    category: product.category_name || product.parent_category_name || undefined,
     brand: { '@type': 'Brand', name: product.brand_name || SITE_NAME },
     offers: {
       '@type': 'Offer',
       url: `${SITE_URL}/product/${product.slug}`,
       priceCurrency: 'KES',
-      price: String(product.price || ''),
+      price: String(unitPrice(product)),
+      // Matches the storefront, which sells every listed product as available online.
       availability: 'https://schema.org/InStock',
+      itemCondition: 'https://schema.org/NewCondition',
+      seller: { '@type': 'Organization', name: SITE_NAME },
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        applicableCountry: 'KE',
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        merchantReturnDays: 5,
+        returnMethod: 'https://schema.org/ReturnByMail',
+        returnFees: 'https://schema.org/ReturnShippingFees',
+      },
     },
   };
+  if (Number(product.ratings_count) > 0 && Number(product.ratings_avg) > 0) {
+    schema.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: String(product.ratings_avg),
+      reviewCount: Number(product.ratings_count),
+    };
+  }
+  return schema;
 }
 
-function itemListSchema(products, listName) {
+function breadcrumbSchema(items) {
   return {
     '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: listName,
-    itemListElement: products.slice(0, 20).map((product, index) => ({
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
       '@type': 'ListItem',
       position: index + 1,
-      url: `${SITE_URL}/product/${product.slug}`,
-      name: product.name,
+      name: item.name,
+      item: `${SITE_URL}${item.path}`,
     })),
   };
 }
 
-function buildProductListHtml(products) {
-  if (!products.length) return '<p>Browse our luxury fashion collection at Prince Esquire Kenya.</p>';
-  return `<ul>${products
-    .map(
-      (p) =>
-        `<li><a href="/product/${escapeHtml(p.slug)}">${escapeHtml(p.name)}</a> — KSh ${escapeHtml(
-          Number(p.price || 0).toLocaleString()
-        )}${p.brand_name ? ` (${escapeHtml(p.brand_name)})` : ''}</li>`
-    )
-    .join('')}</ul>`;
+function itemListSchema(products, name) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    numberOfItems: products.length,
+    itemListElement: products.slice(0, 40).map((product, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: `${SITE_URL}/product/${product.slug}`,
+      name: titleCase(product.name),
+    })),
+  };
 }
 
-function buildNavHtml() {
-  const links = [
-    ['Home', '/'],
-    ['Collections', '/products'],
-    ['Sale', '/sale'],
-    ['Shoes', '/shoes'],
-    ['Shirts', '/shirts'],
-    ['Suits', '/suits'],
-    ['Track Suits', '/products?category=track-suits'],
-    ['Blog', '/blog'],
-    ['Contact', '/contact-us'],
-  ];
-  return `<nav aria-label="Site"><ul>${links
-    .map(([label, href]) => `<li><a href="${href}">${label}</a></li>`)
-    .join('')}</ul></nav>`;
+function faqSchema(faqs) {
+  if (!faqs?.length) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer },
+    })),
+  };
 }
 
-function absoluteImage(url) {
-  if (!url) return DEFAULT_IMAGE;
-  const value = String(url).trim();
-  if (!value) return DEFAULT_IMAGE;
-  let abs = value.startsWith('http://') || value.startsWith('https://')
-    ? value
-    : `${SITE_URL}${value.startsWith('/') ? '' : '/'}${value}`;
-  abs = abs.replace(/^http:\/\//i, 'https://');
-  // Encode spaces for Meta crawlers
-  try {
-    const u = new URL(abs);
-    u.pathname = u.pathname
-      .split('/')
-      .map((seg) => {
-        if (!seg) return seg;
-        try {
-          return encodeURIComponent(decodeURIComponent(seg));
-        } catch {
-          return encodeURIComponent(seg);
-        }
-      })
-      .join('/');
-    abs = u.toString();
-  } catch {
-    abs = abs.replace(/ /g, '%20');
-  }
-  // Square JPEG with white padding so Facebook/Instagram do not crop the product.
-  return toMetaSquareImageUrl(abs) || abs;
-}
+/* ---------- HTML fragments ---------- */
 
-function renderDocument({ title, description, canonicalPath, bodyHtml, schemas = [], image } = {}) {
-  const canonical = `${SITE_URL}${canonicalPath}`;
-  const ogImage = absoluteImage(image || DEFAULT_IMAGE);
-  const schemaScripts = schemas
-    .filter(Boolean)
-    .map((schema) => `<script type="application/ld+json">${JSON.stringify(schema)}</script>`)
-    .join('\n    ');
-
-  let spaAssets = '';
-  try {
-    if (fs.existsSync(DIST_INDEX)) {
-      const dist = fs.readFileSync(DIST_INDEX, 'utf8');
-      const scriptMatch = dist.match(/<script type="module" crossorigin src="([^"]+)"><\/script>/);
-      const cssMatch = dist.match(/<link rel="stylesheet" crossorigin href="([^"]+)">/);
-      if (scriptMatch) spaAssets += `<script type="module" crossorigin src="${scriptMatch[1]}"></script>\n    `;
-      if (cssMatch) spaAssets += `<link rel="stylesheet" crossorigin href="${cssMatch[1]}">`;
-    }
-  } catch {
-    /* optional SPA assets */
-  }
-
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(title)}</title>
-    <meta name="description" content="${escapeHtml(description)}" />
-    <meta name="robots" content="index,follow,max-image-preview:large" />
-    <link rel="canonical" href="${escapeHtml(canonical)}" />
-    <meta property="og:site_name" content="${SITE_NAME}" />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="${escapeHtml(title)}" />
-    <meta property="og:description" content="${escapeHtml(description)}" />
-    <meta property="og:url" content="${escapeHtml(canonical)}" />
-    <meta property="og:image" content="${escapeHtml(ogImage)}" />
-    <meta property="og:image:secure_url" content="${escapeHtml(ogImage)}" />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="1200" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${escapeHtml(title)}" />
-    <meta name="twitter:description" content="${escapeHtml(description)}" />
-    <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
-    ${schemaScripts}
-    ${spaAssets}
-  </head>
-  <body>
-    <div id="root"></div>
-    <noscript>
-      <header>
-        <p><a href="/">${SITE_NAME}</a> — Luxury Fashion Kenya</p>
-        ${buildNavHtml()}
-      </header>
-      <main>${bodyHtml}</main>
-      <footer>
-        <p>Prince Esquire — Nairobi, Kenya. Delivery across Kenya.</p>
-        <p><a href="/contact-us">Contact</a> · <a href="/shipping-returns">Shipping</a> · <a href="/privacy-policy">Privacy</a></p>
-      </footer>
-    </noscript>
-  </body>
-</html>`;
-}
-
-async function buildPageHtml(urlPath) {
-  const productMatch = urlPath.match(/^\/product\/([^/]+)$/);
-  const blogMatch = urlPath.match(/^\/blog\/([^/]+)$/);
-
-  if (productMatch) {
-    const product = await fetchProductBySlug(decodeURIComponent(productMatch[1]));
-    if (!product) return null;
-    const title = `${product.name} | ${SITE_NAME}`;
-    const description =
-      (product.description || '').slice(0, 160) ||
-      `Shop ${product.name} at Prince Esquire — luxury fashion in Kenya.`;
-    const productImage = absoluteImage(product.thumbnail);
-    const bodyHtml = `
-      <article>
-        <h1>${escapeHtml(product.name)}</h1>
-        <p><img src="${escapeHtml(productImage)}" alt="${escapeHtml(product.name)}" width="600" height="600" /></p>
-        <p>${escapeHtml(product.brand_name || 'Prince Esquire')} · KSh ${escapeHtml(Number(product.price || 0).toLocaleString())}</p>
-        <p>${escapeHtml((product.description || description).slice(0, 500))}</p>
-        <p><a href="/products">Back to collections</a></p>
-      </article>`;
-    return renderDocument({
-      title,
-      description,
-      canonicalPath: urlPath,
-      bodyHtml,
-      image: productImage,
-      schemas: [productSchema(product), organizationSchema],
-    });
-  }
-
-  if (blogMatch) {
-    const post = await fetchBlogBySlug(decodeURIComponent(blogMatch[1]));
-    if (!post) return null;
-    const title = post.meta_title || `${post.title} | ${SITE_NAME}`;
-    const description = post.meta_description || post.excerpt || post.title;
-    const bodyHtml = `
-      <article>
-        <h1>${escapeHtml(post.title)}</h1>
-        <p>${escapeHtml(post.excerpt || '')}</p>
-        <div>${escapeHtml(String(post.content || '').replace(/<[^>]+>/g, ' ').slice(0, 1200))}</div>
-      </article>`;
-    const blogSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'BlogPosting',
-      headline: post.title,
-      description,
-      datePublished: post.published_date,
-      dateModified: post.updated_at || post.published_date,
-      mainEntityOfPage: `${SITE_URL}${urlPath}`,
-      publisher: { '@type': 'Organization', name: SITE_NAME, logo: { '@type': 'ImageObject', url: DEFAULT_IMAGE } },
-    };
-    return renderDocument({
-      title,
-      description,
-      canonicalPath: urlPath,
-      bodyHtml,
-      image: absoluteImage(post.featured_image_url),
-      schemas: [blogSchema, organizationSchema],
-    });
-  }
-
-  if (urlPath === '/sale') {
-    const sections = await fetchSaleSections();
-    const allProducts = sections.flatMap((s) => s.products);
-    const meta = routeSeo.sale;
-    const bodyHtml = `
-      <h1>${escapeHtml(meta.h1)}</h1>
-      <p>${escapeHtml(meta.intro)}</p>
-      ${sections
+const productListHtml = (products) =>
+  products.length
+    ? `<ul>${products
         .map(
-          (section) => `
-        <section>
-          <h2>${escapeHtml(section.title)}</h2>
-          ${buildProductListHtml(section.products)}
-        </section>`
+          (p) => `<li><a href="/product/${escapeHtml(p.slug)}"><img src="${escapeHtml(cardImage(p.thumbnail))}" alt="${escapeHtml(
+            titleCase(p.name)
+          )}" width="240" height="300" loading="lazy" /> ${escapeHtml(titleCase(p.name))}</a> — ${money(unitPrice(p))}</li>`
         )
-        .join('')}`;
-    return renderDocument({
-      title: meta.title,
-      description: meta.description,
-      canonicalPath: '/sale',
-      bodyHtml,
-      schemas: [organizationSchema, itemListSchema(allProducts, 'Sale best sellers')],
-    });
+        .join('')}</ul>`
+    : '';
+
+const breadcrumbHtml = (items) =>
+  `<nav aria-label="Breadcrumb">${items
+    .map((c, i) =>
+      i === items.length - 1 ? escapeHtml(c.name) : `<a href="${escapeHtml(c.path)}">${escapeHtml(c.name)}</a> / `
+    )
+    .join('')}</nav>`;
+
+const guideHtml = (sections) =>
+  sections?.length
+    ? `<section><h2>Buying guide</h2>${sections
+        .map((s) => `<h3>${escapeHtml(s.heading)}</h3><p>${escapeHtml(s.body)}</p>`)
+        .join('')}</section>`
+    : '';
+
+const relatedHtml = (posts) =>
+  posts?.length
+    ? `<section><h2>From the Style Journal</h2><ul>${posts
+        .map((p) => `<li><a href="/blog/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a></li>`)
+        .join('')}</ul></section>`
+    : '';
+
+const faqHtml = (faqs) =>
+  faqs?.length
+    ? `<section><h2>Frequently asked questions</h2>${faqs
+        .map((f) => `<h3>${escapeHtml(f.question)}</h3><p>${escapeHtml(f.answer)}</p>`)
+        .join('')}</section>`
+    : '';
+
+async function siteNavHtml() {
+  const stats = await data.loadCategoryStats().catch(() => null);
+  const primaries = TAXONOMY_TREE.map((node) => {
+    const count = stats ? data.statsForSlug(stats, node.slug).count : 1;
+    return count > 0 ? `<li><a href="/shop/${node.slug}">${escapeHtml(node.name)}</a></li>` : '';
+  }).join('');
+  return `<header><p><a href="/">${SITE_NAME}</a> — The Man's Shop, Yala Towers, Nairobi</p><nav aria-label="Primary"><ul><li><a href="/new-arrivals">New Arrivals</a></li>${primaries}<li><a href="/sale">Sale</a></li><li><a href="/blog">Style Journal</a></li><li><a href="/contact-us">Contact</a></li></ul></nav></header>`;
+}
+
+const FOOTER_HTML = `<footer><p>Prince Esquire, The Man's Shop. Yala Towers, Nairobi, Kenya. Phone and WhatsApp: <a href="tel:+254724494089">+254 724 494089</a>. Delivery across Kenya.</p><p><a href="/contact-us">Contact</a> · <a href="/shipping-returns">Shipping &amp; Returns</a> · <a href="/size-guide">Size Guide</a> · <a href="/bespoke-services">Bespoke Services</a> · <a href="/privacy-policy">Privacy Policy</a></p></footer>`;
+
+/* ---------- page builders ---------- */
+
+async function productPage(slug) {
+  const product = await data.fetchProduct(slug);
+  if (!product) return null;
+
+  const name = titleCase(product.name);
+  const price = unitPrice(product);
+  const images = parseImages(product);
+  const summary = product.focus_description || product.description || '';
+  const crumbs = [{ name: 'Home', path: '/' }];
+  if (product.parent_category_slug) {
+    crumbs.push({ name: product.parent_category_name, path: canonicalShopPath(product.parent_category_slug) });
   }
+  if (product.category_slug) {
+    crumbs.push({ name: product.category_name, path: canonicalShopPath(product.category_slug) });
+  }
+  crumbs.push({ name, path: `/product/${product.slug}` });
 
-  const meta = resolveRouteMeta(urlPath);
-  const products = await fetchProductsForPath(urlPath);
-  const bodyHtml = `
-    <h1>${escapeHtml(meta.h1 || meta.title)}</h1>
-    <p>${escapeHtml(meta.intro || meta.description)}</p>
-    <h2>Featured products</h2>
-    ${buildProductListHtml(products)}`;
+  const sizes = [...new Set((product.variants || []).map((v) => v.size).filter((s) => s && s !== 'Standard'))];
+  const colors = [...new Set((product.variants || []).map((v) => v.color).filter(Boolean))];
 
-  const schemas = [organizationSchema, localBusinessSchema, websiteSchema];
-  if (urlPath === '/') schemas.push(itemListSchema(products, 'Featured luxury fashion'));
-  else if (products.length) schemas.push(itemListSchema(products, meta.h1 || meta.title));
+  return {
+    title:
+      [`${name} in Kenya | ${SITE_NAME}`, `${name} | ${SITE_NAME}`].find((t) => t.length <= 70) ||
+      `${clip(name, 52)} | ${SITE_NAME}`,
+    description: clip(`${name}, ${money(price)}. ${summary || "Shop at Prince Esquire, Yala Towers, Nairobi."} Delivery across Kenya.`, 158),
+    canonicalPath: `/product/${product.slug}`,
+    image: socialImage(product.thumbnail),
+    preloadImage: cardImage(product.thumbnail).replace('w_480', 'w_900'),
+    ogType: 'product',
+    price: String(price),
+    schemas: [productSchema(product, images), breadcrumbSchema(crumbs), organizationSchema],
+    bodyHtml: `${breadcrumbHtml(crumbs)}<main><article><h1>${escapeHtml(name)}</h1>
+      <img src="${escapeHtml(cardImage(product.thumbnail))}" alt="${escapeHtml(name)}" width="480" height="600" />
+      <p>${money(price)}${product.brand_name ? ` · ${escapeHtml(product.brand_name)}` : ''}</p>
+      ${sizes.length ? `<p>Sizes: ${escapeHtml(sizes.join(', '))}</p>` : ''}
+      ${colors.length ? `<p>Colours: ${escapeHtml(colors.join(', '))}</p>` : ''}
+      <p>${escapeHtml(product.description || summary)}</p></article></main>`,
+  };
+}
 
-  return renderDocument({
+async function categoryPage(urlPath, segments) {
+  const leaf = segments[segments.length - 1];
+  const stats = await data.loadCategoryStats();
+  const alias = LEGACY_SLUG_ALIASES[leaf];
+  if (alias) return { redirect: canonicalShopPath(alias) };
+
+  const node = findTaxonBySlug(leaf);
+  const dbCategory = stats.categories.find((c) => c.slug === leaf);
+  if (!node && !dbCategory) return null;
+
+  const canonicalPath = node ? canonicalShopPath(leaf) : `/shop/${leaf}`;
+  if (canonicalPath !== urlPath) return { redirect: canonicalPath };
+
+  const name = node?.name || dbCategory.name;
+  const leafStats = data.statsForSlug(stats, leaf);
+  const seo = buildCategorySeo({ slug: leaf, name }, leafStats);
+  const products = await data.fetchProductsForCategory(leaf);
+
+  const chain = canonicalPath.split('/').slice(2);
+  const flat = flattenTaxonomy(TAXONOMY_TREE);
+  const crumbs = [{ name: 'Home', path: '/' }];
+  chain.forEach((slug, index) => {
+    crumbs.push({
+      name: flat.find((row) => row.slug === slug)?.name || slug,
+      path: `/shop/${chain.slice(0, index + 1).join('/')}`,
+    });
+  });
+
+  const children = (node?.children || [])
+    .map((child) => ({ ...child, count: data.statsForSlug(stats, child.slug).count }))
+    .filter((child) => child.count > 0);
+
+  const related = await data.relatedPosts(leaf, GUIDES[leaf]?.keywords).catch(() => []);
+
+  return {
+    title: seo.title,
+    description: seo.description,
+    canonicalPath,
+    // An empty category has nothing to rank with until stock arrives.
+    noindex: leafStats.count === 0,
+    image: socialImage(products[0]?.thumbnail || node?.tileImage),
+    schemas: [
+      breadcrumbSchema(crumbs),
+      organizationSchema,
+      products.length ? itemListSchema(products, seo.h1) : null,
+      leafStats.count > 0 ? faqSchema(seo.faqs) : null,
+    ],
+    bodyHtml: `${breadcrumbHtml(crumbs)}<main><h1>${escapeHtml(seo.h1)}</h1><p>${escapeHtml(seo.intro)}</p>
+      ${
+        children.length
+          ? `<nav aria-label="Shop by style"><ul>${children
+              .map((c) => `<li><a href="${canonicalShopPath(c.slug)}">${escapeHtml(c.name)}</a> (${c.count})</li>`)
+              .join('')}</ul></nav>`
+          : ''
+      }
+      <section><h2>Shop ${escapeHtml(name)}</h2>${productListHtml(products)}</section>
+      ${guideHtml(seo.guide)}
+      <section><h2>Delivery and visiting us</h2><p>Same-day delivery within Nairobi, in just 1-2 hours, and 1-2 days countrywide. Returns within 5 days. Visit us at <a href="${MAP_URL.replace(/&/g, '&amp;')}">Yala Towers, Nairobi</a>.</p></section>
+      ${relatedHtml(related)}
+      ${leafStats.count > 0 ? faqHtml(seo.faqs) : ''}</main>`,
+  };
+}
+
+async function blogPostPage(slug) {
+  const post = await data.fetchBlogPost(slug);
+  if (!post) return null;
+  const description = clip(post.meta_description || post.excerpt || post.title, 158);
+  const canonicalPath = `/blog/${post.slug}`;
+  const text = String(post.content || '')
+    .replace(/<\/(p|h[1-6]|li|div)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ');
+  const paragraphs = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const crumbs = [
+    { name: 'Home', path: '/' },
+    { name: 'Style Journal', path: '/blog' },
+    { name: post.title, path: canonicalPath },
+  ];
+  return {
+    title: clip(post.meta_title || `${post.title} | ${SITE_NAME}`, 70),
+    description,
+    canonicalPath,
+    ogType: 'article',
+    image: socialImage(post.featured_image_url),
+    schemas: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description,
+        image: [absoluteUrl(post.featured_image_url)],
+        datePublished: post.published_date,
+        dateModified: post.updated_at || post.published_date,
+        mainEntityOfPage: `${SITE_URL}${canonicalPath}`,
+        author: { '@type': 'Organization', name: SITE_NAME },
+        publisher: { '@type': 'Organization', name: SITE_NAME, logo: { '@type': 'ImageObject', url: DEFAULT_IMAGE } },
+      },
+      breadcrumbSchema(crumbs),
+    ],
+    bodyHtml: `${breadcrumbHtml(crumbs)}<main><article><h1>${escapeHtml(post.title)}</h1>${paragraphs
+      .map((line) => `<p>${escapeHtml(line)}</p>`)
+      .join('')}</article></main>`,
+  };
+}
+
+async function listingPage(key, products, extraSchemas = []) {
+  const meta = routeSeo[key];
+  return {
     title: meta.title,
     description: meta.description,
-    canonicalPath: meta.path || urlPath,
-    bodyHtml,
-    schemas,
-  });
+    canonicalPath: meta.path,
+    image: products[0] ? socialImage(products[0].thumbnail) : undefined,
+    schemas: [organizationSchema, products.length ? itemListSchema(products, meta.h1) : null, ...extraSchemas],
+    bodyHtml: `<main><h1>${escapeHtml(meta.h1)}</h1>${meta.intro ? `<p>${escapeHtml(meta.intro)}</p>` : ''}${productListHtml(products)}</main>`,
+  };
 }
 
-exports.renderForCrawler = async (req, res, next) => {
+async function homePage() {
+  const meta = routeSeo.home;
+  const [products, stats] = await Promise.all([data.fetchFeaturedProducts(24), data.loadCategoryStats()]);
+  const categories = TAXONOMY_TREE.filter((node) => data.statsForSlug(stats, node.slug).count > 0);
+  return {
+    title: meta.title,
+    description: meta.description,
+    canonicalPath: '/',
+    image: `${SITE_URL}/hero/entrance-1600.jpg`,
+    preloadImage: '/hero/entrance-1600.jpg',
+    schemas: [organizationSchema, localBusinessSchema, websiteSchema, itemListSchema(products, 'Featured menswear')],
+    bodyHtml: `<main><h1>${escapeHtml(meta.h1)}</h1><p>${escapeHtml(meta.intro)}</p>
+      <section><h2>Shop by category</h2><ul>${categories
+        .map((n) => `<li><a href="/shop/${n.slug}">${escapeHtml(n.name)}</a></li>`)
+        .join('')}</ul></section>
+      <section><h2>Featured pieces</h2>${productListHtml(products)}</section></main>`,
+  };
+}
+
+function infoPage(key) {
+  const meta = routeSeo[key];
+  return {
+    title: meta.title,
+    description: meta.description,
+    canonicalPath: meta.path,
+    schemas: [organizationSchema, key === 'contact-us' ? localBusinessSchema : null],
+    bodyHtml: `<main><h1>${escapeHtml(meta.h1)}</h1><p>${escapeHtml(meta.intro || meta.description)}</p></main>`,
+  };
+}
+
+async function buildPage(urlPath, search) {
+  if (urlPath === '/') return homePage();
+
+  const [, first, ...rest] = urlPath.split('/');
+
+  if (first === 'product' && rest.length === 1) return productPage(decodeURIComponent(rest[0]));
+  if (first === 'blog' && rest.length === 1) return blogPostPage(decodeURIComponent(rest[0]));
+  if (first === 'shop' && rest.length >= 1 && rest.length <= 3) {
+    return categoryPage(urlPath, rest.map(decodeURIComponent));
+  }
+
+  if (urlPath === '/blog') {
+    const posts = await data.fetchBlogList();
+    const meta = routeSeo.blog;
+    return {
+      title: meta.title,
+      description: meta.description,
+      canonicalPath: '/blog',
+      schemas: [organizationSchema],
+      bodyHtml: `<main><h1>${escapeHtml(meta.h1)}</h1><p>${escapeHtml(meta.intro)}</p><ul>${posts
+        .map(
+          (p) =>
+            `<li><a href="/blog/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a>${p.excerpt ? ` — ${escapeHtml(p.excerpt)}` : ''}</li>`
+        )
+        .join('')}</ul></main>`,
+    };
+  }
+
+  if (urlPath === '/products') {
+    const params = new URLSearchParams(search);
+    const page = await listingPage('products', await data.fetchAllProducts());
+    // Search results and filtered views must not compete with the real collection pages.
+    if (params.get('search') || params.get('q') || params.get('category') || params.get('sub')) {
+      return { ...page, noindex: true };
+    }
+    return page;
+  }
+  if (urlPath === '/sale') return listingPage('sale', await data.fetchSaleProducts());
+  if (urlPath === '/new-arrivals') return listingPage('new-arrivals', await data.fetchRecentProducts());
+
+  const key = urlPath.slice(1);
+  if (routeSeo[key]?.path === urlPath) return infoPage(key);
+
+  return null;
+}
+
+function privatePage(urlPath) {
+  const match = PRIVATE_ROUTES.find((route) => route.test.test(urlPath));
+  if (!match) return null;
+  return {
+    title: `${match.title} | ${SITE_NAME}`,
+    description: `${match.title} at Prince Esquire, The Man's Shop in Nairobi.`,
+    canonicalPath: urlPath,
+    noindex: true,
+    bodyHtml: '',
+  };
+}
+
+function notFoundPage(navHtml) {
+  return {
+    title: `Page not found | ${SITE_NAME}`,
+    description: 'The page you requested could not be found at Prince Esquire.',
+    canonicalPath: '/',
+    noindex: true,
+    bodyHtml: `${navHtml}<main><h1>Page not found</h1><p><a href="/products">Browse the collection</a></p></main>`,
+  };
+}
+
+/* ---------- request handlers ---------- */
+
+function parseRequestUri(req) {
+  const raw = String(req.headers['x-original-uri'] || req.query.path || '/').slice(0, 2048);
+  const [pathname, ...queryParts] = raw.split('?');
+  return { pathname: pathname.split('#')[0] || '/', search: queryParts.join('?') };
+}
+
+const sendPermanentRedirect = (res, target, search) => {
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.redirect(301, `${SITE_URL}${target}${search ? `?${search}` : ''}`);
+};
+
+/** GET /ssr-html — the storefront document for any page URL (nginx proxies here). */
+exports.renderPage = async (req, res, next) => {
   try {
-    const urlPath = normalizePath(req.query.path || '/');
-    if (urlPath.startsWith('/api') || urlPath.startsWith('/assets') || urlPath.startsWith('/admin')) {
-      return res.status(404).send('Not found');
+    const { pathname, search } = parseRequestUri(req);
+
+    if (pathname.includes('//') || pathname.includes('..')) {
+      const template = loadTemplate();
+      return res
+        .status(404)
+        .type('html')
+        .send(renderDocument(template, notFoundPage('')));
     }
 
-    const html = await buildPageHtml(urlPath);
-    if (!html) {
-      return res.status(404).type('html').send(
-        renderDocument({
-          title: `Page not found | ${SITE_NAME}`,
-          description: 'The page you requested could not be found at Prince Esquire.',
-          canonicalPath: urlPath,
-          bodyHtml: '<h1>Page not found</h1><p><a href="/">Return home</a></p>',
-          schemas: [organizationSchema],
-        })
-      );
+    if (pathname !== '/' && pathname.endsWith('/')) {
+      return sendPermanentRedirect(res, pathname.replace(/\/+$/, ''), search);
+    }
+    if (LEGACY_REDIRECTS[pathname]) {
+      return sendPermanentRedirect(res, LEGACY_REDIRECTS[pathname], search);
     }
 
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.type('html').send(html);
+    const template = loadTemplate();
+    // Only /products varies by query; ?fbclid=… and similar must not multiply cache entries.
+    const cacheKey = pathname === '/products' ? `${pathname}?${search}` : pathname;
+    const cached = pageCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < PAGE_CACHE_TTL_MS) {
+      res.set('Cache-Control', 'public, max-age=0, must-revalidate');
+      return res.status(cached.status).type('html').send(cached.html);
+    }
+
+    let page = privatePage(pathname) || (await buildPage(pathname, search));
+    if (page?.redirect) return sendPermanentRedirect(res, page.redirect, search);
+
+    let status = 200;
+    if (!page) {
+      status = 404;
+      page = notFoundPage(await siteNavHtml());
+    } else if (!page.noindex || page.bodyHtml) {
+      page = { ...page, bodyHtml: `${await siteNavHtml()}${page.bodyHtml}${FOOTER_HTML}` };
+    }
+
+    const html = renderDocument(template, page);
+    // Bots probing random URLs must not grow the cache without limit.
+    if (status === 200) {
+      if (pageCache.size >= PAGE_CACHE_MAX) pageCache.clear();
+      pageCache.set(cacheKey, { at: Date.now(), status, html });
+    }
+    res.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    return res.status(status).type('html').send(html);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
+/** GET /sitemap.xml — only live, indexable URLs, with product images. */
 exports.getSitemap = async (_req, res, next) => {
   try {
-    const { flattenTaxonomy, TAXONOMY_TREE, canonicalShopPath } = require('../data/taxonomy');
-    const shopPaths = [
-      ...new Set(
-        flattenTaxonomy(TAXONOMY_TREE).map((row) => canonicalShopPath(row.slug))
-      ),
-    ];
-
-    const [productsResult, blogsResult, categoriesResult] = await Promise.all([
-      db.query(
-        `SELECT slug, updated_at FROM products
-         WHERE is_active = true
-           AND thumbnail IS NOT NULL
-           AND TRIM(thumbnail::text) <> ''
-           AND LOWER(TRIM(thumbnail::text)) NOT IN ('null', 'undefined', '{}', '[]')
-         ORDER BY updated_at DESC`
-      ),
-      db.query(
-        `SELECT slug, COALESCE(updated_at, published_date) AS updated_at
-         FROM blog_posts
-         WHERE is_published = true
-         ORDER BY COALESCE(updated_at, published_date) DESC`
-      ).catch(() => ({ rows: [] })),
-      db.query(
-        `SELECT slug FROM categories ORDER BY sort_order NULLS LAST, name`
-      ).catch(() => ({ rows: [] })),
+    const [stats, products, posts] = await Promise.all([
+      data.loadCategoryStats(),
+      data.fetchAllProducts(),
+      data.fetchBlogList(),
     ]);
 
-    const categoryShopPaths = categoriesResult.rows
-      .map((row) => {
-        try {
-          return canonicalShopPath(row.slug);
-        } catch {
-          return `/shop/${row.slug}`;
-        }
-      })
-      .filter(Boolean);
-
-    const freqFor = (p) => {
-      if (p === '/' || p === '/products' || p === '/sale' || p === '/new-arrivals') return 'daily';
-      if (String(p).startsWith('/shop') || String(p).startsWith('/blog')) return 'weekly';
-      if (String(p).startsWith('/product/')) return 'weekly';
-      return 'monthly';
-    };
-
-    const urls = [
-      ...staticPaths.map((p) => ({
-        loc: `${SITE_URL}${p === '/' ? '' : p}`,
-        priority: p === '/' ? '1.0' : p === '/products' ? '0.9' : '0.8',
-        changefreq: freqFor(p),
-      })),
-      ...shopPaths.map((p) => ({ loc: `${SITE_URL}${p}`, priority: '0.85', changefreq: 'weekly' })),
-      ...categoryShopPaths.map((p) => ({ loc: `${SITE_URL}${p}`, priority: '0.8', changefreq: 'weekly' })),
-      ...productsResult.rows.map((row) => ({
-        loc: `${SITE_URL}/product/${encodeURI(row.slug)}`,
-        lastmod: row.updated_at,
-        priority: '0.7',
-        changefreq: 'weekly',
-      })),
-      ...blogsResult.rows.map((row) => ({
-        loc: `${SITE_URL}/blog/${encodeURI(row.slug)}`,
-        lastmod: row.updated_at,
-        priority: '0.65',
-        changefreq: 'weekly',
-      })),
+    const shopPaths = [
+      ...new Set(
+        flattenTaxonomy(TAXONOMY_TREE)
+          .filter((row) => data.statsForSlug(stats, row.slug).count > 0)
+          .map((row) => canonicalShopPath(row.slug))
+      ),
     ];
-
-    const seen = new Set();
-    const deduped = urls.filter((entry) => {
-      if (seen.has(entry.loc)) return false;
-      seen.add(entry.loc);
-      return true;
-    });
 
     const escapeXml = (value) =>
       String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+    const toEntry = (urlPath, { lastmod, images = [] } = {}) => {
+      const parts = [`    <loc>${escapeXml(`${SITE_URL}${urlPath}`)}</loc>`];
+      if (lastmod) parts.push(`    <lastmod>${new Date(lastmod).toISOString().slice(0, 10)}</lastmod>`);
+      images.forEach((image) => {
+        parts.push(`    <image:image><image:loc>${escapeXml(image)}</image:loc></image:image>`);
+      });
+      return `  <url>\n${parts.join('\n')}\n  </url>`;
+    };
+
+    const seen = new Set();
+    const entries = [
+      ...staticPaths.map((p) => [p]),
+      ...shopPaths.map((p) => [p]),
+      ...products.map((p) => [
+        `/product/${encodeURIComponent(p.slug)}`,
+        { lastmod: p.updated_at, images: parseImages(p).slice(0, 5) },
+      ]),
+      ...posts.map((p) => [
+        `/blog/${encodeURIComponent(p.slug)}`,
+        { lastmod: p.updated_at, images: p.featured_image_url ? [absoluteUrl(p.featured_image_url)] : [] },
+      ]),
+    ]
+      .filter(([urlPath]) => {
+        if (seen.has(urlPath)) return false;
+        seen.add(urlPath);
+        return true;
+      })
+      .map(([urlPath, options]) => toEntry(urlPath, options));
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${deduped
-  .map((entry) => {
-    const lastmod = entry.lastmod
-      ? `<lastmod>${new Date(entry.lastmod).toISOString().slice(0, 10)}</lastmod>`
-      : '';
-    return `  <url>
-    <loc>${escapeXml(entry.loc)}</loc>
-    ${lastmod}
-    <changefreq>${entry.changefreq || 'weekly'}</changefreq>
-    <priority>${entry.priority || '0.5'}</priority>
-  </url>`;
-  })
-  .join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+${entries.join('\n')}
 </urlset>`;
 
     res.set('Cache-Control', 'public, max-age=1800');
@@ -520,4 +616,3 @@ ${deduped
     next(error);
   }
 };
-

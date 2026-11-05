@@ -95,7 +95,7 @@ const mapHeroProductSlide = (p) => {
 const HOMEPAGE_HIDDEN_CATEGORY_SLUGS = new Set(['casual', 'caps-hats']);
 
 /** Category tiles shown first (used by buildCategoryTiles). */
-const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['track-tops', 'polo-t-shirts', 'suits', 'shoes'];
+const HOMEPAGE_PRIORITY_CATEGORY_SLUGS = ['tracksuits', 'polo-t-shirts', 'suits', 'shoes'];
 
 const categoryViewAllPath = (row) => {
   const slug = resolveTaxonomySlug(row.slug);

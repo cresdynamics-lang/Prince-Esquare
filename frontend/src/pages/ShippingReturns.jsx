@@ -9,8 +9,8 @@ const ShippingReturns = () => {
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
       <SEO
-        title="Shipping & Returns - Prince Esquire"
-        description="Learn about our shipping policies and return procedures at Prince Esquire."
+        title="Delivery & Returns in Kenya | Prince Esquire"
+        description="Same-day delivery in Nairobi, within 1-2 hours, and 1-2 days countrywide. Returns and free size exchanges within 5 days of delivery."
         path="/shipping-returns"
       />
       <Navbar />
@@ -43,9 +43,8 @@ const ShippingReturns = () => {
                 <div>
                   <h3 className="text-white font-semibold mb-2">Delivery Within Kenya</h3>
                   <ul className="space-y-2 text-sm">
-                    <li>• <strong>Nairobi:</strong> 1-2 business days</li>
-                    <li>• <strong>Major Towns:</strong> 2-3 business days</li>
-                    <li>• <strong>Other Areas:</strong> 3-5 business days</li>
+                    <li>• <strong>Within Nairobi:</strong> same day, in just 1-2 hours</li>
+                    <li>• <strong>Countrywide:</strong> 1-2 days</li>
                   </ul>
                 </div>
 
@@ -65,7 +64,7 @@ const ShippingReturns = () => {
 
                 <div>
                   <h3 className="text-white font-semibold mb-2">Order Processing</h3>
-                  <p className="text-sm">All orders are processed within 1-2 business days. You will receive a confirmation email with tracking information once your order ships.</p>
+                  <p className="text-sm">Every order is confirmed by our team before dispatch, so it can reach you within the delivery times above.</p>
                 </div>
               </div>
             </div>
@@ -82,7 +81,7 @@ const ShippingReturns = () => {
               <div className="space-y-6 text-navy-300">
                 <div>
                   <h3 className="text-white font-semibold mb-2">Return Policy</h3>
-                  <p className="text-sm mb-2">We accept returns within 14 days of delivery. Items must be unworn, unwashed, and in original condition with tags attached.</p>
+                  <p className="text-sm mb-2">We accept returns within 5 days of delivery. Items must be unworn, unwashed, and in original condition with tags attached.</p>
                   <ul className="space-y-1 text-sm">
                     <li>• Full refund available for eligible returns</li>
                     <li>• Store credit option available</li>
@@ -94,7 +93,7 @@ const ShippingReturns = () => {
                   <h3 className="text-white font-semibold mb-2">Exchanges</h3>
                   <p className="text-sm mb-2">Exchanges are available for different sizes or colors of the same item, subject to availability.</p>
                   <ul className="space-y-1 text-sm">
-                    <li>• Free exchange within 7 days of delivery</li>
+                    <li>• Free exchange within 5 days of delivery</li>
                     <li>• Size exchanges only (no style changes)</li>
                     <li>• Subject to stock availability</li>
                   </ul>

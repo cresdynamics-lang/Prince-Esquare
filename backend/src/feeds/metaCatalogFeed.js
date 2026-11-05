@@ -29,10 +29,14 @@ const COLUMNS = [
   'price',
   'link',
   'image_link',
+  'additional_image_link',
+  'color',
+  'sale_price',
   'brand',
   'product_type',
   'google_product_category',
   'custom_label_0',
+  'custom_label_1',
   'status',
   'quantity_to_sell_on_facebook',
   'inventory',
@@ -116,6 +120,26 @@ function metaImageUrl(value, imagesField) {
   return url;
 }
 
+/** Every gallery photo except the main one, so shoppers can swipe through them in the ad. */
+function additionalImageLinks(product, mainImage) {
+  let list = product.images;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  const urls = list
+    .map((item) => (typeof item === 'string' ? item : item?.url || item?.secure_url || item?.src || ''))
+    .filter(Boolean)
+    .map((url) => metaImageUrl(url))
+    .filter((url) => url && url !== mainImage && url !== META_FALLBACK_IMAGE);
+  // This field separates photos with commas, and Cloudinary addresses contain them.
+  return [...new Set(urls)].slice(0, 10).map((url) => url.replace(/,/g, '%2C'));
+}
+
 function formatMetaPrice(price) {
   const amount = Number.parseFloat(price || 0);
   return `${amount.toFixed(2)} KES`;
@@ -138,6 +162,11 @@ function mapProductRow(product, { linkToSale = true } = {}) {
     .filter((name, i, arr) => arr.indexOf(name) === i)
     .join(' > ') || 'Fashion';
   const description = cleanField(product.description || product.name, 5000);
+  const imageLink = metaImageUrl(product.thumbnail, product.images);
+  const extraImages = additionalImageLinks(product, imageLink);
+  const colors = (product.variant_colors || []).filter(Boolean);
+  const price = Number(product.price);
+  const salePrice = Number(product.discount_price);
 
   return {
     id: product.slug,
@@ -146,13 +175,19 @@ function mapProductRow(product, { linkToSale = true } = {}) {
     availability: 'in stock',
     condition: 'new',
     price: formatMetaPrice(product.price),
+    sale_price: salePrice > 0 && salePrice < price ? formatMetaPrice(salePrice) : '',
     // Always deep-link the product page so IG/FB can resolve the correct item + OG image.
-    link: `${SITE_URL}/product/${product.slug}`,
-    image_link: metaImageUrl(product.thumbnail, product.images),
+    link: encodeUrlPath(`${SITE_URL}/product/${product.slug}`),
+    image_link: imageLink,
+    additional_image_link: extraImages.join(','),
+    color: cleanField(colors.join('/'), 100),
     brand: cleanField(product.brand_name || 'Prince Esquire', 100),
     product_type: cleanField(productType, 750),
     google_product_category: googleCategoryFor(product),
     custom_label_0: linkToSale || product.is_on_sale ? 'Sale' : 'Catalog',
+    // Same wording as the website card, so ad sets can be built around it.
+    custom_label_1:
+      colors.length > 1 ? `${colors.length}+ colours` : extraImages.length ? `${extraImages.length} more` : '',
     status: 'active',
     quantity_to_sell_on_facebook: META_SELLABLE_QTY,
     inventory: META_SELLABLE_QTY,
@@ -160,8 +195,12 @@ function mapProductRow(product, { linkToSale = true } = {}) {
 }
 
 const PRODUCT_SELECT = `
-  SELECT p.id, p.name, p.slug, p.price, p.description, p.thumbnail, p.images,
+  SELECT p.id, p.name, p.slug, p.price, p.discount_price, p.description, p.thumbnail, p.images,
          p.stock_quantity, p.is_on_sale,
+         ARRAY(
+           SELECT DISTINCT TRIM(pv.color) FROM product_variants pv
+           WHERE pv.product_id = p.id AND COALESCE(TRIM(pv.color), '') <> ''
+         ) AS variant_colors,
          b.name AS brand_name, c.name AS category_name, p_cat.name AS parent_category_name,
          (
            SELECT COUNT(*)::int FROM product_variants pv
@@ -176,7 +215,7 @@ const PRODUCT_SELECT = `
 async function fetchSaleProducts() {
   const result = await db.query(
     `${PRODUCT_SELECT}
-     WHERE p.is_active = true AND ${SALE_WHERE}
+     WHERE p.is_active = true AND ${SALE_WHERE} AND p.price > 0
      ORDER BY p.updated_at DESC NULLS LAST, p.is_featured DESC, p.name ASC`
   );
   return result.rows;
@@ -185,7 +224,7 @@ async function fetchSaleProducts() {
 async function fetchAllProducts() {
   const result = await db.query(
     `${PRODUCT_SELECT}
-     WHERE p.is_active = true
+     WHERE p.is_active = true AND p.price > 0
      ORDER BY p.updated_at DESC NULLS LAST, p.is_featured DESC, p.name ASC`
   );
   return result.rows.map((row) => mapProductRow(row, { linkToSale: false }));

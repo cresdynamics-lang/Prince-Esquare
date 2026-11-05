@@ -91,7 +91,7 @@ export const CATEGORY_PAGE_CONFIG = {
     editorialFallbackLine:
       "There's a difference between owning a shirt and being remembered for wearing it.",
     editorialFallbackCtas: [
-      { label: 'Shop Formal Shirts', href: '/shop/shirts/formal-shirts' },
+      { label: 'Shop Official Shirts', href: '/shop/shirts/formal-shirts' },
     ],
     completeLook: {
       eyebrow: 'Complete the Look',
@@ -136,7 +136,7 @@ export const CATEGORY_PAGE_CONFIG = {
     subTilesLayout: 'split',
     showFabricFilter: false,
     // Product grid + filters: native three only — never Blazers/Vests
-    gridNativeSlugs: ['full-jackets', 'half-jackets', 'track-tops'],
+    gridNativeSlugs: ['full-jackets', 'half-jackets'],
     crossLinkHeading: 'Also Wearable as Outerwear',
     crossLinkTiles: [
       {

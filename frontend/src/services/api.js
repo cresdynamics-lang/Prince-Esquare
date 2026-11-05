@@ -441,8 +441,8 @@ export const onlineSaleAPI = {
 
 export const searchAPI = {
   // Short soft TTL — search stays network-first after 20s; never shares product list cache
-  search: (q) =>
-    cachedGet(API, '/search', { params: { q } }, { ttlMs: 2 * 60 * 1000, softMs: 20 * 1000 }),
+  search: (q, limit) =>
+    cachedGet(API, '/search', { params: limit ? { q, limit } : { q } }, { ttlMs: 2 * 60 * 1000, softMs: 20 * 1000 }),
   suggestions: (q) =>
     cachedGet(API, '/search/suggestions', { params: { q } }, { ttlMs: 5 * 60 * 1000, softMs: 60 * 1000 }),
   restockAlert: (body) => API.post('/search/restock-alert', body),

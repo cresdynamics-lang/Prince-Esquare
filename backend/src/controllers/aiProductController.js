@@ -1,5 +1,7 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const { analyzeProductImage, FRIENDLY_RETRY } = require('../services/groqProductVision');
+const db = require('../config/db');
+const { polishProductName, distinctProductName } = require('../utils/productNaming');
 
 /**
  * POST /api/admin/products/ai-describe
@@ -20,6 +22,14 @@ exports.describeFromImage = async (req, res, next) => {
         brandName: req.body?.brand_name || req.body?.brandName || '',
       },
     });
+
+    if (result?.name) {
+      const existing = await db
+        .query('SELECT name FROM products WHERE is_active = true')
+        .then((r) => r.rows.map((row) => row.name))
+        .catch(() => []);
+      result.name = distinctProductName(polishProductName(result.name), existing);
+    }
 
     return formatResponse(res, 200, true, 'AI product copy generated', result);
   } catch (error) {

@@ -1,106 +1,70 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { tileImageFor } from '../data/categoryLooks';
 
 /**
- * Wide merchandising mega-menu: labeled columns with modeled placeholder thumbs.
+ * Full-width mega-menu: text links plus model photos. Empty categories are hidden
+ * automatically and reappear as soon as they have products.
  */
-const MegaMenu = ({ primary, onNavigate, onClose }) => {
+const MegaMenu = ({ primary, onNavigate }) => {
   if (!primary) return null;
-  const children = primary.children || [];
+  const children = (primary.children || []).filter((col) => col.productCount !== 0);
+  const allHref = shopPath(primary.slug);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 8 }}
-      transition={{ duration: 0.2 }}
-      className="absolute left-1/2 top-full z-50 w-[min(920px,92vw)] -translate-x-1/2 pt-4"
-      role="menu"
-      aria-label={`${primary.name} menu`}
+      exit={{ opacity: 0, y: 4 }}
+      transition={{ duration: 0.16 }}
+      className="absolute inset-x-0 top-full z-50 border-y border-gold-500/20 bg-navy-950 shadow-2xl"
     >
-      <div className="border border-gold-500/20 bg-navy-950/98 p-6 shadow-2xl backdrop-blur-xl md:p-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-gold-500/10 pb-4">
-          <div>
-            <p className="font-sans text-[9px] font-bold uppercase tracking-[0.35em] text-gold-500">
-              Shop the edit
-            </p>
-            <h3 className="mt-1 font-serif text-2xl text-white md:text-3xl">{primary.name}</h3>
-            {primary.navCopy || primary.description ? (
-              <p className="mt-2 max-w-xl font-sans text-sm font-light leading-relaxed text-navy-200">
-                {primary.navCopy || primary.description}
-              </p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => onNavigate(primary.slug)}
-            className="font-sans text-[9px] font-semibold uppercase tracking-[0.22em] text-gold-400 transition-colors hover:text-gold-200"
+      <div className="container mx-auto grid grid-cols-[minmax(180px,240px)_1fr] gap-8 px-6 py-7">
+        <div>
+          <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-400">Shop</p>
+          <p className="mt-1.5 font-display text-3xl text-white">{primary.name}</p>
+          <ul className="mt-4 space-y-2">
+            {children.map((col) => (
+              <li key={col.slug}>
+                <Link
+                  to={shopPath(primary.slug, col.slug)}
+                  onClick={onNavigate}
+                  className="font-sans text-sm text-navy-100 transition-colors hover:text-gold-300"
+                >
+                  {col.name}
+                  {col.productCount ? <span className="ml-1.5 text-xs text-navy-300">({col.productCount})</span> : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link
+            to={allHref}
+            onClick={onNavigate}
+            className="mt-5 inline-block border-b border-gold-400 pb-0.5 font-sans text-xs font-semibold uppercase tracking-[0.16em] text-gold-300 hover:text-gold-100"
           >
             Shop all {primary.name} →
-          </button>
+          </Link>
         </div>
 
-        <div
-          className={`grid gap-4 ${
-            children.length <= 3
-              ? 'grid-cols-2 md:grid-cols-3'
-              : children.length <= 4
-                ? 'grid-cols-2 md:grid-cols-4'
-                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-          }`}
-        >
-          {children.map((col) => {
-            const hasNested = Array.isArray(col.children) && col.children.length > 0;
-            const img = col.tileImage || col.image || `/placeholders/taxonomy/${col.slug}.svg`;
+        <div className="grid grid-cols-5 gap-3">
+          {children.slice(0, 5).map((col) => {
+            const image = tileImageFor(col.slug, col.tileImage || col.image);
+            if (!image || image.endsWith('.svg')) return null;
             return (
-              <div key={col.slug} className="group flex flex-col">
-                <button
-                  type="button"
-                  onClick={() => onNavigate(primary.slug, col.slug)}
-                  className="text-left"
-                >
-                  <div className="relative mb-3 aspect-[4/5] overflow-hidden bg-navy-900 ring-1 ring-gold-500/15 transition-all group-hover:ring-gold-500/40">
-                    <img
-                      src={img}
-                      alt=""
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      loading="lazy"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy-950/80 via-transparent to-transparent" />
-                    <span className="absolute bottom-3 left-3 right-3 font-serif text-base text-white md:text-lg">
-                      {col.name}
-                    </span>
-                  </div>
-                </button>
-                {hasNested ? (
-                  <ul className="mt-1 space-y-1.5 pl-0.5">
-                    {col.children.map((tier) => (
-                      <li key={tier.slug}>
-                        <button
-                          type="button"
-                          onClick={() => onNavigate(primary.slug, col.slug, tier.slug)}
-                          className="font-sans text-[9px] font-medium uppercase tracking-[0.16em] text-navy-200 transition-colors hover:text-gold-400"
-                        >
-                          {tier.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
+              <Link key={col.slug} to={shopPath(primary.slug, col.slug)} onClick={onNavigate} className="group block">
+                <div className="aspect-[3/4] max-h-[290px] w-full overflow-hidden bg-navy-900">
+                  <img
+                    src={image}
+                    alt={`${col.name} at Prince Esquire`}
+                    loading="lazy"
+                    className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
+                  />
+                </div>
+                <p className="mt-2 font-sans text-[13px] font-medium text-white group-hover:text-gold-300">{col.name}</p>
+              </Link>
             );
           })}
-        </div>
-
-        <div className="mt-6 flex justify-end border-t border-gold-500/10 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-sans text-[9px] uppercase tracking-[0.2em] text-navy-300 hover:text-white"
-          >
-            Close
-          </button>
         </div>
       </div>
     </motion.div>

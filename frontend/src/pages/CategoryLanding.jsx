@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
-import { buildBreadcrumbSchema, organizationSchema } from '../seo/seoData';
+import { buildBreadcrumbSchema, buildFaqSchema, organizationSchema, SITE_URL } from '../seo/seoData';
+import { looksFor } from '../data/categoryLooks';
 import HomeSignupBand from '../components/home/HomeSignupBand';
 import CategorySubTiles from '../components/category/CategorySubTiles';
+import DeliveryVisitStrip from '../components/category/DeliveryVisitStrip';
 import CategoryFilterBar from '../components/category/CategoryFilterBar';
 import CategoryEditorial from '../components/category/CategoryEditorial';
 import CategoryCompleteLook from '../components/category/CategoryCompleteLook';
@@ -16,6 +17,7 @@ import {
   findTaxonBySlug,
   TAXONOMY_TREE,
   landingSeo,
+  canonicalShopPath,
   flattenTaxonomy,
 } from '../data/taxonomy';
 import {
@@ -28,6 +30,10 @@ import { productMatchesFabrics } from '../utils/fabric';
 import { trackViewCategory } from '../lib/metaPixel';
 
 const shopHref = (...parts) => `/shop/${parts.filter(Boolean).join('/')}`;
+
+const PAGE_SIZE = 24;
+/** Show the page's namesake first: real suits before blazers on the Suits page. */
+const LEAD_SLUGS = { suits: ['two-piece', 'three-piece'] };
 
 function collectVariantMeta(products) {
   const sizes = new Set();
@@ -90,7 +96,7 @@ const CategoryLanding = () => {
 
   const [landing, setLanding] = useState(null);
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
 
   const [selectedSubs, setSelectedSubs] = useState(() => new Set());
@@ -100,6 +106,7 @@ const CategoryLanding = () => {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [sort, setSort] = useState('newest');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const staticFallback = findTaxonBySlug(leafSlug, TAXONOMY_TREE);
   const primaryNode = findTaxonBySlug(slug, TAXONOMY_TREE);
@@ -112,6 +119,7 @@ const CategoryLanding = () => {
     setMinPrice('');
     setMaxPrice('');
     setSort('newest');
+    setVisibleCount(PAGE_SIZE);
   }, [leafSlug]);
 
   useEffect(() => {
@@ -171,7 +179,7 @@ const CategoryLanding = () => {
     setProductsLoading(true);
     const sortApi = SORT_OPTIONS.find((o) => o.id === sort)?.api || 'newest';
     productAPI
-      .list({ taxonomy: leafSlug, limit: 48, page: 1, sort: sortApi })
+      .list({ taxonomy: leafSlug, limit: 200, page: 1, sort: sortApi })
       .then((res) => {
         if (!cancelled) setProducts(res.data?.data?.products || []);
       })
@@ -195,6 +203,7 @@ const CategoryLanding = () => {
         slug: c.slug,
         tileImage: c.tileImage || node?.tileImage,
         navCopy: c.navCopy || c.copy || node?.copy || '',
+        productCount: c.productCount,
         crossSurfaces: c.crossSurfaces || node?.crossSurfaces || [],
       };
     };
@@ -220,26 +229,26 @@ const CategoryLanding = () => {
     (isPrimaryView && pageConfig?.heroImage) ||
     category?.heroImage ||
     category?.tileImage ||
-    `/placeholders/taxonomy/${leafSlug}-hero.svg`;
-  const heroImageSm = (isPrimaryView && pageConfig?.heroImageSm) || heroImage;
+    '';
 
-  const eyebrow =
-    (isPrimaryView && pageConfig?.eyebrow) ||
-    (category?.name ? category.name : 'Collection');
-  const h1 =
-    (isPrimaryView && pageConfig?.h1) ||
-    category?.navCopy ||
-    category?.name ||
-    leafSlug;
-  const subhead =
-    (isPrimaryView && pageConfig?.subhead) ||
-    (isPrimaryView ? '' : category?.navCopy || '');
+  const apiSeo = landing?.seo;
+  const fallbackSeo = landingSeo({ name: category?.name, description: category?.description });
+  const categoryName = category?.name || staticFallback?.name || leafSlug.replace(/-/g, ' ');
+  const h1 = apiSeo?.h1 || `${categoryName} for Men in Kenya`;
+  const seoTitle = apiSeo?.title || fallbackSeo.title;
+  const seoDescription = apiSeo?.description || fallbackSeo.description;
+  const seoIntro = apiSeo?.intro || '';
+  const faqs = apiSeo?.faqs || [];
+  const guide = apiSeo?.guide || [];
+  const relatedPosts = apiSeo?.relatedPosts || [];
+  /** Brand voice stays on the page as a tagline under the descriptive H1. */
+  const tagline = (isPrimaryView && pageConfig?.h1) || category?.navCopy || '';
 
-  const seo = landingSeo({
-    name: category?.name,
-    navCopy: pageConfig?.subhead || category?.navCopy,
-    description: category?.description,
-  });
+  const looks = useMemo(() => {
+    const curated = looksFor(leafSlug, slug);
+    if (curated.length) return curated;
+    return heroImage && !heroImage.endsWith('.svg') ? [heroImage] : [];
+  }, [leafSlug, slug, heroImage]);
 
   const childHref = (childSlug) => {
     if (tier) return shopHref(slug, sub, childSlug);
@@ -253,11 +262,16 @@ const CategoryLanding = () => {
   }, [pageConfig]);
 
   const catalogProducts = useMemo(() => {
-    if (isPrimaryView && nativeSlugSet) {
-      return products.filter((p) => nativeSlugSet.has(p.category_slug));
-    }
-    return products;
-  }, [products, isPrimaryView, nativeSlugSet]);
+    const list =
+      isPrimaryView && nativeSlugSet
+        ? products.filter((p) => nativeSlugSet.has(p.category_slug))
+        : products;
+    const lead = LEAD_SLUGS[leafSlug];
+    if (!lead || sort !== 'newest') return list;
+    return [...list].sort(
+      (a, b) => Number(lead.includes(b.category_slug)) - Number(lead.includes(a.category_slug))
+    );
+  }, [products, isPrimaryView, nativeSlugSet, leafSlug, sort]);
 
   const { sizes: sizeOptions, colors: colorOptions } = useMemo(
     () => collectVariantMeta(catalogProducts),
@@ -311,9 +325,15 @@ const CategoryLanding = () => {
     [filtered]
   );
 
-  const editorialAfter = getEditorialInsertAfter(filtered.length);
-  const gridHead = filtered.slice(0, editorialAfter);
-  const gridTail = filtered.slice(editorialAfter);
+  const visibleProducts = filtered.slice(0, visibleCount);
+  const editorialAfter = getEditorialInsertAfter(visibleProducts.length);
+  const gridHead = visibleProducts.slice(0, editorialAfter);
+  const gridTail = visibleProducts.slice(editorialAfter);
+  const cardMotion = (i) => ({
+    initial: { opacity: 0, y: 14 },
+    animate: { opacity: 1, y: 0 },
+    transition: { delay: Math.min(i, 8) * 0.02 },
+  });
 
   const toggleInSet = (setter) => (value) => {
     setter((prev) => {
@@ -328,7 +348,6 @@ const CategoryLanding = () => {
     isPrimaryView && (children.length > 0 || (pageConfig?.crossLinkTiles?.length || 0) > 0);
   const showCompleteLook = isPrimaryView && pageConfig?.completeLook;
   const showFabricFilter = Boolean(pageConfig?.showFabricFilter);
-  const subTilesLayout = pageConfig?.subTilesLayout || 'scroll';
 
   const hideBestselling = useMemo(() => {
     const triggers = pageConfig?.hideBestsellingWhenSubs || [];
@@ -359,16 +378,11 @@ const CategoryLanding = () => {
   return (
     <div className="min-h-screen bg-navy-950">
       <SEO
-        title={seo.title}
-        description={seo.description}
-        path={shopHref(...pathParts)}
-        keywords={[
-          category?.name,
-          eyebrow,
-          'Prince Esquire',
-          'menswear Kenya',
-          'Nairobi',
-        ].filter(Boolean)}
+        title={seoTitle}
+        description={seoDescription}
+        path={staticFallback ? canonicalShopPath(leafSlug) : shopHref(...pathParts)}
+        noindex={apiSeo?.count === 0}
+        image={looks[0] ? `${SITE_URL}${looks[0]}` : undefined}
         schema={[
           organizationSchema,
           buildBreadcrumbSchema(
@@ -377,88 +391,92 @@ const CategoryLanding = () => {
               path: c.href || c.path || '/',
             }))
           ),
+          apiSeo?.count > 0 ? buildFaqSchema(faqs) : null,
         ]}
       />
       <Navbar />
 
-      {/* 1–2 Breadcrumb + Category hero */}
-      <section className="relative overflow-hidden border-b border-gold-600/10 pt-24 md:min-h-[42vh]">
-        <div className="absolute inset-0" aria-hidden>
-          <img
-            src={heroImage}
-            srcSet={
-              heroImageSm && heroImageSm !== heroImage
-                ? `${heroImageSm} 800w, ${heroImage} 1600w`
-                : undefined
-            }
-            sizes="100vw"
-            alt=""
-            className="h-full w-full object-cover object-center"
-            onError={(e) => {
-              e.currentTarget.src = `/placeholders/taxonomy/${leafSlug}.svg`;
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/88 to-navy-950/35" />
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-transparent to-navy-950/40" />
-        </div>
+      {/* Category hero: the name people search for, next to full-length model photos */}
+      <section className="border-b border-gold-600/10 pt-[68px] sm:pt-24 lg:pt-[136px]">
+        <div className="container mx-auto grid grid-cols-1 gap-6 px-5 pb-8 pt-6 sm:px-6 lg:grid-cols-12 lg:items-center lg:gap-10 lg:pb-12">
+          <div className="min-w-0 lg:col-span-5">
+            <nav aria-label="Breadcrumb" className="mb-5 font-sans text-xs text-navy-200">
+              {breadcrumbs.map((crumb, i) => (
+                <span key={`${crumb.href}-${i}`}>
+                  {i > 0 ? <span className="mx-1.5 text-gold-400/70">/</span> : null}
+                  {i === breadcrumbs.length - 1 ? (
+                    <span className="text-gold-300">{crumb.name}</span>
+                  ) : (
+                    <Link to={crumb.href} className="transition-colors hover:text-gold-300">
+                      {crumb.name}
+                    </Link>
+                  )}
+                </span>
+              ))}
+            </nav>
 
-        <div className="container relative z-10 mx-auto flex min-h-[36vh] flex-col justify-end px-5 pb-10 pt-10 sm:px-6 md:pb-14 md:pt-14">
-          <nav
-            aria-label="Breadcrumb"
-            className="mb-6 font-sans text-[9px] uppercase tracking-[0.22em] text-gold-500/55"
-          >
-            {breadcrumbs.map((crumb, i) => (
-              <span key={`${crumb.href}-${i}`}>
-                {i > 0 ? <span className="mx-2 text-gold-500/25">/</span> : null}
-                {i === breadcrumbs.length - 1 ? (
-                  <span className="text-gold-400/90">{crumb.name}</span>
-                ) : (
-                  <Link to={crumb.href} className="transition-colors hover:text-gold-300">
-                    {crumb.name}
-                  </Link>
-                )}
-              </span>
-            ))}
-          </nav>
+            <h1 className="font-display text-[2.1rem] leading-[1.08] text-white sm:text-5xl lg:text-[3.4rem]">{h1}</h1>
+            {tagline ? (
+              <p className="mt-4 max-w-lg font-serif text-lg italic leading-snug text-gold-200 md:text-xl">{tagline}</p>
+            ) : null}
 
-          {loading ? (
-            <p className="font-sans text-[10px] uppercase tracking-widest text-gold-500/50">Loading…</p>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45 }}
-              className="max-w-2xl space-y-4"
-            >
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.35em] text-gold-500">
-                {eyebrow}
-              </p>
-              <h1 className="font-display text-3xl leading-[1.12] text-white sm:text-4xl md:text-5xl">
-                {h1}
-              </h1>
-              {subhead ? (
-                <p className="max-w-xl font-sans text-[15px] font-light leading-relaxed text-navy-100/90 md:text-base">
-                  {subhead}
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <a
+                href="#collection"
+                className="bg-gold-500 px-6 py-3.5 font-sans text-xs font-semibold uppercase tracking-[0.16em] text-navy-950 transition-colors hover:bg-gold-300"
+              >
+                Shop the collection
+              </a>
+              {apiSeo?.count > 0 ? (
+                <p className="font-sans text-sm text-navy-100">
+                  {apiSeo.count} {apiSeo.count === 1 ? 'style' : 'styles'}
+                  {apiSeo.minPrice ? ` from KSh ${Number(apiSeo.minPrice).toLocaleString('en-KE')}` : ''}
                 </p>
               ) : null}
-            </motion.div>
-          )}
+            </div>
+          </div>
+
+          {looks.length > 0 ? (
+            <div className="min-w-0 lg:col-span-7">
+              <div className="-mx-5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 lg:overflow-visible">
+                {looks.slice(0, 3).map((src, i) => (
+                  <div
+                    key={src}
+                    className={`relative aspect-[3/4] shrink-0 snap-start overflow-hidden bg-navy-900 lg:w-auto ${
+                      looks.length === 1 ? 'w-full lg:col-span-2 lg:col-start-2' : 'w-[72vw] sm:w-[38vw]'
+                    }`}
+                  >
+                    <img
+                      src={src}
+                      alt={`${categoryName} for men at Prince Esquire, Nairobi, look ${i + 1}`}
+                      width={675}
+                      height={900}
+                      fetchPriority={i === 0 ? 'high' : 'auto'}
+                      decoding="async"
+                      className="h-full w-full object-cover object-top"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
+
+      <DeliveryVisitStrip />
 
       {/* 3 Subcategory tiles */}
       {showSubTiles ? (
         <CategorySubTiles
           children={children}
           childHref={childHref}
-          layout={subTilesLayout}
           crossLinkHeading={pageConfig?.crossLinkHeading}
           crossLinkTiles={pageConfig?.crossLinkTiles || []}
         />
       ) : null}
 
       {/* 4–7 Filter + product grid + editorial break */}
-      <section className="py-12 md:py-16">
+      <section id="collection" className="scroll-mt-24 py-10 md:py-14 lg:scroll-mt-32">
         <div className="container mx-auto px-5 sm:px-6">
           <CategoryFilterBar
             sort={sort}
@@ -485,44 +503,25 @@ const CategoryLanding = () => {
             onToggleSize={toggleInSet(setSelectedSizes)}
           />
 
-          <div className="mb-8 flex items-end justify-between gap-4 border-b border-gold-600/10 pb-6">
-            <div>
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.35em] text-gold-500">
-                The collection
-              </p>
-              <h2 className="mt-2 font-display text-2xl text-white md:text-3xl">
-                {category?.name ? `Shop ${category.name}` : 'Shop'}
-              </h2>
-            </div>
-            <p className="font-sans text-[10px] uppercase tracking-[0.22em] text-gold-500/45">
-              {productsLoading
-                ? 'Loading…'
-                : `${filtered.length} piece${filtered.length === 1 ? '' : 's'}`}
+          <div className="mb-7 flex items-end justify-between gap-4">
+            <h2 className="font-display text-3xl text-white md:text-4xl">Shop {categoryName}</h2>
+            <p className="shrink-0 font-sans text-sm text-navy-100">
+              {productsLoading ? 'Loading…' : `${filtered.length} ${filtered.length === 1 ? 'piece' : 'pieces'}`}
             </p>
           </div>
 
           {productsLoading ? (
-            <p className="py-24 text-center font-sans text-[10px] uppercase tracking-widest text-gold-600/50">
-              Loading collection…
-            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-4" aria-label="Loading collection">
+              {Array.from({ length: 8 }, (_, i) => (
+                <div key={i} className="aspect-[3/4] animate-pulse bg-navy-900/70" />
+              ))}
+            </div>
           ) : filtered.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 xl:grid-cols-4 xl:gap-x-8 xl:gap-y-14">
-                <AnimatePresence mode="popLayout">
-                  {gridHead.map((product, i) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      motionProps={{
-                        layout: true,
-                        initial: { opacity: 0, y: 14 },
-                        animate: { opacity: 1, y: 0 },
-                        exit: { opacity: 0 },
-                        transition: { delay: Math.min(i, 12) * 0.02 },
-                      }}
-                    />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-6 sm:gap-y-12 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-7">
+                {gridHead.map((product, i) => (
+                    <ProductCard key={product.id} product={product} motionProps={cardMotion(i)} />
                   ))}
-                </AnimatePresence>
               </div>
 
               {/* 6 Editorial insert */}
@@ -539,23 +538,32 @@ const CategoryLanding = () => {
               {gridTail.length > 0 ? (
                 <div
                   id="category-grid-continue"
-                  className="grid scroll-mt-28 grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 sm:gap-y-12 xl:grid-cols-4 xl:gap-x-8 xl:gap-y-14"
+                  className="scroll-mt-28 grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-6 sm:gap-y-12 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-7"
                 >
-                  <AnimatePresence mode="popLayout">
-                    {gridTail.map((product, i) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        motionProps={{
-                          layout: true,
-                          initial: { opacity: 0, y: 14 },
-                          animate: { opacity: 1, y: 0 },
-                          exit: { opacity: 0 },
-                          transition: { delay: Math.min(i, 12) * 0.02 },
-                        }}
-                      />
-                    ))}
-                  </AnimatePresence>
+                  {gridTail.map((product, i) => (
+                    <ProductCard key={product.id} product={product} motionProps={cardMotion(i)} />
+                  ))}
+                </div>
+              ) : null}
+
+              {filtered.length > visibleProducts.length ? (
+                <div className="mt-12 flex flex-col items-center gap-4">
+                  <p className="font-sans text-sm text-navy-100">
+                    Showing {visibleProducts.length} of {filtered.length}
+                  </p>
+                  <div className="h-0.5 w-56 bg-navy-800">
+                    <div
+                      className="h-full bg-gold-400"
+                      style={{ width: `${(visibleProducts.length / filtered.length) * 100}%` }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                    className="border border-gold-400 px-8 py-3.5 font-sans text-xs font-semibold uppercase tracking-[0.16em] text-gold-200 transition-colors hover:bg-gold-400 hover:text-navy-950"
+                  >
+                    Show more
+                  </button>
                 </div>
               ) : null}
             </>
@@ -575,6 +583,71 @@ const CategoryLanding = () => {
           )}
         </div>
       </section>
+
+      {/* About this category + FAQ: useful to shoppers and to search engines */}
+      {seoIntro ? (
+        <section className="border-t border-gold-600/10 py-12 md:py-16">
+          <div className="container mx-auto grid gap-10 px-5 sm:px-6 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <h2 className="font-display text-3xl text-white">About {categoryName}</h2>
+              <p className="mt-4 font-sans text-base font-light leading-relaxed text-navy-100">{seoIntro}</p>
+            </div>
+            {apiSeo?.count > 0 && faqs.length > 0 ? (
+              <div>
+                <h2 className="font-display text-3xl text-white">Good to know</h2>
+                <div className="mt-3 divide-y divide-gold-500/15">
+                  {faqs.map((faq) => (
+                    <details key={faq.question} className="group py-3.5">
+                      <summary className="cursor-pointer list-none font-sans text-[15px] font-medium text-white marker:hidden hover:text-gold-300">
+                        {faq.question}
+                      </summary>
+                      <p className="mt-2 font-sans text-sm font-light leading-relaxed text-navy-100">{faq.answer}</p>
+                    </details>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Buying guidance and journal links */}
+      {guide.length > 0 || relatedPosts.length > 0 ? (
+        <section className="border-t border-gold-600/10 py-12 md:py-16">
+          <div className="container mx-auto px-5 sm:px-6">
+            {guide.length > 0 ? (
+              <>
+                <h2 className="font-display text-3xl text-white">Buying guide</h2>
+                <div className="mt-6 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                  {guide.map((item) => (
+                    <div key={item.heading}>
+                      <h3 className="font-sans text-[15px] font-semibold text-gold-200">{item.heading}</h3>
+                      <p className="mt-2 font-sans text-sm font-light leading-relaxed text-navy-100">{item.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            {relatedPosts.length > 0 ? (
+              <div className={guide.length > 0 ? 'mt-10 border-t border-gold-500/15 pt-8' : ''}>
+                <h2 className="font-display text-2xl text-white">From the Style Journal</h2>
+                <ul className="mt-4 grid gap-3 md:grid-cols-3">
+                  {relatedPosts.map((post) => (
+                    <li key={post.slug}>
+                      <Link
+                        to={`/blog/${post.slug}`}
+                        className="font-sans text-sm text-gold-300 underline decoration-gold-500/30 underline-offset-4 hover:text-gold-100"
+                      >
+                        {post.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* 8 Complete the Look */}
       {showCompleteLook ? <CategoryCompleteLook config={pageConfig.completeLook} /> : null}

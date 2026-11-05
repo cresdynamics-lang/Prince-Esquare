@@ -44,13 +44,13 @@ Photo-first rules (critical):
 - Base name, colours, pattern, and category on the actual garment/footwear/accessory in the frame.
 - Do not invent a brand unless a logo/text on the product is clearly readable.
 - Do not invent fabric names, pocket counts, sole types, or accessories that are not visible.
-- Prefer plain accurate naming over hype: "Navy Oxford Shirt" beats a long fictional style story.
+- Stand-out comes from specificity, never from invented claims. If you cannot see it, leave it out.
 - If the photo is a single item, describe that one item. Only fill "components" when multiple distinct pieces are actually visible (outfit/set shot).
 - Colours must match what you see; for stripes/checks use ONE patterned colour name (e.g. "Navy Striped"), never list stripe threads as separate colours.
 
 Return ONLY valid JSON (no markdown) with this exact shape:
 {
-  "name": "Product display name in Title Case with brand/style cues when visible (e.g. Clarks Dark Brown Wingtip Brogue Oxford Shoes)",
+  "name": "Display name following the Product naming rules below (e.g. Clarks Dark Brown Wingtip Brogue Oxford)",
   "slug": "url-safe-kebab-case-slug",
   "focus_description": "1 short sentence, ~80-140 chars. Who it's for + light SEO (e.g. luxury shoes Nairobi).",
   "description": "2 short paragraphs, 300-550 characters max. What it is, finish if visible, when to wear, Nairobi/Kenya. No hashtags. No ALL CAPS.",
@@ -70,7 +70,7 @@ Return ONLY valid JSON (no markdown) with this exact shape:
 }
 
 Rules:
-- name: clear, searchable, specific (color, style, type). Prefer Title Case, not ALL CAPS. Always men's naming.
+- name: follow the Product naming rules below exactly.
 - slug: lowercase, hyphens only, no leading/trailing hyphens, ASCII, max 80 chars.
 - parent_category_slug / category_slug: best-fit menswear categories for this store. Use kebab-case.
   Parents (prefer exact match): polo-t-shirts, shoes, shirts, suits, blazers, track-suits, jackets, vests, boxers, trousers, linen, sets, caps-hats, belts-ties, sweaters, t-shirts.
@@ -91,21 +91,32 @@ Rules:
 - Keep the whole JSON compact so it never truncates. Prefer shorter description (~250-400 chars) over long copy.
 - For Sets: list every visible piece. category_hint: khaki|jeans|gurkha|chino|formal|formal-shirts|shirts-casual|polo-t-shirts|belts-ties|formal-shoes|casual|loafers|boots|caps-hats|blazers|jackets|other.
 - For Sets: size/price optional. Name the whole look as a set when components are filled.
+Product naming rules (critical — the name sells the piece and is what men search for):
+- Formula: [Brand if clearly readable] + [exact colour or finish] + [the one detail that sets it apart] + [product type].
+- Length: 3 to 7 words, 55 characters at most. Title Case. Keep the product type words shoppers search: Oxford, Derby, Brogue, Chelsea Boot, Loafer, Blazer, Two-Piece Suit, Tracksuit, Polo, Chinos, Khakis.
+- Colour must be exact and vivid when the photo supports it: Steel Blue, Royal Blue, Petrol Blue, Burnished Tan, Midnight Navy, Charcoal, Stone. Never "Blue 2" or "Grey 5".
+- The detail must be visible: Cap-Toe, Wingtip, Crocodile-Embossed, Contrast Collar, Quarter-Zip, Windowpane, Lapel Chain, Hybrid Quilted, Red Sole.
+- No brand visible and the piece is a suit, jacket, shoe or knitted polo: you may open with a house name, "The " + one of Ambassador, Chairman, Counsel, Director, Statesman, Regent, Diplomat, Senator, Barrister, Envoy, Vanguard. Example: "The Ambassador Black Cap-Toe Oxford". Use it at most on pieces that would otherwise read as generic.
+- Outfit shot with several pieces: name the lead pieces and end in "Outfit" (e.g. "Navy Paisley Shirt and White Trousers Outfit"). Never name a set after one piece alone.
+- Never put in a name: ALL CAPS; Men's, Luxury, Premium, Executive, Stylish, Elegant, Best, New; SKU or style codes; sizes; NWT or "new with tags"; stock notes or reasoning such as "confirmed via hang tag"; brackets; em dashes; trailing dots or commas; the store name.
+- Good: "Tedd Terry London Steel Blue Wool Two-Piece Suit", "Burnished Tan Leather Chelsea Boot", "The Regent Dark Brown Derby".
+- Bad: "TEDD TERRY LONDON BLUE 2 SUIT", "Men's Premium Luxury Black Shoes..", "Stunning Executive Formal Shoes".
+
 Masculine naming (critical):
 - Never use feminine or unisex-soft words in name, slug, or descriptions: no "dress trousers", "dress pants", "ladies", "women's", "girly", "cute", "pretty", "floral dress", "skirt", "blouse", "heels".
 - Prefer men's terms: men's trousers, formal trousers, tailored trousers, office trousers, wedding trousers, boardroom trousers — never "dress trousers".
-- Say "men's" / "gentlemen" / "him" — never "her" / "she" / "women".
+- In descriptions say "men's" / "gentlemen" / "him" — never "her" / "she" / "women". Do not put "Men's" in the name.
 
 Trousers / pants (critical — be specific):
 - When the product is trousers, chinos, khakis, or similar, name and describe the exact style if visible. Prefer one clear type in the product name.
 - Style cues to look for and name explicitly when they fit:
   - Gurkha / Ghurka trousers: high waist, double buckle or buttoned waistband straps, no classic belt loops look, tailored formal drape.
-  - Khaki trousers: classic khaki / sand / stone cotton work-to-weekend look; say "Men's Khaki Trousers" (or Khakis) when that is the fabric/colour style.
-  - Chinos: cotton twill, smarter-casual tapered or straight; say "Men's Chinos" or "Men's Chino Trousers".
+  - Khaki trousers: classic khaki / sand / stone cotton work-to-weekend look; say "Khaki Trousers" (or Khakis) when that is the fabric/colour style.
+  - Chinos: cotton twill, smarter-casual tapered or straight; say "Chinos" or "Chino Trousers".
   - Formal / tailored trousers: suit-adjacent, sharp crease, wool or fine weave for office or wedding.
   - Linen trousers: visible linen texture, relaxed warm-weather drape.
   - Cargo / utility: visible cargo pockets.
-- Put the style in the name when clear, e.g. "Men's Navy Gurkha Trousers", "Beige Men's Chinos", "Classic Sand Khaki Trousers", "Charcoal Tailored Formal Trousers".
+- Put the style in the name when clear, e.g. "Navy Gurkha Trousers", "Stone Cotton Chinos", "Sand Tapered Khaki Trousers", "Charcoal Tailored Formal Trousers".
 - In focus_description and description, briefly confirm the style (Gurkha buckles, chino twill, khaki wash, etc.) so shoppers know exactly what they are buying.
 - If category hint is Trousers / Chinos / Khakis, lean into that family and still pick the best subtype from the photo.`;
 

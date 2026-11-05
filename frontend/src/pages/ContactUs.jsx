@@ -53,8 +53,8 @@ const ContactUs = () => {
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
       <SEO
-        title="Contact Us - Prince Esquire"
-        description="Get in touch with Prince Esquire. We're here to help with your luxury fashion needs."
+        title="Contact Prince Esquire | Yala Towers, Nairobi"
+        description="Visit Prince Esquire at Yala Towers, Nairobi, or reach us by WhatsApp, phone or email for orders, sizing and styling help."
         path="/contact-us"
       />
       <Navbar />

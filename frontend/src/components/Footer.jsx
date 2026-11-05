@@ -35,7 +35,8 @@ const FOOTER_COLUMNS = [
       title: 'Shirts',
       href: p('shirts'),
       links: [
-        { name: 'Formal Shirts', href: p('formal-shirts') },
+        { name: 'Official Shirts', href: p('formal-shirts') },
+        { name: 'Presidential Shirts', href: p('presidential-shirts') },
         { name: 'Casual Shirts', href: p('shirts-casual') },
         { name: 'Presidential Shirts', href: p('formal-shirts') },
         { name: 'Polo Shirts', href: p('polo-t-shirts') },
@@ -74,18 +75,16 @@ const FOOTER_COLUMNS = [
     },
     {
       title: 'Tracksuits',
-      href: p('track-tops'),
-      links: [
-        { name: 'Full Tracksuits', href: p('track-tops') },
-        { name: 'Joggers', href: p('track-tops') },
-        { name: 'Track Tops', href: p('track-tops') },
-      ],
+      href: p('tracksuits'),
+      links: [{ name: 'All Tracksuits', href: p('tracksuits') }],
     },
     {
       title: 'Shoes',
       href: p('shoes'),
       links: [
-        { name: 'Formal Shoes', href: p('formal-shoes') },
+        { name: 'Official Shoes', href: p('formal-shoes') },
+        { name: 'Chelsea Boots', href: p('chelsea-boots') },
+        { name: 'Brogues', href: p('brogues') },
         {
           name: 'Official Line',
           href: p('formal-shoes'),
@@ -223,6 +222,14 @@ const Footer = () => {
             <span className="flex items-center gap-2 text-xs">
               <MapPin size={14} className="text-gold-600" />
               Nairobi, Kenya
+              <a
+                href="https://www.google.com/maps/search/?api=1&query=Prince+Esquire+Yala+Towers+Nairobi"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gold-400 underline underline-offset-4"
+              >
+                Get directions
+              </a>
             </span>
           </div>
 

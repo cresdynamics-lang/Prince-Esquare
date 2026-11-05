@@ -1,20 +1,7 @@
-# Prince Esquire — The Man's Shop | Yala Towers, Nairobi
+# Prince Esquire, The Man's Shop | Yala Towers, Nairobi
 # https://prince-esquire.co.ke
 
 User-agent: *
-Allow: /
-Allow: /shop/
-Allow: /product/
-Allow: /products
-Allow: /blog/
-Allow: /blog
-Allow: /sale
-Allow: /new-arrivals
-Allow: /contact-us
-Allow: /size-guide
-Allow: /bespoke-services
-Allow: /shipping-returns
-
 Disallow: /cart
 Disallow: /checkout
 Disallow: /payment/
@@ -22,14 +9,14 @@ Disallow: /profile
 Disallow: /login
 Disallow: /signup
 Disallow: /admin
-Disallow: /api/
+Disallow: /api/admin/
+Disallow: /api/auth/
+Disallow: /api/cart
+Disallow: /api/orders
+Disallow: /api/payments
+Disallow: /api/profile
+Disallow: /api/wishlist
+# Do not block /api/ as a whole: Google renders pages with JavaScript and needs the
+# public catalogue endpoints, otherwise product pages render empty for Googlebot.
 
-# Full catalog + Style Journal + shop taxonomy (dynamic)
 Sitemap: https://prince-esquire.co.ke/sitemap.xml
-Sitemap: https://prince-esquire.co.ke/api/seo/sitemap.xml
-
-User-agent: Googlebot
-Allow: /
-
-User-agent: Googlebot-Image
-Allow: /

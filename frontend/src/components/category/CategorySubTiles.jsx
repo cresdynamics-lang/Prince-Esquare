@@ -1,72 +1,49 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { CROSS_SURFACE_LABELS } from '../../data/categoryPages';
-import HomeScrollRail from '../home/HomeScrollRail';
+import { tileImageFor } from '../../data/categoryLooks';
 
-function TileCard({ child, href, crossLine, i, compact }) {
-  const img = child.tileImage || child.image || `/placeholders/taxonomy/${child.slug}.svg`;
+function TileCard({ child, href, crossLine }) {
+  const img = tileImageFor(child.slug, child.tileImage || child.image);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: compact ? 0 : 12, x: compact ? 18 : 0 }}
-      whileInView={{ opacity: 1, y: 0, x: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: Math.min(i, 6) * 0.05 }}
-      className={
-        compact
-          ? 'w-[30vw] max-w-[140px] shrink-0 sm:w-[28vw] sm:max-w-[180px] md:w-[22vw] md:max-w-[200px] lg:w-[18vw] lg:max-w-[220px]'
-          : 'min-w-0'
-      }
-    >
+    <div className="min-w-0">
       <Link to={href} className="group block">
-        <div className="relative aspect-[3/4] overflow-hidden border border-gold-500/10 bg-navy-900">
+        <div className="relative aspect-[3/4] overflow-hidden bg-navy-900">
           <img
             src={img}
-            alt=""
+            alt={`${child.name} at Prince Esquire, Nairobi`}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.03]"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/25 to-transparent" />
-          <div
-            className={`absolute inset-x-0 bottom-0 ${
-              compact ? 'p-2.5 sm:p-3.5 md:p-4' : 'p-3 sm:p-4 md:p-5'
-            }`}
-          >
-            <span
-              className={`inline-flex items-center gap-1 font-display leading-tight text-gold-300 ${
-                compact
-                  ? 'text-[11px] sm:gap-1.5 sm:text-sm md:text-base'
-                  : 'text-sm sm:text-base md:text-lg'
-              }`}
-            >
+        </div>
+        <div className="mt-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-display text-lg leading-tight text-white transition-colors group-hover:text-gold-300 md:text-xl">
               {child.name}
-              <ArrowUpRight
-                size={compact ? 12 : 14}
-                className="shrink-0 text-gold-500/70 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                aria-hidden
-              />
-            </span>
-            {crossLine ? (
-              <p
-                className={`mt-1 font-sans font-medium uppercase text-gold-500/55 ${
-                  compact
-                    ? 'text-[7px] tracking-[0.14em] sm:text-[8px] sm:tracking-[0.16em]'
-                    : 'text-[8px] tracking-[0.16em] sm:text-[9px]'
-                }`}
-              >
-                {crossLine}
-              </p>
-            ) : null}
+            </p>
+            <p className="mt-1 font-sans text-xs text-navy-200">
+              {child.productCount ? `${child.productCount} ${child.productCount === 1 ? 'style' : 'styles'}` : crossLine || 'Shop now'}
+            </p>
           </div>
+          <ArrowUpRight
+            size={18}
+            className="mt-0.5 shrink-0 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+            aria-hidden
+          />
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 
-function buildTile(child, href, i, compact, crossSurfacesBySlug) {
+const hasRealPhoto = (tile) => {
+  const img = tileImageFor(tile.slug, tile.tileImage || tile.image);
+  return Boolean(img) && !img.endsWith('.svg');
+};
+
+function buildTile(child, href, crossSurfacesBySlug) {
   const surfaces = crossSurfacesBySlug[child.slug] || child.crossSurfaces || [];
   const crossLine = surfaces.map((s) => CROSS_SURFACE_LABELS[s]).filter(Boolean)[0];
   return (
@@ -75,87 +52,48 @@ function buildTile(child, href, i, compact, crossSurfacesBySlug) {
       child={child}
       href={href}
       crossLine={crossLine}
-      i={i}
-      compact={compact}
     />
   );
 }
 
 /**
- * Subcategory tiles — scroll (Suits), grid (Shirts/Trousers), or split
- * (Jackets: native row + cross-tagged link-out row).
+ * Subcategory tiles with the name under the photo, so the model stays visible.
+ * Empty subcategories hide themselves until they have products.
  */
 export default function CategorySubTiles({
   children = [],
   childHref,
   crossSurfacesBySlug = {},
-  layout = 'scroll',
   crossLinkHeading,
   crossLinkTiles = [],
 }) {
-  if (!children.length && !crossLinkTiles.length) return null;
+  const liveChildren = children.filter((child) => child.productCount !== 0);
+  const liveLinks = crossLinkTiles.filter(hasRealPhoto);
+  if (!liveChildren.length && !liveLinks.length) return null;
 
-  const compact = layout === 'scroll';
-
-  const nativeTiles = children.map((child, i) =>
-    buildTile(child, childHref(child.slug), i, compact, crossSurfacesBySlug)
+  const nativeTiles = liveChildren.map((child) =>
+    buildTile(child, childHref(child.slug), crossSurfacesBySlug)
   );
+  const linkTiles = liveLinks.map((tile) => buildTile(tile, tile.href, {}));
 
-  const linkTiles = crossLinkTiles.map((tile, i) =>
-    buildTile(
-      tile,
-      tile.href,
-      children.length + i,
-      false,
-      {}
-    )
-  );
+  const columns =
+    liveChildren.length >= 5 ? 'md:grid-cols-5' : liveChildren.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
 
   return (
-    <section className="border-b border-gold-600/10 py-14 md:py-20">
+    <section className="border-b border-gold-600/10 py-12 md:py-16">
       <div className="container mx-auto px-5 sm:px-6">
-        <div className="mb-10">
-          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.35em] text-gold-500">
-            Browse by edit
-          </p>
-          <h2 className="mt-2 font-display text-2xl text-white md:text-3xl">Choose your lane</h2>
-        </div>
-
-        {layout === 'split' ? (
-          <div className="space-y-10 md:space-y-12">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5">
-              {nativeTiles}
-            </div>
-            {linkTiles.length > 0 ? (
-              <div>
-                {crossLinkHeading ? (
-                  <p className="mb-5 font-sans text-[10px] font-bold uppercase tracking-[0.28em] text-gold-500/70">
-                    {crossLinkHeading}
-                  </p>
-                ) : null}
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:max-w-2xl md:gap-5">
-                  {linkTiles}
-                </div>
-              </div>
+        <h2 className="mb-8 font-display text-3xl text-white md:text-4xl">Shop by style</h2>
+        <div className={`grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 ${columns}`}>{nativeTiles}</div>
+        {linkTiles.length > 0 ? (
+          <div className="mt-10">
+            {crossLinkHeading ? (
+              <p className="mb-5 font-sans text-xs font-semibold uppercase tracking-[0.2em] text-gold-300">
+                {crossLinkHeading}
+              </p>
             ) : null}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 md:grid-cols-4">{linkTiles}</div>
           </div>
-        ) : layout === 'grid' ? (
-          <div
-            className={`grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 ${
-              children.length >= 5
-                ? 'md:grid-cols-5'
-                : children.length === 4
-                  ? 'md:grid-cols-4'
-                  : 'md:grid-cols-3'
-            }`}
-          >
-            {nativeTiles}
-          </div>
-        ) : (
-          <HomeScrollRail ariaLabel="Browse by edit" gapClass="gap-2 sm:gap-3 md:gap-4">
-            {nativeTiles}
-          </HomeScrollRail>
-        )}
+        ) : null}
       </div>
     </section>
   );

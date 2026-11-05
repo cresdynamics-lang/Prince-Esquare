@@ -7,10 +7,17 @@ export const SOCIAL_INSTAGRAM = 'https://www.instagram.com/prince_esquire.1/';
 export const SOCIAL_FACEBOOK = 'https://www.facebook.com/prince.esquire254';
 export const SOCIAL_TIKTOK = 'https://www.tiktok.com/@princeesquire';
 
+/** Catalogue names are often ALL CAPS; shout-free versions read better in search results. */
+export const displayProductName = (value) => {
+  const text = String(value || '').trim();
+  if (text !== text.toUpperCase()) return text;
+  return text.toLowerCase().replace(/(^|[\s-])([a-z])/g, (m, sep, ch) => sep + ch.toUpperCase());
+};
+
 export const routeSeo = {
   home: {
-    title: 'Luxury Fashion Kenya | Prince Esquire',
-    description: 'Shop curated luxury fashion in Kenya at Prince Esquire. Discover refined menswear, footwear and accessories with Nairobi delivery. Explore now.',
+    title: 'Luxury Menswear in Nairobi, Kenya | Prince Esquire',
+    description: "Prince Esquire, The Man's Shop at Yala Towers, Nairobi. Luxury men's suits, shirts, shoes and accessories, with delivery across Kenya.",
     path: '/',
     keywords: [
       'luxury fashion Kenya',
@@ -21,14 +28,14 @@ export const routeSeo = {
     ],
   },
   products: {
-    title: 'Designer Clothing Kenya | Prince Esquire',
-    description: 'Browse premium clothing, shoes and accessories at Prince Esquire. Curated luxury fashion for discerning Kenyan wardrobes. Shop the edit.',
+    title: "All Men's Clothing & Shoes in Kenya | Prince Esquire",
+    description: "Browse the full Prince Esquire collection of men's clothing, shoes and accessories. Visit us at Yala Towers, Nairobi, or order online for delivery across Kenya.",
     path: '/products',
     keywords: ['designer clothing Kenya', 'premium fashion Kenya', 'luxury clothing Nairobi'],
   },
   'new-arrivals': {
-    title: 'New Arrivals | Prince Esquire Kenya',
-    description: 'Shop new arrivals at Prince Esquire — the latest products added or updated, newest first. Menswear, shoes and accessories in Nairobi.',
+    title: "New Arrivals in Men's Fashion, Kenya | Prince Esquire",
+    description: "The latest men's clothing, shoes and accessories at Prince Esquire, Yala Towers, Nairobi. See what just landed, with delivery across Kenya.",
     path: '/new-arrivals',
     keywords: ['new arrivals Kenya', 'latest menswear Nairobi', 'new fashion Kenya'],
   },
@@ -75,14 +82,14 @@ export const routeSeo = {
     introCopy: 'Luxury linen in Kenya belongs in a wardrobe built for climate, comfort and effortless polish. Prince Esquire curates linen shirts, sets, trousers and shorts with a relaxed sophistication suited to Nairobi weekends, coastal escapes and warm weather events. The collection favours breathable textures, calm colour and silhouettes that feel composed without stiffness. Explore linen pieces that make ease look deliberate.',
   },
   sale: {
-    title: 'Sale — Best Sellers | Prince Esquire Kenya',
-    description: 'Shop best-selling tracksuits, official shoes and official boots at Prince Esquire Kenya. Curated sale picks with Nairobi delivery.',
+    title: "Men's Clothing & Shoes on Sale in Kenya | Prince Esquire",
+    description: "Shop best-selling men's track suits, official shoes and boots on sale at Prince Esquire, Nairobi. Delivery across Kenya.",
     path: '/sale',
     keywords: ['sale menswear Kenya', 'tracksuits Nairobi', 'formal shoes Kenya', 'luxury fashion sale'],
   },
   blog: {
-    title: 'Prince Esquire Style Journal',
-    description: 'Style Journal from Prince Esquire — wedding guest outfits, quality shirts, office wear and power dressing guides for men in Kenya.',
+    title: "Men's Style Journal: Kenya Dressing Guides | Prince Esquire",
+    description: 'Wedding guest outfits, office wear, shoes and suit advice for men in Kenya, from the Prince Esquire Style Journal.',
     path: '/blog',
     keywords: [
       'Prince Esquire journal',
@@ -135,6 +142,7 @@ export const localBusinessSchema = {
     addressLocality: 'Nairobi',
     addressCountry: 'KE',
   },
+  hasMap: 'https://www.google.com/maps/search/?api=1&query=Prince+Esquire+Yala+Towers+Nairobi',
   geo: {
     '@type': 'GeoCoordinates',
     latitude: -1.2921,
@@ -176,7 +184,7 @@ export const buildBreadcrumbSchema = (items) => ({
 export const buildProductSchema = (product, image, price) => ({
   '@context': 'https://schema.org',
   '@type': 'Product',
-  name: product.name,
+  name: displayProductName(product.name),
   image: image ? [image.startsWith('http') ? image : `${SITE_URL}${image}`] : [DEFAULT_IMAGE],
   description:
     product.focus_description ||
@@ -198,6 +206,14 @@ export const buildProductSchema = (product, image, price) => ({
     seller: {
       '@type': 'Organization',
       name: SITE_NAME,
+    },
+    hasMerchantReturnPolicy: {
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'KE',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+      merchantReturnDays: 5,
+      returnMethod: 'https://schema.org/ReturnByMail',
+      returnFees: 'https://schema.org/ReturnShippingFees',
     },
   },
 });

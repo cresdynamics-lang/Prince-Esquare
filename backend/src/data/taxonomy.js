@@ -36,6 +36,12 @@ const TAXONOMY_TREE = [
         tileImage: ph("two-piece"),
       },
       {
+        name: "Wedding Suits",
+        slug: "wedding-suits",
+        copy: "The day you will see in photographs for the rest of your life.",
+        tileImage: ph("two-piece"),
+      },
+      {
         name: "Three-Piece",
         slug: "three-piece",
         copy: "When the occasion asks for more — and you deliver.",
@@ -72,9 +78,15 @@ const TAXONOMY_TREE = [
     heroImage: ph("shirts-hero"),
     children: [
       {
-        name: "Formal Shirts",
+        name: "Official Shirts",
         slug: "formal-shirts",
         copy: "The collar that closes the room before you speak.",
+        tileImage: ph("formal-shirts"),
+      },
+      {
+        name: "Presidential Shirts",
+        slug: "presidential-shirts",
+        copy: "The print that does the talking for you.",
         tileImage: ph("formal-shirts"),
       },
       {
@@ -162,13 +174,14 @@ const TAXONOMY_TREE = [
         copy: "Lighter weight. Same presence.",
         tileImage: ph("half-jackets"),
       },
-      {
-        name: "Track Tops",
-        slug: "track-tops",
-        copy: "Off-duty polish that still photographs well.",
-        tileImage: ph("track-tops"),
-      }
     ],
+  },
+  {
+    name: "Tracksuits",
+    slug: "tracksuits",
+    copy: "Off-duty polish that still photographs well.",
+    tileImage: "/hero/tracksuits-800.webp",
+    children: [],
   },
   {
     name: "Shoes",
@@ -178,9 +191,21 @@ const TAXONOMY_TREE = [
     heroImage: ph("shoes-hero"),
     children: [
       {
-        name: "Formal",
+        name: "Official Shoes",
         slug: "formal-shoes",
         copy: "The sound of the room going quiet.",
+        tileImage: ph("formal-shoes"),
+      },
+      {
+        name: "Chelsea Boots",
+        slug: "chelsea-boots",
+        copy: "Clean lines from the ankle down.",
+        tileImage: ph("formal-shoes"),
+      },
+      {
+        name: "Brogues",
+        slug: "brogues",
+        copy: "Detail you notice on the second look.",
         tileImage: ph("formal-shoes"),
       },
       {
@@ -279,12 +304,13 @@ const TAXONOMY_TREE = [
 
 const LEGACY_SLUG_ALIASES = {
   'belts-ties': 'accessories',
-  'track-suits': 'track-tops',
+  'track-suits': 'tracksuits',
+  'track-tops': 'tracksuits',
   linen: 'linen-edit',
   boots: 'formal-shoes',
   sandals: 'casual',
   sweaters: 'half-jackets',
-  presidential: 'formal-shirts',
+  presidential: 'presidential-shirts',
   polos: 'polo-t-shirts',
   'knitted-polos': 'polo-t-shirts',
   'round-neck-t-shirts': 't-shirts',

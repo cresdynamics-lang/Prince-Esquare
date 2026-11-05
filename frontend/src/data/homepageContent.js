@@ -18,64 +18,19 @@ export const HOME_HERO = {
 };
 
 /**
- * Section 3 — Shop by Category (3×3 grid).
- * Suits moved off lead; Track Suits closes as card 9.
+ * Section 3 — Shop by Category. The two featured cards run larger.
  */
 export const HOME_CATEGORY_CARDS = [
-  {
-    name: 'Shirts',
-    href: '/shop/shirts',
-    image: '/models/categories/shirts.jpg',
-    imageSm: '/models/categories/shirts.jpg',
-  },
-  {
-    name: 'Shoes',
-    href: '/shop/shoes',
-    image: '/models/categories/shoes.jpg',
-    imageSm: '/models/categories/shoes.jpg',
-  },
-  {
-    name: 'Trousers',
-    href: '/shop/trousers',
-    image: '/models/categories/jeans.jpg',
-    imageSm: '/models/categories/jeans.jpg',
-  },
-  {
-    name: 'Suits',
-    href: '/shop/suits',
-    image: '/models/categories/suits.jpg',
-    imageSm: '/models/categories/suits.jpg',
-  },
-  {
-    name: 'Jackets & Outerwear',
-    href: '/shop/jackets',
-    image: '/models/categories/jackets.jpg',
-    imageSm: '/models/categories/jackets.jpg',
-  },
-  {
-    name: 'Accessories',
-    href: '/shop/accessories',
-    image: '/hero/belts-1600.webp',
-    imageSm: '/hero/belts-800.webp',
-  },
-  {
-    name: 'The Linen Edit',
-    href: '/shop/linen-edit',
-    image: '/models/categories/linen-edit-1600.jpg',
-    imageSm: '/models/categories/linen-edit-800.jpg',
-  },
-  {
-    name: 'Gift Sets & Boxes',
-    href: '/shop/gift-sets',
-    image: '/models/categories/gift-sets-1600.jpg',
-    imageSm: '/models/categories/gift-sets-800.jpg',
-  },
-  {
-    name: 'Track Suits',
-    href: '/shop/jackets/track-tops',
-    image: '/hero/tracksuits-1600.webp',
-    imageSm: '/hero/tracksuits-800.webp',
-  },
+  { name: 'Suits', slug: 'suits', href: '/shop/suits', image: '/models/categories/suits.jpg', featured: true },
+  { name: 'Shoes', slug: 'shoes', href: '/shop/shoes', image: '/models/shoes/tan-brogue-lifestyle.jpg', featured: true },
+  { name: 'Shirts', slug: 'shirts', href: '/shop/shirts', image: '/models/categories/shirts.jpg' },
+  { name: 'Trousers', slug: 'trousers', href: '/shop/trousers', image: '/models/shirts/rose-contrast.jpg' },
+  { name: 'Blazers', slug: 'blazers', href: '/shop/suits/blazers', image: '/models/blazers/burgundy-lifestyle.jpg' },
+  { name: 'Jackets & Outerwear', slug: 'jackets', href: '/shop/jackets', image: '/models/categories/jackets.jpg' },
+  { name: 'Tracksuits', slug: 'tracksuits', href: '/shop/tracksuits', image: '/hero/tracksuits-1600.webp', imageSm: '/hero/tracksuits-800.webp' },
+  { name: 'Accessories', slug: 'accessories', href: '/shop/accessories', image: '/hero/belts-1600.webp', imageSm: '/hero/belts-800.webp' },
+  { name: 'The Linen Edit', slug: 'linen-edit', href: '/shop/linen-edit', image: '/hero/linen-1600.webp', imageSm: '/hero/linen-800.webp' },
+  { name: 'Gift Sets & Boxes', slug: 'gift-sets', href: '/shop/gift-sets', image: '/models/categories/gift-sets-1600.jpg', imageSm: '/models/categories/gift-sets-800.jpg' },
 ];
 
 /** Fallback editorial captions when product has no focus_description. */
@@ -98,8 +53,8 @@ export const HOME_LINEN_BANNER = {
   eyebrow: 'Season Edit',
   title: "Nairobi heat doesn't have to mean compromise.",
   cta: { label: 'Shop the Linen Edit', href: '/shop/linen-edit' },
-  image: '/models/categories/linen-edit-1600.jpg',
-  imageSm: '/models/categories/linen-edit-800.jpg',
+  image: '/hero/linen-1600.webp',
+  imageSm: '/hero/linen-800.webp',
 };
 
 export const HOME_GIFT_BANNER = {

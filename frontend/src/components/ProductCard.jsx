@@ -1,12 +1,13 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import WhatsAppIcon from './WhatsAppIcon';
 import { trackProductClick } from './VisitorTracker';
 import { launchWhatsAppOrder } from '../lib/whatsappOrder';
 import { productCardSrcSet, hasProductImage, parseProductImages } from '../utils/cloudinary';
 import { productImageObjectClass } from '../utils/productImages';
 import { getProductMerchBadges, bespokeLeadCopy } from '../utils/merchTags';
 import { formatSetContentsLine } from '../lib/setComponents';
+import { displayProductName } from '../seo/seoData';
 
 function uniqueSorted(values) {
   return [...new Set(values.filter(Boolean).map((v) => String(v).trim()).filter(Boolean))].sort(
@@ -23,6 +24,15 @@ function availableSizesAndColors(product) {
   );
   const colors = uniqueSorted(variants.map((v) => v.color));
   return { sizes, colors };
+}
+
+/** Second gallery photo, shown on hover so shoppers can see another angle without clicking. */
+function alternateImageSrc(product, primaryRaw) {
+  const gallery = parseProductImages(product?.images);
+  const other = gallery
+    .map((item) => (typeof item === 'string' ? item : item?.url || item?.optimized || item?.secure_url))
+    .find((url) => url && url !== primaryRaw && url !== product?.thumbnail);
+  return other ? productCardSrcSet(other).src : null;
 }
 
 /** Badge when a product has more colours or gallery angles to choose from. */
@@ -63,6 +73,7 @@ export default function ProductCard({
 
   const raw = product.thumbnail_optimized || product.thumbnail || product.image_url || '';
   const { src, srcSet } = productCardSrcSet(raw);
+  const hoverSrc = alternateImageSrc(product, raw);
   const objectPos = productImageObjectClass(src || raw);
 
   if (!src) return null;
@@ -121,27 +132,37 @@ export default function ProductCard({
         <Link
           to={`/product/${product.slug}`}
           onClick={() => trackProductClick(product)}
-          className="relative block aspect-[4/5] overflow-hidden bg-navy-900/80"
+          className="relative block aspect-[3/4] overflow-hidden bg-navy-900/80"
         >
           <img
             src={src}
             srcSet={srcSet || undefined}
             sizes={sizes}
-            alt={product.name || 'Product'}
+            alt={displayProductName(product.name) || 'Product'}
             width={480}
             height={600}
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             fetchPriority={priority ? 'high' : 'auto'}
-            className={`absolute inset-0 h-full w-full bg-navy-900 object-cover ${objectPos} transition-transform duration-700 ease-out group-hover:scale-[1.04]`}
+            className={`absolute inset-0 h-full w-full bg-navy-900 object-cover ${objectPos} transition-transform duration-700 ease-out group-hover:scale-[1.03]`}
           />
+          {hoverSrc ? (
+            <img
+              src={hoverSrc}
+              alt=""
+              aria-hidden
+              loading="lazy"
+              decoding="async"
+              className={`absolute inset-0 hidden h-full w-full bg-navy-900 object-cover ${objectPos} opacity-0 transition-opacity duration-500 group-hover:opacity-100 lg:block`}
+            />
+          ) : null}
         </Link>
 
         {(showPrimary || showSecondary || saleRailBadge || multiLabel) ? (
           <div className="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-start justify-between gap-2">
             <div className="flex max-w-[70%] flex-col items-start gap-1.5">
               {saleRailBadge ? (
-                <span className="bg-white px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-navy-950">
+                <span className="bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-950">
                   {saleRailBadge.label}
                 </span>
               ) : null}
@@ -149,12 +170,12 @@ export default function ProductCard({
                 showPrimary.href ? (
                   <Link
                     to={showPrimary.href}
-                    className="pointer-events-auto bg-navy-950/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-gold-300 ring-1 ring-gold-500/40 backdrop-blur-sm transition-colors hover:bg-gold-500 hover:text-navy-950"
+                    className="pointer-events-auto bg-navy-950/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-300 ring-1 ring-gold-500/40 backdrop-blur-sm transition-colors hover:bg-gold-500 hover:text-navy-950"
                   >
                     {showPrimary.label}
                   </Link>
                 ) : (
-                  <span className="bg-navy-950/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-gold-300 ring-1 ring-gold-500/40 backdrop-blur-sm">
+                  <span className="bg-navy-950/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-300 ring-1 ring-gold-500/40 backdrop-blur-sm">
                     {showPrimary.label}
                   </span>
                 )
@@ -170,7 +191,7 @@ export default function ProductCard({
                 <button
                   type="button"
                   onClick={handleMultiOptionOrder}
-                  className="pointer-events-auto bg-navy-950/90 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-white ring-1 ring-white/25 backdrop-blur-sm transition-colors hover:bg-gold-500 hover:text-navy-950 hover:ring-gold-400"
+                  className="pointer-events-auto bg-navy-950/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white ring-1 ring-white/25 backdrop-blur-sm transition-colors hover:bg-gold-500 hover:text-navy-950 hover:ring-gold-400"
                   aria-label={`${multiLabel} — order via WhatsApp`}
                 >
                   {multiLabel}
@@ -183,7 +204,7 @@ export default function ProductCard({
 
       <div className="flex flex-1 flex-col pb-1 pt-3.5">
         {product.brand_name && (
-          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.22em] text-gold-500/45">
+          <p className="mb-1 truncate text-[11px] font-medium uppercase tracking-[0.16em] text-gold-300/90">
             {product.brand_name}
           </p>
         )}
@@ -193,42 +214,33 @@ export default function ProductCard({
           onClick={() => trackProductClick(product)}
           className="block"
         >
-          <h3 className="min-h-[2.4rem] font-serif text-[14px] leading-snug text-white line-clamp-2 transition-colors group-hover:text-gold-400 sm:text-base">
-            {product.name}
+          <h3 className="min-h-[2.4rem] font-serif text-[15px] font-medium leading-snug text-white line-clamp-2 transition-colors group-hover:text-gold-300 sm:text-[17px]">
+            {displayProductName(product.name)}
           </h3>
         </Link>
 
         {setContentsLine ? (
-          <p className="mt-1.5 font-sans text-[10px] leading-snug text-navy-200/85 line-clamp-2">
+          <p className="mt-1.5 font-sans text-xs leading-snug text-navy-200 line-clamp-2">
             {setContentsLine}
           </p>
         ) : null}
 
         {showVariantMeta && (availSizes.length > 0 || availColors.length > 0) ? (
-          <div className="mt-2 space-y-1.5">
-            {availSizes.length > 0 ? (
-              <p className="font-sans text-[9px] leading-relaxed text-navy-300/90">
-                <span className="font-semibold uppercase tracking-[0.16em] text-gold-500/55">Sizes </span>
-                <span className="tracking-wide text-navy-200">{availSizes.join(' · ')}</span>
-              </p>
-            ) : null}
-            {availColors.length > 0 ? (
-              <p className="font-sans text-[9px] leading-relaxed text-navy-300/90">
-                <span className="font-semibold uppercase tracking-[0.16em] text-gold-500/55">Colours </span>
-                <span className="tracking-wide text-navy-200 capitalize">{availColors.join(' · ')}</span>
-              </p>
-            ) : null}
-          </div>
+          <p className="mt-1.5 truncate font-sans text-xs text-navy-200">
+            {availSizes.length > 0 ? `Sizes ${availSizes.join(', ')}` : null}
+            {availSizes.length > 0 && availColors.length > 1 ? ' · ' : null}
+            {availColors.length > 1 ? `${availColors.length} colours` : null}
+          </p>
         ) : null}
 
         <div className="mt-auto flex flex-col gap-1.5 pt-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2">
-              <span className="whitespace-nowrap text-sm font-medium tracking-wide text-gold-400">
+              <span className="whitespace-nowrap text-[15px] font-semibold tracking-wide text-gold-300">
                 KSh {Number(unitPrice || 0).toLocaleString()}
               </span>
               {hasMarkdown && (
-                <span className="whitespace-nowrap text-[10px] text-navy-300/60 line-through sm:text-xs">
+                <span className="whitespace-nowrap text-xs text-navy-200 line-through">
                   KSh {listPrice.toLocaleString()}
                 </span>
               )}
@@ -237,16 +249,14 @@ export default function ProductCard({
             <button
               type="button"
               onClick={handleWhatsAppOrder}
-              className="inline-flex shrink-0 items-center justify-center gap-1 rounded-full border border-green-500/70 bg-green-600/95 px-2.5 py-2 text-[8px] font-bold uppercase tracking-[0.12em] text-white transition-all hover:border-green-400 hover:bg-green-500 sm:gap-1.5 sm:px-3 sm:text-[9px] sm:tracking-[0.16em]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition-[background-color,transform] duration-150 hover:bg-[#1ebe5d] active:scale-90"
               aria-label={`Order ${product.name} via WhatsApp`}
             >
-              <MessageCircle size={13} strokeWidth={2} className="shrink-0" />
-              <span className="hidden xs:inline sm:inline">WhatsApp</span>
-              <span className="sm:hidden">Order</span>
+              <WhatsAppIcon size={22} className="shrink-0" />
             </button>
           </div>
           {bespokeLead ? (
-            <p className="font-sans text-[9px] font-medium tracking-[0.04em] text-gold-500/50">
+            <p className="font-sans text-xs text-gold-300/80">
               {bespokeLead}
             </p>
           ) : null}

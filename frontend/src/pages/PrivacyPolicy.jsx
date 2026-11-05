@@ -9,8 +9,8 @@ const PrivacyPolicy = () => {
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
       <SEO
-        title="Privacy Policy - Prince Esquire"
-        description="Read our privacy policy to understand how we protect your personal information."
+        title="Privacy Policy"
+        description="How Prince Esquire collects and protects your personal information when you shop with us."
         path="/privacy-policy"
       />
       <Navbar />

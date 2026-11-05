@@ -6,7 +6,7 @@ import { canonicalShopPath } from '../data/taxonomy';
  */
 const TILE = {
   'formal-shirts': {
-    name: 'Formal Shirts',
+    name: 'Official Shirts',
     image: '/models/categories/formal-shirts.jpg',
     alt: 'formal-shirts-to-fit-with-outfit-nairobi',
   },
@@ -21,7 +21,7 @@ const TILE = {
     alt: 'mens-shirts-category-prince-esquire',
   },
   'formal-shoes': {
-    name: 'Formal Shoes',
+    name: 'Official Shoes',
     image: '/models/categories/formal-shoes.jpg',
     alt: 'formal-shoes-to-finish-the-look',
   },

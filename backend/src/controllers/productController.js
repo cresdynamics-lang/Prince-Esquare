@@ -173,7 +173,13 @@ exports.getProducts = async (req, res, next) => {
         const offset = (page - 1) * limit;
         const categorySlug = normalizeCategoryParam(category);
         const subSlug = normalizeCategoryParam(sub);
-        const taxonomySlug = normalizeCategoryParam(taxonomy);
+        // Not normalizeCategoryParam: its old aliases turn "belts" into all of Accessories.
+        const taxonomySlug = String(taxonomy || '')
+            .trim()
+            .toLowerCase()
+            .replace(/&/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
 
         let query = `
             SELECT p.*, c.name as category_name, c.slug as category_slug,

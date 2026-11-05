@@ -1,17 +1,57 @@
 const { formatResponse } = require('../utils/responseFormatter');
 const db = require('../config/db');
+const { searchCatalog, matchCategories } = require('../services/searchEngine');
+const { canonicalShopPath, flattenTaxonomy, TAXONOMY_TREE } = require('../data/taxonomy');
 
-const PRODUCT_FIELDS = `
-  p.id, p.name, p.slug, p.price, p.discount_price, p.thumbnail,
-  p.stock_quantity, p.is_active, p.is_featured,
-  c.name AS category_name, b.name AS brand_name
-`;
+const CATALOG_TTL_MS = 60 * 1000;
+let catalogCache = { at: 0, promise: null };
 
-const BASE_FROM = `
-  FROM products p
-  LEFT JOIN categories c ON p.category_id = c.id
-  LEFT JOIN brands b ON p.brand_id = b.id
-`;
+/** Searchable catalogue + category counts, refreshed at most once a minute. */
+function loadSearchCatalog() {
+  if (catalogCache.promise && Date.now() - catalogCache.at < CATALOG_TTL_MS) {
+    return catalogCache.promise;
+  }
+  const promise = (async () => {
+    const result = await db.query(
+      `SELECT p.id, p.name, p.slug, p.price, p.discount_price, p.thumbnail, p.description,
+              p.stock_quantity, p.is_active, p.is_featured,
+              c.name AS category_name, c.slug AS category_slug,
+              parent.name AS parent_category_name, b.name AS brand_name
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN categories parent ON c.parent_id = parent.id
+       LEFT JOIN brands b ON p.brand_id = b.id
+       WHERE p.is_active = true
+         AND p.thumbnail IS NOT NULL
+         AND TRIM(p.thumbnail::text) <> ''`
+    );
+    const products = result.rows;
+    const counts = products.reduce((acc, p) => {
+      if (p.category_slug) acc[p.category_slug] = (acc[p.category_slug] || 0) + 1;
+      return acc;
+    }, {});
+    const flat = flattenTaxonomy(TAXONOMY_TREE);
+    const countFor = (slug) =>
+      (counts[slug] || 0) +
+      flat.filter((row) => row.parentSlug === slug).reduce((sum, row) => sum + countFor(row.slug), 0);
+    const categories = flat
+      .map((row) => ({
+        name: row.name,
+        slug: row.slug,
+        href: canonicalShopPath(row.slug),
+        count: countFor(row.slug),
+      }))
+      .filter((row) => row.count > 0);
+    return { products, categories };
+  })();
+  catalogCache = { at: Date.now(), promise };
+  promise.catch(() => {
+    catalogCache = { at: 0, promise: null };
+  });
+  return promise;
+}
+
+const stripForList = ({ description, ...product }) => product;
 
 function normalizeQuery(q) {
   return String(q || '').trim().slice(0, 120);
@@ -22,89 +62,6 @@ function searchTokens(q) {
     .toLowerCase()
     .split(/\s+/)
     .filter((t) => t.length >= 2);
-}
-
-async function fetchDirectMatches(q, limit = 8) {
-  const term = normalizeQuery(q);
-  if (!term) return [];
-
-  const like = `%${term}%`;
-  const prefix = `${term}%`;
-
-  const result = await db.query(
-    `SELECT ${PRODUCT_FIELDS}
-     ${BASE_FROM}
-     WHERE p.is_active = true
-       AND (
-         p.name ILIKE $1 OR p.slug ILIKE $1 OR COALESCE(p.description, '') ILIKE $1
-         OR COALESCE(b.name, '') ILIKE $1 OR COALESCE(c.name, '') ILIKE $1
-       )
-     ORDER BY
-       CASE WHEN p.name ILIKE $2 THEN 0 WHEN p.name ILIKE $1 THEN 1 ELSE 2 END,
-       p.is_featured DESC NULLS LAST,
-       p.name ASC
-     LIMIT $3`,
-    [like, prefix, limit]
-  );
-  return result.rows;
-}
-
-async function fetchRelatedMatches(q, excludeIds = [], limit = 6) {
-  const term = normalizeQuery(q);
-  if (!term) return [];
-
-  const tokens = searchTokens(q);
-  const terms = tokens.length > 0 ? tokens : [term];
-
-  const params = [];
-  const conditions = ['p.is_active = true'];
-
-  if (excludeIds.length > 0) {
-    params.push(excludeIds);
-    conditions.push(`p.id <> ALL($${params.length}::uuid[])`);
-  }
-
-  const tokenClauses = terms.map((token) => {
-    params.push(`%${token}%`);
-    const idx = params.length;
-    return `(
-      p.name ILIKE $${idx} OR COALESCE(p.description, '') ILIKE $${idx}
-      OR COALESCE(b.name, '') ILIKE $${idx} OR COALESCE(c.name, '') ILIKE $${idx}
-    )`;
-  });
-  conditions.push(`(${tokenClauses.join(' OR ')})`);
-
-  params.push(limit);
-  const result = await db.query(
-    `SELECT ${PRODUCT_FIELDS}
-     ${BASE_FROM}
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY p.is_featured DESC NULLS LAST, p.ratings_count DESC NULLS LAST, p.created_at DESC
-     LIMIT $${params.length}`,
-    params
-  );
-
-  if (result.rows.length > 0) return result.rows;
-
-  const catParams = excludeIds.length ? [excludeIds] : [];
-  catParams.push(`%${term}%`);
-  const catIdx = catParams.length;
-  const catExclude = excludeIds.length ? 'AND p.id <> ALL($1::uuid[])' : '';
-  const catResult = await db.query(
-    `SELECT ${PRODUCT_FIELDS}
-     ${BASE_FROM}
-     LEFT JOIN categories parent ON c.parent_id = parent.id
-     WHERE p.is_active = true ${catExclude}
-       AND (
-         c.name ILIKE $${catIdx} OR parent.name ILIKE $${catIdx}
-         OR c.slug ILIKE $${catIdx} OR parent.slug ILIKE $${catIdx}
-       )
-     ORDER BY p.is_featured DESC NULLS LAST, p.created_at DESC
-     LIMIT $${catIdx + 1}`,
-    [...catParams, limit]
-  );
-
-  return catResult.rows;
 }
 
 async function findInactiveMatch(q) {
@@ -120,7 +77,7 @@ async function findInactiveMatch(q) {
   return result.rows[0]?.name || null;
 }
 
-async function buildSearchResponse(q) {
+async function buildSearchResponse(q, limit = 8) {
   const query = normalizeQuery(q);
   if (!query) {
     return {
@@ -128,30 +85,40 @@ async function buildSearchResponse(q) {
       matchType: 'none',
       products: [],
       related: [],
+      categories: [],
+      total: 0,
+      correctedQuery: null,
       showRestockPrompt: false,
       message: null,
     };
   }
 
-  const products = await fetchDirectMatches(query);
-  if (products.length > 0) {
+  const { products, categories } = await loadSearchCatalog();
+  const hit = searchCatalog(query, products, { categories, limit });
+  const shared = {
+    query,
+    categories: matchCategories(hit.correctedQuery || query, categories),
+    total: hit.total,
+    correctedQuery: hit.correctedQuery,
+  };
+
+  if (hit.matchType === 'exact') {
     return {
-      query,
+      ...shared,
       matchType: 'exact',
-      products,
+      products: hit.products.map(stripForList),
       related: [],
       showRestockPrompt: false,
       message: null,
     };
   }
 
-  const related = await fetchRelatedMatches(query, [], 6);
-  if (related.length > 0) {
+  if (hit.matchType === 'related') {
     return {
-      query,
+      ...shared,
       matchType: 'related',
       products: [],
-      related,
+      related: hit.products.map(stripForList),
       showRestockPrompt: false,
       message: `No exact match for "${query}". Here are related items you might like.`,
     };
@@ -160,7 +127,7 @@ async function buildSearchResponse(q) {
   const inactiveName = await findInactiveMatch(query);
   const label = inactiveName || query;
   return {
-    query,
+    ...shared,
     matchType: 'none',
     products: [],
     related: [],
@@ -174,7 +141,8 @@ async function buildSearchResponse(q) {
 exports.search = async (req, res, next) => {
   try {
     const q = normalizeQuery(req.query.q || req.query.query);
-    const data = await buildSearchResponse(q);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 8, 1), 200);
+    const data = await buildSearchResponse(q, limit);
     formatResponse(res, 200, true, 'Search results fetched', data);
   } catch (error) {
     next(error);
@@ -188,7 +156,8 @@ exports.getSuggestions = async (req, res, next) => {
       return formatResponse(res, 200, true, 'Search suggestions fetched', { suggestions: [] });
     }
 
-    const products = await fetchDirectMatches(q, 6);
+    const catalog = await loadSearchCatalog();
+    const { products } = searchCatalog(q, catalog.products, { categories: catalog.categories, limit: 6 });
     const suggestions = products.map((p) => ({
       id: p.id,
       name: p.name,

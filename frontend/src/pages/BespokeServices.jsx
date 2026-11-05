@@ -44,8 +44,8 @@ const BespokeServices = () => {
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
       <SEO
-        title="Bespoke Services - Prince Esquire"
-        description="Experience luxury bespoke tailoring at Prince Esquire. Custom suits, shirts, and made-to-measure services."
+        title="Bespoke Tailoring in Nairobi | Prince Esquire"
+        description="Bespoke tailoring and personal styling from Prince Esquire: menswear made to your measure at Yala Towers, Nairobi."
         path="/bespoke-services"
       />
       <Navbar />

@@ -49,6 +49,7 @@ export const TAXONOMY_TREE = [
     children: [
       { name: 'Suits', slug: 'suit-sets', copy: 'Complete looks, ready for the day that matters.', tileImage: ph('suit-sets') },
       { name: 'Two-Piece', slug: 'two-piece', copy: 'Clean lines. Zero hesitation.', tileImage: ph('two-piece') },
+      { name: 'Wedding Suits', slug: 'wedding-suits', copy: 'The day you will see in photographs for the rest of your life.', tileImage: ph('two-piece') },
       { name: 'Three-Piece', slug: 'three-piece', copy: 'When the occasion asks for more — and you deliver.', tileImage: ph('three-piece') },
       { name: 'Blazers', slug: 'blazers', copy: 'Structure without the full suit. Authority that travels.', tileImage: ph('blazers'), crossSurfaces: ['jackets'] },
       { name: 'Waistcoats', slug: 'waistcoats', copy: 'The layer that finishes the story.', tileImage: ph('waistcoats'), crossSurfaces: ['jackets'] },
@@ -62,7 +63,8 @@ export const TAXONOMY_TREE = [
     tileImage: ph('shirts'),
     heroImage: ph('shirts-hero'),
     children: [
-      { name: 'Formal Shirts', slug: 'formal-shirts', copy: 'The collar that closes the room before you speak.', tileImage: ph('formal-shirts') },
+      { name: 'Official Shirts', slug: 'formal-shirts', copy: 'The collar that closes the room before you speak.', tileImage: ph('formal-shirts') },
+      { name: 'Presidential Shirts', slug: 'presidential-shirts', copy: 'The print that does the talking for you.', tileImage: ph('formal-shirts') },
       { name: 'Casual Shirts', slug: 'shirts-casual', copy: 'Ease that still reads as intention.', tileImage: ph('shirts-casual') },
       { name: 'Polo Shirts', slug: 'polo-t-shirts', copy: 'Weekend polish without trying too hard.', tileImage: ph('polo-t-shirts') },
       { name: 'T-Shirts', slug: 't-shirts', copy: 'The quiet layer under everything sharp.', tileImage: ph('t-shirts') },
@@ -92,8 +94,14 @@ export const TAXONOMY_TREE = [
     children: [
       { name: 'Full Jackets', slug: 'full-jackets', copy: 'The last layer they remember.', tileImage: ph('full-jackets') },
       { name: 'Half Jackets', slug: 'half-jackets', copy: 'Lighter weight. Same presence.', tileImage: ph('half-jackets') },
-      { name: 'Track Tops', slug: 'track-tops', copy: 'Off-duty polish that still photographs well.', tileImage: ph('track-tops') },
     ],
+  },
+  {
+    name: 'Tracksuits',
+    slug: 'tracksuits',
+    copy: 'Off-duty polish that still photographs well.',
+    tileImage: '/hero/tracksuits-800.webp',
+    children: [],
   },
   {
     name: 'Shoes',
@@ -102,7 +110,9 @@ export const TAXONOMY_TREE = [
     tileImage: ph('shoes'),
     heroImage: ph('shoes-hero'),
     children: [
-      { name: 'Formal', slug: 'formal-shoes', copy: 'The sound of the room going quiet.', tileImage: ph('formal-shoes') },
+      { name: 'Official Shoes', slug: 'formal-shoes', copy: 'The sound of the room going quiet.', tileImage: ph('formal-shoes') },
+      { name: 'Chelsea Boots', slug: 'chelsea-boots', copy: 'Clean lines from the ankle down.', tileImage: ph('formal-shoes') },
+      { name: 'Brogues', slug: 'brogues', copy: 'Detail you notice on the second look.', tileImage: ph('formal-shoes') },
       { name: 'Bespoke Formal', slug: 'bespoke-formal', copy: 'Built to your measure — made to order.', tileImage: ph('bespoke-formal') },
       { name: 'Loafers', slug: 'loafers', copy: 'Slip-on ease with evening-ready finish.', tileImage: ph('loafers') },
       { name: 'Casual', slug: 'casual', copy: 'Weekend footing without losing the line.', tileImage: ph('casual') },
@@ -151,13 +161,14 @@ export const TAXONOMY_TREE = [
 /** Legacy slugs → new taxonomy paths (for redirects / product remap) */
 export const LEGACY_SLUG_ALIASES = {
   'belts-ties': 'accessories',
-  'track-suits': 'track-tops',
+  'track-suits': 'tracksuits',
+  'track-tops': 'tracksuits',
   linen: 'linen-edit',
   'jackets-outerwear': 'jackets',
   boots: 'formal-shoes',
   sandals: 'casual',
   sweaters: 'half-jackets',
-  presidential: 'formal-shirts',
+  presidential: 'presidential-shirts',
   polos: 'polo-t-shirts',
   'knitted-polos': 'polo-t-shirts',
   'round-neck-t-shirts': 't-shirts',

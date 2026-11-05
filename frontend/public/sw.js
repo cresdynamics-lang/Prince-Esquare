@@ -2,8 +2,8 @@
  * Isolates image/static caching from API traffic so catalogue search,
  * contact, and checkout always hit the network (or their own axios cache).
  */
-const STATIC_CACHE = 'pe-static-v2';
-const IMAGE_CACHE = 'pe-images-v2';
+const STATIC_CACHE = 'pe-static-v3';
+const IMAGE_CACHE = 'pe-images-v3';
 const STATIC_ASSETS = ['/', '/index.html', '/LOGO.jpeg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

@@ -57,7 +57,7 @@ const start = async () => {
     }
     process.exit(1);
   });
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, '127.0.0.1', () => {
     logger.info({
       msg: 'Server started',
       port: PORT,

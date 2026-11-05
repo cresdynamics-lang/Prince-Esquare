@@ -120,8 +120,8 @@ const ProductDescription = ({
           <ul className="space-y-2 text-[14px] font-light leading-relaxed text-slate-300/90">
             {(deliveryLines.length ? deliveryLines : [
               'All orders are confirmed by our team before dispatch.',
-              'Nairobi CBD and surrounding areas may qualify for in house rider delivery.',
-              'Prepaid orders are shipped via your preferred courier nationwide.',
+              'Within Nairobi: same-day delivery, in just 1-2 hours.',
+              'Countrywide: delivery in 1-2 days.',
               'Fulfilment is subject to availability of your selected size and colour.',
             ]).map((line) => (
               <li key={line} className="flex gap-2">
@@ -174,8 +174,8 @@ const ProductDescription = ({
               Do you deliver outside Nairobi?
             </h4>
             <p>
-              Yes. Nairobi may use rider delivery; prepaid orders ship nationwide via courier after
-              confirmation.
+              Yes. Delivery within Nairobi is same day, in just 1-2 hours, and countrywide delivery
+              takes 1-2 days after confirmation.
             </p>
           </div>
         </div>

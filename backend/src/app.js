@@ -10,6 +10,11 @@ const app = express();
 // Nginx / reverse proxy sets X-Forwarded-For — required for correct rate limiting
 app.set('trust proxy', 1);
 
+// Server-rendered storefront HTML (nginx routes page requests here). Mounted before
+// helmet: this is the SPA document itself, and the API's strict CSP would block the
+// storefront's own scripts, fonts and analytics.
+app.get('/ssr-html', require('./controllers/seoController').renderPage);
+
 // Middleware — allow Cloudinary product images for Meta/IG crawlers & shop embeds
 app.use(
   helmet({

@@ -4,6 +4,8 @@ import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import HomeHero from '../components/home/HomeHero';
 import HomeCategoryRail from '../components/home/HomeCategoryRail';
+import HomeCategoryTabs from '../components/home/HomeCategoryTabs';
+import DeliveryVisitStrip from '../components/category/DeliveryVisitStrip';
 import HomeProductRail from '../components/home/HomeProductRail';
 import HomeEditorial from '../components/home/HomeEditorial';
 import HomeBespokeStrip from '../components/home/HomeBespokeStrip';
@@ -12,6 +14,20 @@ import HomeSignupBand from '../components/home/HomeSignupBand';
 import { productAPI } from '../services/api';
 import { HOME_LINEN_BANNER, HOME_GIFT_BANNER } from '../data/homepageContent';
 import { localBusinessSchema, organizationSchema, routeSeo, websiteSchema } from '../seo/seoData';
+
+/** Keeps one category from filling the row, then tops up if there are too few others. */
+function mixedByCategory(products, size, perCategory = 2) {
+  const used = {};
+  const picked = [];
+  for (const product of products) {
+    const key = product.category_slug || 'other';
+    if ((used[key] || 0) >= perCategory) continue;
+    used[key] = (used[key] || 0) + 1;
+    picked.push(product);
+    if (picked.length === size) return picked;
+  }
+  return [...picked, ...products.filter((p) => !picked.includes(p))].slice(0, size);
+}
 
 const Home = () => {
   const [newArrivals, setNewArrivals] = useState([]);
@@ -26,12 +42,12 @@ const Home = () => {
 
     setLoadingNew(true);
     productAPI
-      .newArrivals({ limit: 8 })
+      .newArrivals({ limit: 24 })
       .then((res) => {
         if (!cancelled) {
           const payload = res.data?.data;
           const list = Array.isArray(payload) ? payload : payload?.products || [];
-          setNewArrivals(list.slice(0, 8));
+          setNewArrivals(mixedByCategory(list, 8));
         }
       })
       .catch(() => {
@@ -94,6 +110,8 @@ const Home = () => {
       <main>
         <HomeHero />
         <HomeCategoryRail />
+        <DeliveryVisitStrip />
+        <HomeCategoryTabs />
         <HomeProductRail
           id="home-new-arrivals"
           eyebrow="This Week's Arrivals"

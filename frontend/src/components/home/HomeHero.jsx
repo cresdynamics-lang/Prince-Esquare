@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -6,12 +6,23 @@ import { BRAND_TAGLINE, HOME_HERO } from '../../data/homepageContent';
 
 /**
  * Full-bleed hero with a short scroll-reveal portrait.
- * Keep the pin short on mobile so the page feels responsive;
- * desktop gets a slightly longer reveal without locking the scroll.
+ * Phones and tablets scroll straight away with no pin: a pinned hero looks frozen under the
+ * first swipe, because the page stays put while only the photo moves inside it.
  */
+const PIN_QUERY = '(min-width: 1024px)';
+const PHONE_OBJECT_POSITION = '58% 0%';
+
 export default function HomeHero() {
   const hero = HOME_HERO;
   const sectionRef = useRef(null);
+  const [pinned, setPinned] = useState(() => window.matchMedia(PIN_QUERY).matches);
+
+  useEffect(() => {
+    const query = window.matchMedia(PIN_QUERY);
+    const onChange = (e) => setPinned(e.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -36,22 +47,22 @@ export default function HomeHero() {
   return (
     <section
       ref={sectionRef}
-      className="relative h-[130vh] bg-navy-950 sm:h-[145vh] md:h-[155vh]"
+      className="relative h-[100svh] bg-navy-950 lg:h-[155vh]"
     >
-      <div className="sticky top-0 h-[100svh] overflow-hidden md:h-screen">
+      <div className="relative h-[100svh] overflow-hidden lg:sticky lg:top-0 lg:h-screen">
         <div className="absolute inset-0" aria-hidden="true">
           <motion.img
             src={hero.image}
             srcSet={`${hero.imageSm} 800w, ${hero.image} 1600w`}
             sizes="100vw"
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-top will-change-[object-position] md:object-[58%_top]"
-            style={{ objectPosition }}
+            className="absolute inset-0 h-full w-full object-cover object-top md:object-[58%_top]"
+            style={{ objectPosition: pinned ? objectPosition : PHONE_OBJECT_POSITION }}
             decoding="async"
             loading="eager"
             fetchPriority="high"
           />
-          <motion.div className="absolute inset-0" style={{ opacity: scrimOpacity }}>
+          <motion.div className="absolute inset-0" style={pinned ? { opacity: scrimOpacity } : undefined}>
             <div className="absolute inset-0 bg-gradient-to-r from-navy-950/88 via-navy-950/40 to-transparent md:from-navy-950/80 md:via-navy-950/25" />
             <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/25 to-navy-950/20 md:from-navy-950/75 md:via-transparent md:to-navy-950/25" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_18%_30%,rgba(201,162,39,0.12),transparent_50%)]" />
@@ -59,7 +70,7 @@ export default function HomeHero() {
         </div>
 
         <motion.div
-          style={{ opacity: copyOpacity, y: copyY }}
+          style={pinned ? { opacity: copyOpacity, y: copyY } : undefined}
           className="relative z-10 flex h-full flex-col justify-end px-5 pb-16 pt-28 sm:px-6 sm:pb-20 md:justify-center md:pb-24 md:pt-36"
         >
           <div className="container mx-auto">

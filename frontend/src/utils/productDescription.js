@@ -207,7 +207,7 @@ export const buildRichDescription = (product, variantMeta = {}, parentCategoryNa
   const sizeLines = parsed.sizes.length ? parsed.sizes : [sizeLine];
 
   const deliveryNote = [
-    'Orders are confirmed by our team before dispatch. Nairobi CBD and surrounding areas may qualify for in house rider delivery. Prepaid orders ship via your preferred courier. Fulfilment depends on size and color availability at time of confirmation.',
+    'Orders are confirmed by our team before dispatch. Delivery within Nairobi is same day, in just 1-2 hours, and countrywide delivery takes 1-2 days. Fulfilment depends on size and color availability at time of confirmation.',
   ];
 
   const blocks = [

@@ -20,6 +20,15 @@ export default function HomeBespokeStrip({ leadDays } = {}) {
             'radial-gradient(ellipse at 20% 50%, rgba(197,138,61,0.12), transparent 50%), radial-gradient(ellipse at 80% 30%, rgba(197,138,61,0.06), transparent 45%)',
         }}
       />
+      <img
+        src="/hero/shoe-atelier-1600.webp"
+        srcSet="/hero/shoe-atelier-800.webp 800w, /hero/shoe-atelier-1600.webp 1600w"
+        sizes="100vw"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25"
+      />
       <div className="container relative z-10 mx-auto max-w-3xl px-5 text-center sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}

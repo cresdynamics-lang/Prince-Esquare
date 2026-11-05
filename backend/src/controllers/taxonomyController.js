@@ -7,6 +7,7 @@ const {
   LEGACY_SLUG_ALIASES,
   findTaxonBySlug,
   flattenTaxonomy,
+  canonicalShopPath,
 } = require('../data/taxonomy');
 
 /** Allowed child slugs per parent from locked config (hides legacy orphans in nav) */
@@ -24,6 +25,10 @@ function allowedChildrenMap() {
   walk(TAXONOMY_TREE);
   return map;
 }
+
+const { loadCategoryStats, statsForSlug, relatedPosts } = require('../seo/pageData');
+const { GUIDES } = require('../seo/categoryGuides');
+const { buildCategorySeo } = require('../seo/categorySeo');
 
 const ALLOWED_CHILDREN = allowedChildrenMap();
 const NAV_SLUGS = new Set(flattenTaxonomy(TAXONOMY_TREE).map((r) => r.slug));
@@ -97,7 +102,15 @@ exports.getTaxonomy = async (req, res, next) => {
   try {
     const { rows } = await loadCategoryMap();
     const primaries = rows.filter((r) => r.is_nav_primary);
-    const tree = primaries.length ? buildNavTree(rows) : TAXONOMY_TREE;
+    const baseTree = primaries.length ? buildNavTree(rows) : TAXONOMY_TREE;
+    const stats = await loadCategoryStats().catch(() => null);
+    const withCounts = (nodes) =>
+      nodes.map((node) => ({
+        ...node,
+        ...(stats ? { productCount: statsForSlug(stats, node.slug).count } : {}),
+        children: withCounts(node.children || []),
+      }));
+    const tree = withCounts(baseTree);
 
     formatResponse(res, 200, true, 'Taxonomy fetched', {
       version: TAXONOMY_VERSION,
@@ -139,6 +152,12 @@ exports.getTaxonomyLanding = async (req, res, next) => {
       });
     }
 
+    const stats = await loadCategoryStats().catch(() => null);
+    const withCount = (child) =>
+      stats ? { ...child, productCount: statsForSlug(stats, child.slug).count } : child;
+    const seo = buildCategorySeo(cat, stats ? statsForSlug(stats, cat.slug) : {});
+    seo.relatedPosts = await relatedPosts(cat.slug, GUIDES[cat.slug]?.keywords).catch(() => []);
+
     const allowed = ALLOWED_CHILDREN[cat.slug];
     let children = rows
       .filter((r) => r.parent_id === cat.id)
@@ -170,13 +189,14 @@ exports.getTaxonomyLanding = async (req, res, next) => {
       walkCat = walkCat.parent_id ? byId[walkCat.parent_id] : null;
     }
     for (const c of chain) {
-      breadcrumbs.push({ name: c.name, href: `/shop/${c.slug}`, slug: c.slug });
+      breadcrumbs.push({ name: c.name, href: canonicalShopPath(c.slug), slug: c.slug });
     }
 
     formatResponse(res, 200, true, 'Taxonomy landing fetched', {
       category: mapCategoryRow(cat),
-      children,
+      children: children.map(withCount),
       breadcrumbs,
+      seo,
     });
   } catch (error) {
     next(error);

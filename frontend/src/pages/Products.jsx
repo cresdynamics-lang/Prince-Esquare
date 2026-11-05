@@ -5,19 +5,21 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ProductCard from '../components/ProductCard';
-import { productAPI } from '../services/api';
+import SEO from '../components/SEO';
+import { productAPI, searchAPI } from '../services/api';
+import { organizationSchema, routeSeo } from '../seo/seoData';
 
 /** Labels for page title only — navigation lives in the menu. */
 const CATEGORY_LABELS = {
   'polo-t-shirts': 'Polo T-shirts',
   shoes: 'Shoes',
-  'formal-shoes': 'Formal Shoes',
+  'formal-shoes': 'Official Shoes',
   casual: 'Casual Shoes',
   boots: 'Boots',
   sandals: 'Sandals',
   loafers: 'Loafers',
   shirts: 'Shirts',
-  'formal-shirts': 'Formal Shirts',
+  'formal-shirts': 'Official Shirts',
   'shirts-casual': 'Casual Shirts',
   presidential: 'Presidential Shirts',
   suits: 'Suits',
@@ -73,13 +75,16 @@ const Products = () => {
   const { pathname } = useLocation();
   const currentCategory = searchParams.get('category') || PATH_CATEGORY[pathname] || 'All';
   const currentSub = searchParams.get('sub') || 'All';
+  const siteSearch = (searchParams.get('search') || searchParams.get('q') || '').trim();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMeta, setSearchMeta] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const pageTitle =
-    labelFor(currentSub !== 'All' ? currentSub : currentCategory) || 'The Collection';
+    (siteSearch ? `Results for “${siteSearch}”` : labelFor(currentSub !== 'All' ? currentSub : currentCategory)) ||
+    "All Men's Clothing and Shoes";
   const pageEyebrow =
     currentCategory !== 'All' || currentSub !== 'All'
       ? 'Browse collection'
@@ -89,7 +94,16 @@ const Products = () => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setSearchMeta(null);
       try {
+        if (siteSearch) {
+          const res = await searchAPI.search(siteSearch, 200);
+          if (cancelled) return;
+          const data = res.data?.data || {};
+          setSearchMeta(data);
+          setProducts((data.matchType === 'exact' ? data.products : data.related) || []);
+          return;
+        }
         const params = { limit: 200, page: 1, sort: 'updated' };
         if (currentCategory !== 'All') params.category = currentCategory;
         if (currentSub !== 'All') params.sub = currentSub;
@@ -110,7 +124,7 @@ const Products = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentCategory, currentSub]);
+  }, [currentCategory, currentSub, siteSearch]);
 
   const filteredProducts = products.filter((product) => {
     const q = searchQuery.toLowerCase();
@@ -131,19 +145,30 @@ const Products = () => {
 
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
+      <SEO
+        title={siteSearch ? `Search results for ${siteSearch}` : routeSeo.products.title}
+        description={routeSeo.products.description}
+        path="/products"
+        noindex={Boolean(siteSearch || currentCategory !== 'All' || currentSub !== 'All')}
+        schema={[organizationSchema]}
+      />
       <Navbar />
 
-      <section className="pt-32 pb-10 md:pb-12 bg-navy-950 border-b border-gold-600/5">
+      <section className="pt-36 pb-10 lg:pt-44 md:pb-12 bg-navy-950 border-b border-gold-600/5">
         <div className="container mx-auto px-6">
           <div className="space-y-4 max-w-3xl">
-            <span className="text-gold-500 text-[10px] uppercase tracking-[0.4em] font-bold font-sans">
-              {pageEyebrow}
+            <span className="text-gold-300 text-[11px] uppercase tracking-[0.3em] font-semibold font-sans">
+              {siteSearch ? 'Search' : pageEyebrow}
             </span>
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-serif text-white tracking-tight">
               {pageTitle}
             </h1>
             <p className="text-sm text-navy-200/80 font-light font-sans max-w-md">
-              Newest first. Switch collections anytime from the menu.
+              {siteSearch && searchMeta?.correctedQuery
+                ? `Showing results for “${searchMeta.correctedQuery}”.`
+                : siteSearch && searchMeta?.matchType === 'related'
+                  ? 'No exact match, so here are the closest pieces.'
+                  : 'Newest first. Use the menu to shop a specific collection.'}
             </p>
           </div>
         </div>
@@ -152,7 +177,7 @@ const Products = () => {
       <main className="py-12 md:py-16">
         <div className="container mx-auto px-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-10 md:mb-12 border-b border-gold-600/10 pb-8">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-gold-500/50 font-sans">
+            <p className="text-sm text-navy-100 font-sans">
               {loading
                 ? 'Loading…'
                 : `${filteredProducts.length} item${filteredProducts.length === 1 ? '' : 's'}`}
@@ -164,8 +189,8 @@ const Products = () => {
               />
               <input
                 type="text"
-                placeholder="Search this collection…"
-                className="w-full pl-12 pr-4 py-3.5 bg-navy-950 border border-gold-600/10 text-[10px] uppercase tracking-widest text-white focus:border-gold-600 outline-none transition-all placeholder:text-gold-600/20 font-sans"
+                placeholder="Filter these results…"
+                className="w-full pl-12 pr-4 py-3.5 bg-navy-950 border border-gold-600/10 text-sm text-white focus:border-gold-400 outline-none transition-all placeholder:text-navy-300 font-sans"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -186,8 +211,8 @@ const Products = () => {
             </div>
           ) : (
             <div className="py-32 text-center space-y-6">
-              <p className="text-gold-600/30 text-[10px] uppercase tracking-widest font-bold font-sans">
-                No products in this section yet.
+              <p className="text-navy-100 text-base font-sans">
+                {siteSearch ? `Nothing matched “${siteSearch}”. Try a broader word, like suit or shoes.` : 'No products in this section yet.'}
               </p>
               <Link
                 to="/products"

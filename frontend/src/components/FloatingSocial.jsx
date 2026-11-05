@@ -82,7 +82,7 @@ export default function FloatingSocial() {
   return (
     <nav
       aria-label="Social media"
-      className="pointer-events-none fixed bottom-6 left-3 z-40 flex flex-col items-center gap-2.5 sm:left-5 sm:bottom-7 md:left-6"
+      className="pointer-events-none fixed bottom-7 left-6 z-40 hidden flex-col items-center gap-2.5 xl:flex"
     >
       {LINKS.map(({ name, href, Icon }) => (
         <a

@@ -36,8 +36,8 @@ const SizeGuide = () => {
   return (
     <div className="bg-navy-950 min-h-screen font-serif">
       <SEO
-        title="Size Guide - Prince Esquire"
-        description="Find your perfect fit with our comprehensive size guide for shirts, shoes, and trousers."
+        title="Men's Size Guide: Shirts, Suits & Shoes | Prince Esquire"
+        description="Find your fit with the Prince Esquire size guide for shirts, suits, trousers and shoes before you order."
         path="/size-guide"
       />
       <Navbar />
